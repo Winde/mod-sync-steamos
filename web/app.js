@@ -306,20 +306,23 @@
   function renderProgress(job, pack) {
     const p = pack || selectedPack();
     const failed = job.status === "error";
+    const verifying = job.phase === "verify";
     const percent = job.bytesTotal ? pct(job.bytesDone, job.bytesTotal) : pct(job.done, job.total);
-    const rate = failed ? { speed: 0, eta: null } : rateInfo(job);
-    const line = job.phase === "launcher"
-      ? "Writing launcher, shortcut, and Steam art..."
-      : (job.log && job.log[job.log.length - 1]) || job.phase || "Working";
+    const rate = failed || verifying ? { speed: 0, eta: null } : rateInfo(job);
+    const line = verifying
+      ? "Checking files already on the TV..."
+      : job.phase === "launcher"
+        ? "Writing launcher, shortcut, and Steam art..."
+        : (job.log && job.log[job.log.length - 1]) || job.phase || "Working";
     const status = failed
       ? `${esc(job.error || "Unknown error")}`
       : `${fmtBytes(job.bytesDone)} of ${fmtBytes(job.bytesTotal)} · ${job.done || 0}/${job.total || 0} files`;
-    const speed = !failed && job.status === "running"
+    const speed = !failed && !verifying && job.status === "running"
       ? `<div class="meta">${rate.speed > 0 ? `${fmtBytes(rate.speed)}/s · ${fmtDuration(rate.eta)} left` : "Measuring speed..."}</div>`
       : "";
     main.innerHTML = `
       <section class="progresswrap">
-        <div class="kicker">${failed ? "INSTALL FAILED" : "INSTALLING"}</div>
+        <div class="kicker">${failed ? "INSTALL FAILED" : verifying ? "CHECKING" : "INSTALLING"}</div>
         <h1>${failed ? "Something went wrong" : `${esc(p ? p.name : "Pack")}`}</h1>
         <div class="progress">
           <div class="big">${failed ? "ERROR" : percent + "%"}</div>

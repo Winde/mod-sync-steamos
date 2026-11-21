@@ -104,6 +104,41 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   let done = 0;
   let bytesDone = 0;
   let lastReport = 0;
+  const counted = new Map();
+  const setCounted = (file, n) => {
+    const prev = counted.get(file.source) || 0;
+    const next = Math.max(0, Math.min(file.size, n));
+    if (next === prev) return;
+    counted.set(file.source, next);
+    bytesDone += next - prev;
+  };
+  const pathFor = (file) => {
+    const isPayload = file.target.startsWith(payloadPrefix);
+    return isPayload
+      ? path.join(staging, file.target.slice(payloadPrefix.length))
+      : safeJoin(packRoot, file.target);
+  };
+
+  // Resume baseline: count what is already on disk so the bar starts where the
+  // previous run stopped instead of at 0%.
+  for (const file of files) {
+    const target = pathFor(file);
+    let have = 0;
+    try {
+      if (fs.statSync(target).isFile() && fs.statSync(target).size === file.size) {
+        have = file.size;
+      } else {
+        const part = `${target}.part`;
+        if (fs.existsSync(part)) have = Math.min(fs.statSync(part).size, file.size);
+      }
+    } catch { /* not present */ }
+    if (have > 0) setCounted(file, have);
+  }
+  if (bytesDone > 0) {
+    progress({ phase: "verify", done, total: files.length, bytesDone, bytesTotal: totalBytes });
+    log(`Resume: ${formatBytes(bytesDone)} already on disk; verifying.`);
+  }
+
   const report = (file) => {
     const now = Date.now();
     if (now - lastReport > 750 || done === files.length) {
@@ -124,10 +159,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
 
   await mapLimit(files, 6, async (file) => {
     if (signal?.aborted) throw abortError();
-    const isPayload = file.target.startsWith(payloadPrefix);
-    const target = isPayload
-      ? path.join(staging, file.target.slice(payloadPrefix.length))
-      : safeJoin(packRoot, file.target);
+    const target = pathFor(file);
     ensureDir(path.dirname(target));
     const tmp = `${target}.part`;
     const url = `${remoteBase}/api/packs/${encodeURIComponent(pack.id)}/file?path=${encodeURIComponent(file.source)}`;
@@ -137,12 +169,13 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
       try {
         if ((await sha256File(target)) === file.sha256) {
           done++;
-          bytesDone += file.size;
+          setCounted(file, file.size);
           report(file.target);
           return;
         }
       } catch { }
       fs.rmSync(target, { force: true });
+      setCounted(file, 0);
     }
 
     let lastError = null;
@@ -153,6 +186,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
         const hash = await sha256File(tmp);
         if (hash !== file.sha256) {
           fs.rmSync(tmp, { force: true });
+          setCounted(file, 0);
           throw new Error("hash mismatch");
         }
         if (fs.existsSync(target)) fs.rmSync(target, { force: true });
@@ -169,7 +203,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
     }
     if (lastError) throw lastError;
     done++;
-    bytesDone += file.size;
+    setCounted(file, file.size);
     report(file.target);
   });
 
