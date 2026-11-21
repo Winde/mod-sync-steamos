@@ -4,11 +4,16 @@
   "private": true,
   "description": "Reusable mod-pack deployment for Windows and SteamOS. Mods only in v1.",
   "type": "commonjs",
+  "main": "electron/main.js",
   "bin": {
     "modsync": "bin/modsync.js"
   },
   "scripts": {
     "start": "node bin/modsync.js",
+    "electron": "electron .",
+    "dev": "electron . --devtools",
+    "build:linux": "electron-builder --linux AppImage",
+    "build:dir": "electron-builder --dir",
     "test": "node --test",
     "e2e": "node scripts/e2e-factory.js",
     "verify-install": "node scripts/e2e-factory.js --verify-only"
@@ -18,5 +23,9 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "electron": "^45.3.4",
+    "electron-builder": "^26.18.0"
   }
 }

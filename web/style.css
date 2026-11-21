@@ -25,11 +25,9 @@ body { font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; overflow: 
 }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 2vw; }
 .brand { display: flex; align-items: center; gap: .7vw; }
-.mark {
+.appicon {
   width: clamp(30px, 2.6vw, 48px); height: clamp(30px, 2.6vw, 48px);
-  border-radius: .55vw; background: linear-gradient(135deg,#c0392b,#6b1414);
-  display: grid; place-items: center; font-weight: 850;
-  font-size: clamp(11px, 1vw, 18px); letter-spacing: .04em;
+  border-radius: .55vw; flex: 0 0 auto;
 }
 .word { font-weight: 780; letter-spacing: .12em; font-size: clamp(13px, 1.35vw, 26px); }
 .chip {

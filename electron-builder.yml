@@ -1,0 +1,39 @@
+appId: tv.modsync.linux
+productName: ModSync
+copyright: ModSync
+artifactName: ModSync-${version}-${arch}.${ext}
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - electron/**
+  - src/**
+  - web/**
+  - templates/**
+  - package.json
+
+extraFiles:
+  - from: LICENSE
+    to: LICENSE
+  - from: THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.md
+  - from: licenses
+    to: licenses
+
+asar: true
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  executableName: modsync
+  synopsis: Mod pack sync for SteamOS
+  description: Install, update, roll back, and launch mod packs on a Steam Machine.
+  desktop:
+    entry:
+      Name: ModSync
+      Comment: Mod pack sync for SteamOS
+      Categories: Utility;Game;
+      Keywords: mods;steamos;steam;pack;
