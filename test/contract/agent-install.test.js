@@ -89,7 +89,7 @@ async function install(agent) {
   return job;
 }
 
-test("state reports the pack, game, and passing preconditions", { timeout: 60000 }, async (t) => {
+test("state reports the pack and passing preconditions", { timeout: 60000 }, async (t) => {
   const { agent } = await startTv(t);
 
   const res = await request(agent.base, "/api/state");
@@ -115,8 +115,6 @@ test("state reports the pack, game, and passing preconditions", { timeout: 60000
     assert.equal(checks[type].blocked, false);
   }
   assert.equal(checks["proton-prefix"].status, "pass");
-  assert.equal(state.game.title, "ELDEN RING");
-  assert.equal(state.game.running, false);
 });
 
 test("install writes the complete TV contract", { timeout: 60000 }, async (t) => {

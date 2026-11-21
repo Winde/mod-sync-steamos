@@ -170,23 +170,9 @@ interface AgentPackState extends AgentPackInput, LocalInfo {
   local: boolean;
 }
 
-interface GameState {
-  title?: string;
-  expectedBuild: string | null;
-  path: string | null;
-  build: string | null;
-  mode: string | null;
-  variant: Variant;
-  supported: boolean;
-  prefixReady: boolean | null;
-  running: boolean;
-  ok: boolean;
-}
-
 interface AgentState {
   agent: { version: string; root: string; port: number };
   pc: { url: string; online: boolean; error: string | null };
-  game: GameState | null;
   packs: AgentPackState[];
   diskFreeBytes: number | null;
   job: JobSummary | null;
@@ -302,27 +288,6 @@ export function createAgent(config: AgentConfig): Agent {
     };
   }
 
-  async function gameState(pack: AgentPackInput | null | undefined): Promise<GameState | null> {
-    if (!pack) return null;
-    const g = steam.findGame(pack.game);
-    const target = paths.resolve(pack as unknown as Pack, g);
-    return {
-      title: pack.game.title,
-      expectedBuild: pack.game.build || null,
-      path: g ? g.root : null,
-      build: g ? g.build || null : null,
-      mode: g ? g.mode || null : null,
-      variant: target.variant,
-      supported: target.supported,
-      prefixReady: g ? g.prefixReady ?? null : null,
-      running: util.isGameRunning(target.processes),
-      ok: !!g
-        && (!pack.game.build || g.build === String(pack.game.build))
-        && target.supported
-        && (target.variant !== "linux-proton" || !pack.game.prefix || !!g.prefixReady),
-    };
-  }
-
   async function state(): Promise<AgentState> {
     const remote = await fetchRemote();
     const confirmed = readConfirmations();
@@ -361,11 +326,9 @@ export function createAgent(config: AgentConfig): Agent {
       const game = String(a.game?.title || "").localeCompare(String(b.game?.title || ""));
       return game || String(a.name || "").localeCompare(String(b.name || ""));
     });
-    const first = packs[0];
     return {
       agent: { version: "0.1.0", root, port },
       pc: { url: pcUrl, online: !remote.error && !!pcUrl, error: remote.error || null },
-      game: await gameState(first),
       packs,
       diskFreeBytes: util.freeBytes(root),
       job: activeJob ? jobSummary(activeJob) : (lastJob ? jobSummary(lastJob) : null),
