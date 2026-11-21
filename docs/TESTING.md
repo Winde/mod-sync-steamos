@@ -46,7 +46,7 @@ cd D:\source\mod-sync-steamos
 New-Item -ItemType Directory -Force state\manual | Out-Null
 @'
 {"pcUrl":"http://<PC-LAN-IP>:8787","token":"test123","root":"D:\\source\\mod-sync-steamos\\state\\manual-tv","port":8788}
-'@ | Set-Content state\manual\agent.json -Encoding utf8
+'@ | Set-Content state\manual\agent.json -Encoding ascii
 
 node bin/modsync.js agent --config state\manual\agent.json
 ```

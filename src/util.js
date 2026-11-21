@@ -12,7 +12,8 @@ function ensureDir(p) {
 }
 
 function readJson(p) {
-  return JSON.parse(fs.readFileSync(p, "utf8"));
+  const text = fs.readFileSync(p, "utf8").replace(/^\uFEFF/, "");
+  return JSON.parse(text);
 }
 
 function writeJson(p, value) {

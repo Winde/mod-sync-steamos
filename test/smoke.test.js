@@ -1,8 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { validatePack, validateFiles } = require("../src/manifest");
-const { safeJoin, formatBytes } = require("../src/util");
+const { safeJoin, formatBytes, readJson } = require("../src/util");
 const { compareVersions } = require("../src/installer");
 const { shortcutId } = require("../src/steam");
 const { parseRange } = require("../src/server");
@@ -59,4 +61,12 @@ test("HTTP Range parsing supports resume", () => {
   assert.deepEqual(parseRange("bytes=1000-", 1000), { invalid: true });
   assert.deepEqual(parseRange("chunks=1-2", 1000), { invalid: true });
   assert.equal(parseRange(null, 1000), null);
+});
+
+test("readJson tolerates a UTF-8 BOM", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-bom-"));
+  const file = path.join(dir, "agent.json");
+  fs.writeFileSync(file, "\uFEFF{\"token\":\"ok\"}", "utf8");
+  assert.equal(readJson(file).token, "ok");
+  fs.rmSync(dir, { recursive: true, force: true });
 });
