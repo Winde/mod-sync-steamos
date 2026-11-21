@@ -7,5 +7,9 @@ logs/
 *.tar.gz
 tools/node-linux/
 
-# Generated packs are NEVER committed. They contain multi-GB payloads.
-packs/*
+# Generated packs: commit only the definition JSON, never the mod payload.
+packs/*/payload/
+packs/*/tools/
+packs/*/profiles/
+packs/*/art/
+packs/*/README.md

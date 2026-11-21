@@ -1,13 +1,21 @@
 #!/bin/sh
-# Refuse to commit generated packs or very large files.
+# Refuse to commit generated pack payloads or very large files.
+# Allowed under packs/: <pack>/pack.json and <pack>/files.json only.
 set -e
 
 staged=$(git diff --cached --name-only --diff-filter=ACM)
 
-bad=$(printf '%s\n' "$staged" | grep -E '^packs/' || true)
-if [ -n "$bad" ]; then
-  echo "Refusing to commit generated packs:"
-  printf '%s\n' "$bad"
+payload=$(printf '%s\n' "$staged" | grep -E '^packs/[^/]+/(payload|tools|profiles|art)/' || true)
+if [ -n "$payload" ]; then
+  echo "Refusing to commit generated pack files:"
+  printf '%s\n' "$payload"
+  exit 1
+fi
+
+other=$(printf '%s\n' "$staged" | grep -E '^packs/' | grep -Ev '^packs/[^/]+/(pack\.json|files\.json)$' || true)
+if [ -n "$other" ]; then
+  echo "Only pack.json and files.json may be committed under packs/:"
+  printf '%s\n' "$other"
   exit 1
 fi
 
