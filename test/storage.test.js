@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { computeStorage, clearStorage } = require("../src/storage");
+const { computeStorage, clearStorage, planClear } = require("../src/storage");
 
 function setup() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-storage-"));
@@ -60,6 +60,17 @@ test("remove old versions keeps the current version and its profile", () => {
   assert.ok(fs.existsSync(path.join(versions, "2")));
   assert.equal(fs.existsSync(path.join(packRoot, "profiles", "demo-1.me3")), false);
   assert.ok(fs.existsSync(path.join(packRoot, "profiles", "demo-2.me3")));
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("planClear reports the plan without changing anything", () => {
+  const { root, packRoot } = setup();
+  const before = computeStorage(root).packs[0].totalBytes;
+  const plan = planClear(root, { packId: "demo", scope: "pack" });
+  assert.equal(plan.ok, true);
+  assert.ok(plan.actions.length > 0);
+  assert.equal(fs.existsSync(packRoot), true);
+  assert.equal(computeStorage(root).packs[0].totalBytes, before);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

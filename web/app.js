@@ -487,8 +487,6 @@
     const p = (S.data?.packs || []).find((x) => x.id === S.download.packId) || selectedPack();
     if (!p) { S.download = null; return renderHome(); }
     const free = S.data?.diskFreeBytes;
-    const need = (p.totalBytes || 0) + 1024 * 1024 * 1024;
-    const low = free != null && free < need;
     const resume = !!p.staging;
     const update = !!(p.installed && p.installedVersion && p.installedVersion !== p.mod.version);
     const blocker = firstBlocker(p);
@@ -506,11 +504,11 @@
       ${update ? `<div class="row"><span>${labels.current}</span><b>${esc(p.installedVersion)}</b></div>` : ""}
       <div class="row"><span>${labels.freeOnTv}</span><b>${free == null ? labels.unknown : gb(free) + " GB"}</b></div>
       <div class="row"><span>${labels.kept}</span><b>${labels.keptValue}</b></div>
-      ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}</div>` : low ? `<div class="callout error">${labels.notEnoughSpace(gb(need))}</div>` : ""}
+      ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}</div>` : ""}
       ${notes.length ? `<p style="margin-top:2vh"><b>${labels.beforeInstall}</b></p>${renderNotes(p)}` : ""}
       ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>${labels.checks}</b></p>${renderChecks(p, true)}` : ""}
       <div class="actions">
-        <button class="btn primary" data-action="start-download" data-pack="${esc(p.id)}" ${low || blocker ? "disabled" : ""} data-autofocus data-focusable data-key="start">${resume ? labels.resumeDownload : update ? labels.downloadUpdate : labels.startDownload}</button>
+        <button class="btn primary" data-action="start-download" data-pack="${esc(p.id)}" ${blocker ? "disabled" : ""} data-autofocus data-focusable data-key="start">${resume ? labels.resumeDownload : update ? labels.downloadUpdate : labels.startDownload}</button>
         ${update ? `<button class="btn" data-action="launch" data-pack="${esc(p.id)}" data-focusable data-key="play">${labels.playVersion(esc(p.installedVersion))}</button>` : ""}
         <button class="btn ghost" data-action="close-download" data-focusable data-key="cancel">${labels.notNow}</button>
       </div>
@@ -590,8 +588,8 @@
     </section>`;
   }
 
-  function requestStorageClear(packId, scope, bytes) {
-    const p = storagePack(packId);
+  async function requestStorageClear(packId, scope, bytes) {
+    const p = storagePack(packId) || selectedPack();
     const amount = fmtBytes(Number(bytes) || 0);
     let title;
     let message;
@@ -608,13 +606,48 @@
       title = labels.clearLogsTitle;
       message = labels.clearLogsMessage(amount);
     }
-    S.confirm = { title, message, storage: { packId, scope } };
-    render();
+
+    if (scope === "pack") {
+      showConfirm({ title: labels.checkingUninstallTitle, message: labels.checkingUninstallMessage, busy: true });
+      try {
+        const plan = await api("/api/storage/clear", {
+          method: "POST",
+          body: JSON.stringify({ packId, scope, dryRun: true }),
+        });
+        if (!plan.ok) {
+          showConfirm({
+            title: labels.uninstallBlocked,
+            message: "",
+            detailsTitle: labels.uninstallBlockedMessage,
+            details: plan.errors,
+            simple: true,
+          });
+          return;
+        }
+        showConfirm({
+          title,
+          message,
+          detailsTitle: labels.uninstallPlan,
+          details: plan.actions && plan.actions.length ? plan.actions : ["Remove the pack"],
+          warnings: plan.warnings,
+          storage: { packId, scope },
+        });
+      } catch (err) {
+        showConfirm({ title: labels.uninstallBlocked, message: err.message, simple: true });
+      }
+      return;
+    }
+
+    showConfirm({ title, message, storage: { packId, scope } });
   }
 
   async function clearStorageData({ packId, scope }) {
     const fromDetails = S.view === "details";
-    S.confirm = null;
+    showConfirm({
+      title: scope === "pack" ? labels.uninstallingTitle : labels.clearingTitle,
+      message: scope === "pack" ? labels.uninstallingMessage : labels.clearingMessage,
+      busy: true,
+    });
     try {
       const out = await api("/api/storage/clear", {
         method: "POST",
@@ -725,9 +758,17 @@
     const buttons = S.confirm.simple
       ? `<button class="btn primary" data-action="confirm-no" data-autofocus data-focusable data-key="ok">${labels.ok}</button>`
       : `<button class="btn primary" data-action="confirm-yes" data-autofocus data-focusable data-key="yes">${labels.confirm}</button><button class="btn ghost" data-action="confirm-no" data-focusable data-key="no">${labels.cancel}</button>`;
+    const details = Array.isArray(S.confirm.details) && S.confirm.details.length
+      ? `<p class="plantitle">${esc(S.confirm.detailsTitle || labels.uninstallPlan)}</p><ul class="plan">${S.confirm.details.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
+      : "";
+    const warnings = Array.isArray(S.confirm.warnings) && S.confirm.warnings.length
+      ? `<p class="plantitle">${labels.uninstallWarnings}</p><ul class="plan warning">${S.confirm.warnings.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
+      : "";
     overlay.innerHTML = `<div class="panel" style="width:min(60vw,680px)">
       <h2>${esc(S.confirm.title)}</h2>
       <p>${esc(S.confirm.message)}</p>
+      ${details}
+      ${warnings}
       <div class="actions">${buttons}</div>
     </div>`;
   }
@@ -870,17 +911,14 @@
   }
 
   async function rollback(packId) {
-    S.confirm = null;
+    showConfirm({ title: labels.rollingBackTitle, message: labels.rollingBackMessage, busy: true });
     try {
       const out = await api("/api/rollback", { method: "POST", body: JSON.stringify({ packId }) });
       S.view = "home";
       await refresh();
-      S.confirm = { title: labels.rolledBackTitle, message: labels.rolledBackMessage(out.previous), simple: true };
-      render();
-      setTimeout(() => { S.confirm = null; render(); }, 3000);
+      showConfirm({ title: labels.rolledBackTitle, message: labels.rolledBackMessage(out.previous), simple: true }, 3000);
     } catch (err) {
-      S.confirm = { title: labels.rollbackFailed, message: err.message, simple: true };
-      render();
+      showConfirm({ title: labels.rollbackFailed, message: err.message, simple: true });
     }
   }
 

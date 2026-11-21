@@ -391,6 +391,11 @@ function createAgent(config) {
             }
           } catch { }
         }
+        if (body.dryRun) {
+          const plan = storage.planClear(root, body);
+          res.writeHead(200, { "content-type": "application/json" });
+          return res.end(JSON.stringify(plan));
+        }
         const out = storage.clearStorage(root, body);
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify({ ok: true, ...out, storage: storage.computeStorage(root) }));

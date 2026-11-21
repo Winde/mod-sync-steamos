@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { applyBg3, revertBg3, dataDirFor, readApplied } = require("../src/installers/bg3");
+const { applyBg3, revertBg3, plan, dataDirFor, readApplied } = require("../src/installers/bg3");
 
 function write(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -114,6 +114,9 @@ test("BG3 apply on a native Linux build installs BG3LE and wraps the game binary
   assert.match(fs.readFileSync(path.join(gameRoot, "bin", "bg3"), "utf8"), /ModSync BG3LE wrapper/);
   assert.equal(fs.readFileSync(path.join(process.env.XDG_DATA_HOME, "bg3le", "build", "libbg3le.so"), "utf8"), "library");
   assert.equal(applied.nativeLoader.wrapper, "bin/bg3");
+  const planBefore = plan({ pack, root });
+  assert.equal(planBefore.ok, true);
+  assert.ok(planBefore.actions.some((action) => action.includes("original Baldur's Gate 3 executable")));
 
   revertBg3({ pack, root, log: () => { } });
   assert.equal(fs.existsSync(path.join(dataDir, "Mods", "a.pak")), false);
@@ -122,4 +125,26 @@ test("BG3 apply on a native Linux build installs BG3LE and wraps the game binary
   assert.equal(fs.readFileSync(path.join(gameRoot, "bin", "bg3"), "utf8"), "native-binary");
   assert.equal(fs.existsSync(path.join(gameRoot, "bin", "bg3.bg3le-real")), false);
   assert.equal(fs.existsSync(path.join(process.env.XDG_DATA_HOME, "bg3le")), false);
+});
+
+test("BG3 uninstall preflight blocks when a backup is missing", (t) => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-bg3-plan-"));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
+  const root = path.join(base, "tv");
+  const pack = packWithDataDir("bg3-plan", path.join(base, "data"));
+  const packRoot = path.join(root, "packs", pack.id);
+  write(path.join(packRoot, "applied.json"), JSON.stringify({
+    packId: pack.id,
+    version: "1.0.0",
+    dataDir: path.join(base, "data"),
+    gameRoot: path.join(base, "game"),
+    data: ["Mods/a.pak"],
+    game: [],
+    backups: [{ scope: "data", rel: "PlayerProfiles/Public/modsettings.lsx" }],
+  }));
+
+  const result = plan({ pack, root });
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /Missing backup/);
+  assert.throws(() => revertBg3({ pack, root, log: () => { } }), /preflight failed/);
 });

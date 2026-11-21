@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const {
-  ensureDir, materialize, readJson, writeJson, safeJoin, walkFiles,
+  ensureDir, materialize, readJson, writeJson, safeJoin, walkFiles, isGameRunning,
 } = require("../util");
 const paths = require("../paths");
 const steam = require("../steam");
@@ -55,9 +55,12 @@ function installNativeLoader({ packRoot, gameRoot, platform = process.platform }
     throw new Error(`Bundled BG3LE is missing: ${libSource}`);
   }
   const dir = bg3leDirFor(platform);
+  const existed = fs.existsSync(dir);
+  const owned = !existed || fs.existsSync(path.join(dir, ".modsync-bg3le"));
   ensureDir(dir);
   fs.cpSync(source, dir, { recursive: true, force: true });
   fs.chmodSync(path.join(dir, "build", "libbg3le.so"), 0o644);
+  fs.writeFileSync(path.join(dir, ".modsync-bg3le"), "bundled by ModSync\n");
 
   const bg3 = path.join(gameRoot, "bin", "bg3");
   const real = path.join(gameRoot, "bin", "bg3.bg3le-real");
@@ -73,6 +76,7 @@ function installNativeLoader({ packRoot, gameRoot, platform = process.platform }
 
   return {
     dir,
+    created: owned,
     wrapper: "bin/bg3",
     real: "bin/bg3.bg3le-real",
     lib: path.join(dir, "build", "libbg3le.so"),
@@ -85,13 +89,18 @@ function removeNativeLoader(applied) {
   const bg3 = safeJoin(applied.gameRoot, loader.wrapper);
   const real = safeJoin(applied.gameRoot, loader.real);
   if (fs.existsSync(bg3) && isBg3leWrapper(bg3)) {
+    if (!fs.existsSync(real)) {
+      throw new Error(`Cannot restore ${bg3}: ${real} is missing. Reinstall the game files, then retry uninstall.`);
+    }
     fs.rmSync(bg3, { force: true });
-    if (fs.existsSync(real)) fs.renameSync(real, bg3);
+    fs.renameSync(real, bg3);
   } else if (fs.existsSync(real)) {
     // Steam replaced bin/bg3 with a fresh game binary; keep it and drop the stale copy.
     fs.rmSync(real, { force: true });
   }
-  if (loader.dir) fs.rmSync(loader.dir, { recursive: true, force: true });
+  if (loader.dir && loader.created !== false) {
+    fs.rmSync(loader.dir, { recursive: true, force: true });
+  }
 }
 
 function appliedFile(packRoot) {
@@ -243,10 +252,85 @@ function applyBg3({ pack, root, game, version, platform = process.platform, log 
   return applied;
 }
 
-function revertBg3({ pack, root, log = () => {} }) {
+function planRevert({ pack, root }) {
   const packRoot = path.join(root, "packs", pack.id);
   const applied = readApplied(packRoot);
+  const errors = [];
+  const warnings = [];
+  const actions = [];
+  if (!applied) {
+    return {
+      ok: true,
+      errors,
+      warnings,
+      actions: ["Remove the pack directory (no applied game files were recorded)"],
+      applied: null,
+    };
+  }
+
+  if (isGameRunning(["bg3", "bg3.bg3le-real"])) {
+    errors.push("Baldur's Gate 3 is running. Close it before uninstalling.");
+  }
+
+  const roots = { data: applied.dataDir, game: applied.gameRoot };
+  for (const [scope, base] of Object.entries(roots)) {
+    const list = applied[scope] || [];
+    if (list.length && !base) errors.push(`The ${scope} install path is missing.`);
+    if (base && list.length) {
+      try { fs.accessSync(base, fs.constants.W_OK); } catch { errors.push(`No write access to ${base}.`); }
+    }
+  }
+
+  for (const entry of applied.backups || []) {
+    const backup = backupPath(packRoot, entry.scope, entry.rel);
+    if (!fs.existsSync(backup)) errors.push(`Missing backup for ${entry.scope}/${entry.rel}; refusing to uninstall.`);
+    if (!roots[entry.scope]) errors.push(`No ${entry.scope} install path for ${entry.rel}.`);
+  }
+
+  if (applied.data && applied.data.length) {
+    actions.push(`Remove ${applied.data.length} pack file(s) from the game data folder`);
+  }
+  if (applied.game && applied.game.length) {
+    actions.push(`Remove ${applied.game.length} game file(s) from the game folder`);
+  }
+  if (applied.backups && applied.backups.length) {
+    actions.push(`Restore ${applied.backups.length} original file(s) from backup`);
+  }
+
+  if (applied.nativeLoader) {
+    const bg3 = applied.gameRoot ? path.join(applied.gameRoot, "bin", "bg3") : "";
+    const real = applied.gameRoot ? path.join(applied.gameRoot, "bin", "bg3.bg3le-real") : "";
+    if (bg3 && isBg3leWrapper(bg3)) {
+      if (!fs.existsSync(real)) {
+        errors.push(`Cannot restore the original game binary: ${real} is missing.`);
+      } else {
+        actions.push("Restore the original Baldur's Gate 3 executable");
+      }
+    } else if (real && fs.existsSync(real)) {
+      warnings.push("Steam replaced bin/bg3; the stale BG3LE copy will be removed.");
+    } else {
+      warnings.push("The BG3LE wrapper is absent; no game executable change to undo.");
+    }
+
+    if (applied.nativeLoader.dir) {
+      if (applied.nativeLoader.created === false) {
+        warnings.push("The BG3LE directory existed before this pack and will be left in place.");
+      } else if (fs.existsSync(applied.nativeLoader.dir)) {
+        actions.push(`Remove the bundled BG3LE directory ${applied.nativeLoader.dir}`);
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors, warnings, actions, applied };
+}
+
+function revertBg3({ pack, root, log = () => {}, dryRun = false }) {
+  const plan = planRevert({ pack, root });
+  if (!plan.ok) throw new Error(`Uninstall preflight failed: ${plan.errors.join("; ")}`);
+  if (dryRun) return { ...plan, reverted: false, dryRun: true };
+  const applied = plan.applied;
   if (!applied) return { reverted: false };
+  const packRoot = path.join(root, "packs", pack.id);
   removeApplied(packRoot, applied);
   restoreBackups(packRoot, applied);
   fs.rmSync(appliedFile(packRoot), { force: true });
@@ -265,6 +349,7 @@ module.exports = {
   revert: revertBg3,
   applyBg3,
   revertBg3,
+  plan: planRevert,
   rollback,
   dataDirFor,
   readApplied,

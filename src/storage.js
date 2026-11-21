@@ -113,6 +113,44 @@ function removeDesktopShortcuts(modId) {
   }
 }
 
+function planClear(root, { packId, scope }) {
+  if (scope === "logs") {
+    return { ok: true, scope, actions: ["Clear the log files"], errors: [], warnings: [] };
+  }
+  if (!validPackId(packId)) throw new Error("invalid pack id");
+  const packRoot = versionStore.packRoot(root, packId);
+  if (!fs.existsSync(packRoot)) throw new Error(`Pack is not installed: ${packId}`);
+  let pack = null;
+  try { pack = readJson(versionStore.packFile(packRoot)); } catch { }
+
+  if (scope === "pack") {
+    const adapter = installers.forPack(pack);
+    if (adapter && adapter.plan) {
+      const plan = adapter.plan({ pack, root });
+      return { ...plan, scope, packId };
+    }
+    return {
+      ok: true,
+      scope,
+      packId,
+      actions: [`Delete the pack directory ${packRoot}`],
+      errors: [],
+      warnings: [],
+    };
+  }
+  if (scope === "staging" || scope === "old-versions") {
+    return {
+      ok: true,
+      scope,
+      packId,
+      actions: [scope === "staging" ? "Remove partial downloads" : "Remove kept old versions"],
+      errors: [],
+      warnings: [],
+    };
+  }
+  throw new Error(`unknown scope: ${scope}`);
+}
+
 function clearStorage(root, { packId, scope }) {
   if (scope === "logs") {
     const logs = path.join(root, "logs");
@@ -155,9 +193,13 @@ function clearStorage(root, { packId, scope }) {
       }
     }
   } else if (scope === "pack") {
+    const plan = planClear(root, { packId, scope });
+    if (!plan.ok) throw new Error(`Uninstall preflight failed: ${plan.errors.join("; ")}`);
     const adapter = installers.forPack(pack);
     if (adapter && adapter.revert) {
-      try { adapter.revert({ pack, root, log: () => { } }); } catch { }
+      // If the game-side revert fails, keep the pack root and its backups so
+      // the user can retry instead of losing the only record of applied files.
+      adapter.revert({ pack, root, log: () => { } });
     }
     fs.rmSync(packRoot, { recursive: true, force: true });
     removeDesktopShortcuts(modId);
@@ -169,4 +211,4 @@ function clearStorage(root, { packId, scope }) {
   return { freedBytes: Math.max(0, before - after), scope, packId };
 }
 
-module.exports = { computeStorage, clearStorage, dirBytes, packStorage };
+module.exports = { computeStorage, clearStorage, planClear, dirBytes, packStorage };
