@@ -8,6 +8,7 @@ const recipes = require("./recipes");
 const { loadPack, packSummary } = require("./manifest");
 const { createServer } = require("./server");
 const { createAgent } = require("./agent");
+const labels = require("./labels");
 const steam = require("./steam");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -149,25 +150,25 @@ async function cmdServe(values) {
     baseUrl,
   });
   server.listen(port, host, () => {
-    console.log(`\nModSync repository: ${baseUrl}/`);
-    console.log(`Bind: ${host}${loopback ? " (loopback only)" : ""}`);
-    console.log(`Token: ${token}`);
-    console.log(`Packs: ${packs.map((p) => `${p.name} ${p.mod.version}`).join(", ") || "none"}`);
+    console.log(`\n${labels.serve.repository(baseUrl)}`);
+    console.log(labels.serve.bind(host, loopback));
+    console.log(labels.serve.token(token));
+    console.log(labels.serve.packs(packs.map((p) => `${p.name} ${p.mod.version}`).join(", ")));
     if (loopback) {
-      console.log("\nOnly this PC can reach the server. Use --lan when the Steam Machine is ready.");
+      console.log(`\n${labels.serve.loopbackOnly}`);
       return;
     }
     const candidates = util.lanAddresses();
     if (candidates.length > 1) {
-      console.log(`LAN interfaces: ${candidates.map((c) => `${c.address} (${c.name})`).join(", ")}`);
-      console.log(`Using ${host}. Pass --host <ip> if that is the wrong interface.`);
+      console.log(labels.serve.lanInterfaces(candidates.map((c) => `${c.address} (${c.name})`).join(", ")));
+      console.log(labels.serve.usingHost(host));
     }
-    console.log("\nSteam Machine (Desktop Mode):");
-    console.log(`curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' | bash -s -- --pc '${baseUrl}' --token '${token}'`);
-    console.log("\nFirewall (admin PowerShell, once; local subnet only):");
-    console.log(`New-NetFirewallRule -DisplayName "ModSync HTTP ${port}" -Direction Inbound -Action Allow -Protocol TCP -LocalPort ${port} -RemoteAddress LocalSubnet -Profile Any`);
-    console.log("\nDo not port-forward this port or enable UPnP. Keep it on the LAN.");
-    console.log("Keep this process running while the TV installs/updates.");
+    console.log(`\n${labels.serve.steamMachine}`);
+    console.log(labels.serve.install(baseUrl, token));
+    console.log(`\n${labels.serve.firewallTitle}`);
+    console.log(labels.serve.firewall(port));
+    console.log(`\n${labels.serve.lanOnly}`);
+    console.log(labels.serve.keepRunning);
   });
 }
 
@@ -178,9 +179,9 @@ async function cmdAgent(values) {
   if (values.port) config.port = Number(values.port);
   const agent = createAgent(config);
   agent.listen(() => {
-    console.log(`ModSync TV dashboard: http://127.0.0.1:${config.port || 8788}`);
-    console.log(`Root: ${config.root || "~/ModSync"}`);
-    console.log(`PC: ${config.pcUrl || "(not configured)"}`);
+    console.log(labels.agent.dashboard(config.port || 8788));
+    console.log(labels.agent.root(config.root || "~/ModSync"));
+    console.log(labels.agent.pc(config.pcUrl));
   });
 }
 
