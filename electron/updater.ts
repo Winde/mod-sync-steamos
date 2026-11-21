@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import {
   accessSync, chmodSync, constants, createReadStream, createWriteStream,
-  realpathSync, renameSync, rmSync,
+  mkdirSync, realpathSync, renameSync, rmSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
@@ -55,6 +55,10 @@ export function compareVersions(a: unknown, b: unknown): number {
 
 export function appImageName(version: string): string {
   return `ModSync-Client-${version}-x86_64.AppImage`;
+}
+
+export function windowsInstallerName(product: "Server" | "Client", version: string, arch = "x64"): string {
+  return `ModSync-${product}-${version}-${arch}.exe`;
 }
 
 export interface ReleaseAsset {
@@ -135,19 +139,34 @@ export interface UpdateCheck {
   error?: string;
 }
 
+export interface InstallerTarget {
+  /** Name of the release asset for this version, such as ModSync-Server-0.8.0-x64.exe. */
+  assetName: (version: string) => string;
+  /** Folder the verified installer is written to before it runs. */
+  downloadDir: () => string;
+}
+
+export interface UpdateInstall {
+  kind: "appimage" | "installer";
+  path: string;
+}
+
 export class Updater {
   private readonly currentVersion: () => string;
   private readonly appImage: () => string | null;
+  private readonly installer: InstallerTarget | null;
   private readonly fetch: FetchLike;
   private pending: Release | null = null;
 
-  constructor({ currentVersion, appImage, fetch }: {
+  constructor({ currentVersion, appImage, installer, fetch }: {
     currentVersion: () => string;
-    appImage: () => string | null;
+    appImage?: () => string | null;
+    installer?: InstallerTarget;
     fetch: FetchLike;
   }) {
     this.currentVersion = currentVersion;
-    this.appImage = appImage;
+    this.appImage = appImage ?? (() => null);
+    this.installer = installer ?? null;
     this.fetch = fetch;
   }
 
@@ -176,20 +195,38 @@ export class Updater {
       current,
       latest: release.version,
       available,
-      canInstall: available && this.appImage() !== null,
+      canInstall: available && (this.installer !== null || this.appImage() !== null),
     };
   }
 
-  async install(): Promise<string> {
+  async install(): Promise<UpdateInstall> {
     const release = this.pending;
     if (!release) throw new Error("Check for updates before installing one");
+
+    if (this.installer) {
+      const name = this.installer.assetName(release.version);
+      const directory = this.installer.downloadDir();
+      mkdirSync(directory, { recursive: true });
+      const target = join(directory, name);
+      await this.download(release, name, target, false);
+      // Keep the release pending: if the installer cannot start, the console
+      // can retry without checking GitHub again.
+      return { kind: "installer", path: target };
+    }
+
     const target = this.appImage();
     if (!target) throw new Error("This copy of ModSync cannot update itself");
-
     const name = appImageName(release.version);
+    await this.download(release, name, target, true);
+    this.pending = null;
+    return { kind: "appimage", path: target };
+  }
+
+  private async download(release: Release, name: string, target: string, executable: boolean): Promise<void> {
     const asset = release.assets.find((entry) => entry.name === name);
+    if (!asset) throw new Error(`The latest release does not include ${name}`);
     const checksums = release.assets.find((entry) => entry.name === CHECKSUMS_NAME);
-    if (!asset || !checksums) throw new Error("The latest release is missing its AppImage or checksums");
+    if (!checksums) throw new Error("The latest release is missing its checksums");
 
     let sums: string;
     try {
@@ -207,17 +244,18 @@ export class Updater {
       const response = await this.fetch(asset.url, { headers: API_HEADERS, signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
       if (!response.ok) throw new Error(`The update download failed (${response.status}).`);
       if (!response.body) throw new Error("The update download was empty.");
-      await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), createWriteStream(part, { mode: 0o755 }));
+      await pipeline(
+        Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+        createWriteStream(part, executable ? { mode: 0o755 } : {}),
+      );
       const actual = await sha256(part);
       if (actual !== expected) throw new Error("The downloaded update failed its checksum.");
-      chmodSync(part, 0o755);
+      if (executable) chmodSync(part, 0o755);
       renameSync(part, target);
     } catch (error) {
       rmSync(part, { force: true });
       throw error;
     }
-    this.pending = null;
-    return target;
   }
 }
 

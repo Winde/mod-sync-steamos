@@ -10,6 +10,7 @@ const {
   checksumFor,
   compareVersions,
   parseRelease,
+  windowsInstallerName,
 } = require("../dist/electron/updater");
 
 const REPO = "Winde/mod-sync-steamos";
@@ -81,7 +82,61 @@ test("the updater checks and installs a checksummed AppImage", async () => {
     assert.equal(info.available, true);
     assert.equal(info.canInstall, true);
     const installed = await updater.install();
-    assert.equal(installed, target);
+    assert.deepEqual(installed, { kind: "appimage", path: target });
+    assert.deepEqual(fs.readFileSync(target), payload);
+    assert.equal(fs.existsSync(`${target}.part`), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the updater downloads a checksummed Windows Server installer", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-installer-"));
+  const name = windowsInstallerName("Server", "0.3.0");
+  const payload = Buffer.from("new nsis installer bytes");
+  const hash = crypto.createHash("sha256").update(payload).digest("hex");
+  const fetch = async (url) => {
+    if (url.endsWith("/releases/latest")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tag_name: "v0.3.0",
+          assets: [
+            { name, browser_download_url: `${DOWNLOAD}/v0.3.0/${name}` },
+            { name: "SHA256SUMS.txt", browser_download_url: `${DOWNLOAD}/v0.3.0/SHA256SUMS.txt` },
+          ],
+        }),
+        text: async () => "",
+        body: null,
+      };
+    }
+    if (url.endsWith("SHA256SUMS.txt")) {
+      return { ok: true, status: 200, json: async () => ({}), text: async () => `${hash}  ${name}\n`, body: null };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => "",
+      body: new Response(payload).body,
+    };
+  };
+  const updater = new Updater({
+    currentVersion: () => "0.2.0",
+    installer: {
+      assetName: (version) => windowsInstallerName("Server", version),
+      downloadDir: () => dir,
+    },
+    fetch,
+  });
+  try {
+    const info = await updater.check();
+    assert.equal(info.available, true);
+    assert.equal(info.canInstall, true);
+    const installed = await updater.install();
+    const target = path.join(dir, name);
+    assert.deepEqual(installed, { kind: "installer", path: target });
     assert.deepEqual(fs.readFileSync(target), payload);
     assert.equal(fs.existsSync(`${target}.part`), false);
   } finally {

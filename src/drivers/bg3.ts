@@ -110,8 +110,26 @@ interface Bg3Mod {
   md5: string;
   publishHandle: string;
   builtin: boolean;
-  file?: string;
   [key: string]: unknown;
+}
+
+const XML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  quot: "\"",
+};
+
+function decodeXmlEntities(value: string): string {
+  return String(value).replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (match, code: string) => {
+    if (code[0] === "#") {
+      const hex = code[1]?.toLowerCase() === "x";
+      const point = Number.parseInt(code.slice(hex ? 2 : 1), hex ? 16 : 10);
+      return Number.isFinite(point) && point >= 0 && point <= 0x10ffff ? String.fromCodePoint(point) : match;
+    }
+    return XML_ENTITIES[code.toLowerCase()] ?? match;
+  });
 }
 
 export function parseModSettings(xml: string): Bg3Mod[] {
@@ -119,7 +137,7 @@ export function parseModSettings(xml: string): Bg3Mod[] {
   for (const match of String(xml).matchAll(/<node id="ModuleShortDesc">([\s\S]*?)<\/node>/g)) {
     const attrs: Record<string, string> = {};
     for (const attr of match[1].matchAll(/<attribute id="([^"]+)"[^>]*value="([^"]*)"/g)) {
-      attrs[attr[1]] = attr[2];
+      attrs[attr[1]] = decodeXmlEntities(attr[2]);
     }
     if (!attrs.Name) continue;
     const folder = attrs.Folder || "";
@@ -136,43 +154,104 @@ export function parseModSettings(xml: string): Bg3Mod[] {
   return mods;
 }
 
-function matchPak(mod: Bg3Mod, paks: string[], used: Set<string>): string | null {
-  const folder = String(mod.folder || "").toLowerCase();
-  const short = folder.split("_")[0];
-  const id = String(mod.id || "").toLowerCase();
-  return paks.find((name) => {
-    if (used.has(name)) return false;
-    const lower = name.toLowerCase();
-    return (folder && lower.startsWith(folder))
-      || (short && lower.startsWith(short))
-      || (id && lower.includes(id));
-  }) || null;
+function normalizePakName(value: string): string {
+  return decodeXmlEntities(value)
+    .toLowerCase()
+    .replace(/\.pak$/i, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function commonPrefixLength(a: string, b: string): number {
+  const limit = Math.min(a.length, b.length);
+  let index = 0;
+  while (index < limit && a[index] === b[index]) index++;
+  return index;
+}
+
+/**
+ * BG3 mod folders often carry a full UUID while the published pak only keeps
+ * its start (`foo_someprefix-xxxx.pak`). Build short aliases from the display
+ * name so titles such as "Whispers of the Divine: Aasimar ..." still match
+ * `WotD-Aasimar.pak`.
+ */
+function acronymAliases(value: string): Set<string> {
+  const words = decodeXmlEntities(value).match(/[A-Za-z0-9]+/g) || [];
+  const aliases = new Set<string>();
+  for (let take = 1; take <= words.length; take++) {
+    const acronym = words.slice(0, take).map((word) => word[0]).join("");
+    for (let upto = take; upto <= words.length; upto++) {
+      const alias = normalizePakName(acronym + words.slice(take, upto).join(""));
+      if (alias.length >= 6) aliases.add(alias);
+    }
+  }
+  return aliases;
+}
+
+function pakScore(mod: Bg3Mod, pak: string): number {
+  const stem = normalizePakName(pak);
+  if (!stem) return 0;
+  const folder = normalizePakName(mod.folder || "");
+  const name = normalizePakName(mod.name || "");
+  const id = normalizePakName(mod.id || "");
+  let score = 0;
+  if (id && stem.includes(id)) score = Math.max(score, 990);
+
+  const compare = (value: string, exact: number): number => {
+    if (!value) return 0;
+    if (value === stem) return exact;
+    const prefix = commonPrefixLength(value, stem);
+    const shortest = Math.min(value.length, stem.length);
+    // Long shared starts cover published paks whose UUID suffix is truncated.
+    if (shortest >= 8 && prefix >= 8 && prefix >= Math.ceil(shortest * 0.5)) {
+      return exact - 100 + Math.min(prefix, 99);
+    }
+    return 0;
+  };
+  score = Math.max(score, compare(folder, 1000), compare(name, 950));
+  if (name && acronymAliases(mod.name).has(stem)) score = Math.max(score, 880);
+  return score;
+}
+
+function matchPaks(mods: Bg3Mod[], paks: string[]): Map<number, string> {
+  const pairs: Array<{ mod: number; pak: string; score: number }> = [];
+  mods.forEach((mod, index) => {
+    for (const pak of paks) {
+      const score = pakScore(mod, pak);
+      if (score >= 500) pairs.push({ mod: index, pak, score });
+    }
+  });
+  // Assign the strongest matches first so a generic prefix cannot steal the
+  // pak that a later mod names exactly (the old `test_...` collision).
+  pairs.sort((a, b) => b.score - a.score || a.pak.localeCompare(b.pak) || a.mod - b.mod);
+  const byMod = new Map<number, string>();
+  const used = new Set<string>();
+  for (const pair of pairs) {
+    if (byMod.has(pair.mod) || used.has(pair.pak)) continue;
+    byMod.set(pair.mod, pair.pak);
+    used.add(pair.pak);
+  }
+  return byMod;
 }
 
 function contentsFrom(source: string, paks: string[]): ContentsSummary {
   const xml = fs.readFileSync(path.join(source, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8");
-  const mods = parseModSettings(xml);
-  const used = new Set<string>();
-  for (const mod of mods) {
-    if (mod.builtin) continue;
-    const file = matchPak(mod, paks, used);
-    if (file) {
-      mod.file = `Mods/${file}`;
-      used.add(file);
-    }
-  }
+  const mods = parseModSettings(xml).filter((mod) => !mod.builtin);
+  const matches = matchPaks(mods, paks);
+  const used = new Set(matches.values());
   const inactive = paks.filter((name) => !used.has(name));
-  const activeMods = mods.filter((mod) => !mod.builtin);
   return {
     source: "modsettings.lsx",
     generatedAt: new Date().toISOString(),
-    count: activeMods.length,
+    count: mods.length,
     itemsLabel: "Included mods",
-    items: activeMods.map((mod) => ({
-      label: mod.name,
-      path: mod.file,
-      active: true,
-    })),
+    items: mods.map((mod, index) => {
+      const file = matches.get(index);
+      return {
+        label: mod.name,
+        path: file ? `Mods/${file}` : undefined,
+        active: true,
+      };
+    }),
     inactive,
   };
 }
@@ -363,7 +442,6 @@ export async function buildPack({
     launch: {
       type: "steam",
       mode: "default",
-      defaultExe: "bin/bg3.exe",
       exe: "bin/bg3.exe",
       gameProcess: "bg3.exe",
       steamAppId: GAME.appId,
@@ -371,10 +449,6 @@ export async function buildPack({
     install: {
       type: "bg3",
       label: "modsettings + script extender",
-      options: {
-        bg3se: bg3seFiles > 0,
-        bg3le: { version: bg3le.VERSION, path: "tools/bg3le" },
-      },
     },
     art: {
       grid: `art/${modId}/grid.png`,
@@ -388,7 +462,6 @@ export async function buildPack({
     preconditions,
     contents,
     files: "files.json",
-    save: { transfer: "out-of-scope" },
   };
 
   writeJson(path.join(dst, "pack.json"), pack);

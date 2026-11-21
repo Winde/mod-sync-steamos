@@ -108,7 +108,6 @@ export interface PreconditionsResult {
 export interface LaunchInfo {
   type: string;
   exe?: string;
-  defaultExe?: string;
   gameProcess?: string;
   gameProcessAlt?: string;
   steamAppId?: number;
@@ -126,7 +125,6 @@ export interface LoaderInfo {
 export interface InstallInfo {
   type: string;
   label?: string;
-  options?: Record<string, unknown>;
 }
 
 export interface ArtInfo {
@@ -176,7 +174,6 @@ export interface Pack {
   files: string;
   notes?: Note[];
   preconditions?: PreconditionConfig[];
-  save?: { transfer?: string };
 }
 
 export interface PackFile {

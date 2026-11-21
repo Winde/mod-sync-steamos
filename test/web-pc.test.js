@@ -42,6 +42,14 @@ function fixture(overrides = {}) {
       mod: { id: "graceborne", version: "0.2.7" },
       files: 1442,
       totalBytes: 7.3 * 1024 * 1024 * 1024,
+      contents: {
+        source: "me3 profile",
+        generatedAt: "2026-11-21T12:00:00.000Z",
+        count: 1,
+        itemsLabel: "Included packages",
+        items: [{ label: "Graceborne", path: "../mods/graceborne/versions/0.2.7/mod", active: true }],
+        inactive: [],
+      },
       platforms: ["windows", "linux-proton"],
       root: "C:\\ModSync\\packs\\eldenring-graceborne",
       modifiedAt: "2026-11-21T12:00:00.000Z",
@@ -122,6 +130,14 @@ test("Server console renders packs, settings, and the server control", async () 
     assert.match(doc.querySelector("#server-pill-text").textContent, /Server stopped/);
     assert.match(doc.querySelector("#packs").textContent, /7\.3 GB/);
     assert.match(doc.querySelector("#packs").textContent, /Windows · Proton/);
+    assert.match(doc.querySelector("#packs").textContent, /1 package/);
+    doc.querySelector('[data-action="contents"]').click();
+    await waitFor(window, (w) => w.document.querySelector(".modal h2")?.textContent === "Graceborne");
+    assert.match(doc.querySelector(".modal").textContent, /Included packages/);
+    assert.match(doc.querySelector(".contentslist").textContent, /Graceborne/);
+    assert.match(doc.querySelector(".contentslist").textContent, /mods\/graceborne\/versions\/0\.2\.7\/mod/);
+    doc.querySelector('[data-action="close-contents"]').click();
+    await waitFor(window, (w) => !w.document.querySelector(".modal"));
     assert.equal(doc.querySelector("#packs-dir").value, "C:\\ModSync\\packs");
     assert.equal(doc.querySelector("#server-port").value, "8787");
     assert.equal(doc.querySelector("#server-token").type, "password");
@@ -358,6 +374,34 @@ test("Server console checks for updates and links to the release", async () => {
     await waitFor(window, (w) => w.document.querySelector("#open-releases")?.textContent === "Update 0.6.0");
     doc.querySelector("#open-releases").click();
     await waitFor(window, () => opened === 1);
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console installs a Windows update after confirmation", async () => {
+  let installed = 0;
+  let opened = 0;
+  const dom = await boot(
+    async (url) => response(String(url).endsWith("/api/state") ? fixture() : {}),
+    {
+      checkUpdate: async () => ({ current: "0.4.0", latest: "0.6.0", available: true, canInstall: true }),
+      installUpdate: async () => { installed++; },
+      openReleases: async () => { opened++; },
+    },
+  );
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    doc.querySelector("#check-updates").click();
+    await waitFor(window, (w) => w.document.querySelector("#open-releases")?.textContent === "Install 0.6.0");
+    doc.querySelector("#open-releases").click();
+    await waitFor(window, (w) => w.document.querySelector(".modal h2")?.textContent === "Update ModSync Server to 0.6.0?");
+    assert.equal(opened, 0);
+    doc.querySelector('[data-action="install-update"]').click();
+    await waitFor(window, () => installed === 1);
+    await waitFor(window, (w) => /Downloading and installing 0\.6\.0/.test(w.document.querySelector(".callout.installing")?.textContent || ""));
   } finally {
     window.close();
   }

@@ -73,7 +73,9 @@ The Server console:
   tray instead of the taskbar. The app starts hidden in the tray for sign-in
   starts.
 - **Update check** — the footer asks GitHub for the latest release only when
-  you press **Check for updates**, then links to the releases page if a newer
+  you press **Check for updates**. On Windows the installed Server updates
+  itself: it downloads the new installer, verifies its checksum, installs it
+  silently, and reopens. Other builds link to the releases page when a newer
   build exists.
 - **Rebuilds are staged** — the old pack stays in place until the new build is
   complete, then it is swapped in. A failed build does not destroy the working

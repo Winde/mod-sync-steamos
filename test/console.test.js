@@ -11,7 +11,12 @@ function addVersion(source, version) {
   for (const [rel, body] of [
     [`mods/graceborne/versions/${version}/mod/regulation.bin`, `regulation-${version}`],
     [`mods/graceborne/versions/${version}/mod/parts/test.partsbndsc.dcx`, `part-${version}`],
-    [`profiles/graceborne-${version}.me3`, `profile ${version}\n`],
+    [`profiles/graceborne-${version}.me3`, `[[packages]]
+path = '../mods/graceborne/versions/${version}/mod'
+enabled = true
+load_after = []
+load_before = []
+`],
   ]) {
     h.write(source, rel, body);
   }
@@ -32,6 +37,7 @@ test("Server console lists, rebuilds, serves, and removes packs", async (t) => {
   const root = h.tempDir("modsync-console-");
   const packsDir = path.join(root, "packs");
   const source = h.workingInstall({ versions: ["0.2.7"] });
+  addVersion(source, "0.2.7");
   const configFile = path.join(root, "state", "console.json");
   let loginCalls = 0;
   const service = createConsole({
@@ -80,6 +86,9 @@ test("Server console lists, rebuilds, serves, and removes packs", async (t) => {
   assert.equal(built.result.version, "0.2.7");
   assert.equal(service.listPacks().length, 1);
   assert.equal(service.listPacks()[0].mod.version, "0.2.7");
+  assert.equal(service.listPacks()[0].contents.count, 1);
+  assert.equal(service.listPacks()[0].contents.itemsLabel, "Included packages");
+  assert.equal(service.listPacks()[0].contents.items[0].label, "Graceborne");
 
   addVersion(source, "0.2.8");
   service.startBuild({ recipeId: "eldenring-graceborne", source, version: "0.2.8" });
@@ -202,7 +211,7 @@ test("Server console passes driver build options and progress to a BG3 build", a
   assert.equal(built.percent, 100);
 
   const pack = h.readJson(path.join(packsDir, "bg3-modded", "pack.json"));
-  assert.equal(pack.install.options.bg3se, true);
+  assert.equal(pack.install.type, "bg3");
   const doc = h.readJson(path.join(packsDir, "bg3-modded", "files.json"));
   assert.ok(doc.files.some((file) => file.target === "mods/bg3/versions/1.2.3/bg3se/DWrite.dll"));
 });

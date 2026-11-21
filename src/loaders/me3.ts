@@ -54,13 +54,24 @@ export function parseMe3Profile(text: string): { packages: Me3Block[]; natives: 
   return { packages, natives };
 }
 
+function packageLabel(entryPath: string, index: number, recipeName: string): string {
+  if (index === 0 && recipeName) return recipeName;
+  const parts = entryPath.replace(/\\/g, "/").split("/").filter((part) => part && part !== "." && part !== "..");
+  const mods = parts.indexOf("mods");
+  if (mods >= 0 && parts[mods + 1]) return parts[mods + 1];
+  const last = parts[parts.length - 1] || "";
+  // A package commonly ends in ".../mod"; the folder above it is the mod name.
+  if (last.toLowerCase() === "mod" && parts.length > 1) return parts[parts.length - 2];
+  return last;
+}
+
 export function contentsFor({ recipe, source, version }: ContentsInput): ContentsSummary {
   const parsed = parseMe3Profile(fs.readFileSync(profileFile(source, recipe.modId, version), "utf8"));
   const packages = parsed.packages.map((entry, index) => {
     const entryPath = typeof entry.path === "string" ? entry.path : "";
     return {
       path: entryPath,
-      label: index === 0 ? recipe.name : (entryPath.split("/").filter(Boolean).pop() || ""),
+      label: packageLabel(entryPath, index, recipe.name),
       enabled: entry.enabled !== false,
       loadAfter: entry.load_after || [],
       loadBefore: entry.load_before || [],
@@ -69,7 +80,7 @@ export function contentsFor({ recipe, source, version }: ContentsInput): Content
   return {
     source: "me3 profile",
     generatedAt: new Date().toISOString(),
-    count: packages.length,
+    count: packages.filter((entry) => entry.enabled).length,
     itemsLabel: "Included packages",
     items: packages.map((entry) => ({
       label: entry.label,

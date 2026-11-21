@@ -23,7 +23,10 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
 6. Minimizing the window hides it to the tray while the setting is enabled;
    closing it always hides it. **Quit** in the tray exits.
 7. **Check for updates** in the footer reports that the build is current, or
-   offers the latest release. It does not run on its own.
+   offers the latest release. It does not run on its own. In an installed
+   Windows build, **Install x.y.z** asks for confirmation, installs the update,
+   and the Server reopens with the new version; packs, settings, and the token
+   are still there.
 8. With an old or wrong token, the Client shows **Pair with the Server**. The
    Server console lists the TV under the pack library; **Allow** connects it and
    the Client keeps the token after a restart. **Deny** leaves it paired out.

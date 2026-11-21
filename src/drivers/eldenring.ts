@@ -179,7 +179,6 @@ export async function buildPack({
     launch: {
       type: me3.TYPE,
       mode: "loader",
-      defaultExe: "Game/eldenring.exe",
       exe: "Game/eldenring.exe",
       gameProcess: "eldenring.exe",
       steamAppId: GAME.appId,
@@ -194,7 +193,6 @@ export async function buildPack({
     preconditions: recipe.preconditions || [],
     contents,
     files: "files.json",
-    save: { transfer: "out-of-scope" },
   };
   writeJson(path.join(dst, "pack.json"), pack);
   writeJson(path.join(dst, "files.json"), {

@@ -9,6 +9,7 @@ import {
   ServerPanel,
   SettingsPanel,
   Toasts,
+  UpdateModal,
 } from "./components";
 import type {
   BuildFormState,
@@ -61,6 +62,8 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updatePrompt, setUpdatePrompt] = useState<UpdateInfo | null>(null);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
   const lastBuildStatus = useRef<string | null>(null);
   const settingsBase = useRef<SettingsDraft | null>(null);
   const toastId = useRef(0);
@@ -332,6 +335,28 @@ export default function App() {
     }
   };
 
+  const requestUpdate = () => {
+    const bridge = desktopBridge();
+    if (!updateInfo) return;
+    if (updateInfo.canInstall && bridge?.installUpdate) {
+      setUpdatePrompt(updateInfo);
+      return;
+    }
+    void bridge?.openReleases?.();
+  };
+
+  const installUpdate = async () => {
+    const bridge = desktopBridge();
+    if (!bridge?.installUpdate || !updatePrompt) return;
+    setInstallingUpdate(true);
+    try {
+      await bridge.installUpdate();
+    } catch (err) {
+      setInstallingUpdate(false);
+      toast(messageOf(err), "error");
+    }
+  };
+
   const closeModal = () => {
     setModal(null);
     setBuildView(false);
@@ -404,9 +429,9 @@ export default function App() {
                 id="open-releases"
                 className="btn small"
                 type="button"
-                title="Open the releases page"
-                onClick={() => { void desktopBridge()?.openReleases?.(); }}
-              >Update {updateInfo.latest}</button>
+                title={updateInfo.canInstall && desktopBridge()?.installUpdate ? "Download and install the update" : "Open the releases page"}
+                onClick={requestUpdate}
+              >{updateInfo.canInstall && desktopBridge()?.installUpdate ? `Install ${updateInfo.latest}` : `Update ${updateInfo.latest}`}</button>
             ) : null}
             {desktopBridge()?.checkUpdate ? (
               <button
@@ -440,6 +465,14 @@ export default function App() {
           busy={busy}
           onConfirm={() => { void confirmRemove(); }}
           onClose={closeModal}
+        />
+      ) : null}
+      {updatePrompt ? (
+        <UpdateModal
+          info={updatePrompt}
+          installing={installingUpdate}
+          onInstall={() => { void installUpdate(); }}
+          onClose={() => { setUpdatePrompt(null); }}
         />
       ) : null}
       <Toasts items={toasts} />

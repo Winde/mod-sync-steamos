@@ -26,7 +26,6 @@ app.setName("ModSync Client");
 let win: BrowserWindow | null = null;
 let agent: ReturnType<typeof createAgent> | null = null;
 let localUrl = "";
-let updater: Updater | null = null;
 
 function pathArg(name: string): string {
   const index = process.argv.indexOf(name);
@@ -181,7 +180,6 @@ if (!app.requestSingleInstanceLock()) {
       appImage: () => currentAppImage(process.env),
       fetch: (url, init) => net.fetch(url, init) as Promise<Response>,
     });
-    updater = updateService;
 
     ipcMain.handle("modsync:version", () => app.getVersion());
     ipcMain.handle("modsync:update-check", async () => {
@@ -192,8 +190,9 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
     ipcMain.handle("modsync:update-install", async () => {
-      const appImage = await updateService.install();
-      app.relaunch({ execPath: appImage, args: relaunchArgs(process.argv.slice(1)) });
+      const installed = await updateService.install();
+      if (installed.kind !== "appimage") throw new Error("This copy of ModSync cannot install the update.");
+      app.relaunch({ execPath: installed.path, args: relaunchArgs(process.argv.slice(1)) });
       setTimeout(() => app.quit(), CLOSING_OVERLAY_MS);
     });
     ipcMain.handle("modsync:releases", () => shell.openExternal(RELEASES_PAGE));

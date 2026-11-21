@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildOptions, buildPack, contentsFor } = require("../dist/src/drivers/bg3");
+const { buildOptions, buildPack, contentsFor, parseModSettings } = require("../dist/src/drivers/bg3");
 const { loadRecipe } = require("../dist/src/recipes");
 const { loadPack } = require("../dist/src/manifest");
 
@@ -22,6 +22,61 @@ function moduleNode({ name, folder, id }) {
     <attribute id="Version64" type="int64" value="36028797018963968"/>
   </node>`;
 }
+
+test("BG3 contents match published pak names without crossing duplicate prefixes", () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-bg3-contents-"));
+  const source = path.join(base, "data");
+  try {
+    const paks = [
+      "Path of Undeath.pak",
+      "Valkrana's Skeleton Crew.pak",
+      "Valkrana's Spellbook.pak",
+      "Warlock Spell List Fixer.pak",
+      "WotD-Aasimar.pak",
+      "extra_encounters_plus_6324f71c7nct.pak",
+      "test_27f18a86-94f8-1f5c-760c-1-gxcc.pak",
+      "test_4b516620-9c56-aa18-96ae-a-dk21.pak",
+      "CombatMod.pak",
+    ];
+    for (const name of paks) write(path.join(source, "Mods", name), name);
+    const modules = [
+      { name: "Path of Undeath", folder: "PathOfUndeath", id: "fe04695e-d206-4a88-b3f9-b2a65855ac4c" },
+      { name: "Valkrana&apos;s Skeleton Crew", folder: "Valkrana&apos;s Skeleton Crew", id: "0dd8b949-b56e-4248-9bf0-b03b3c3bd8c5" },
+      { name: "Valkrana&apos;s Spellbook", folder: "Valkrana&apos;s Spellbook", id: "9deeb371-f01e-41b4-b20e-c5eee0751b12" },
+      { name: "Warlock Spell List Fixer", folder: "CharlatanListSupport", id: "da838ab2-4d4b-4ca2-9e11-0257a03b13fc" },
+      { name: "Whispers of the Divine: Aasimar Script Extender Edition", folder: "Trips_Aasimar", id: "4806bd2a-929b-406e-b1d4-2e0e9cc23bb2" },
+      { name: "Extra encounters and Minibosses", folder: "Extra_encounters_plus_6324f71c-80f2-6c13-b2e8-1c3441fa6072", id: "6324f71c-80f2-6c13-b2e8-1c3441fa6072" },
+      { name: "Mystra&apos;s Spells", folder: "Test_4b516620-9c56-aa18-96ae-a9ee4f57b515", id: "4b516620-9c56-aa18-96ae-a9ee4f57b515" },
+      { name: "Dread Overlord | Mystra&apos;s Spells - Compatibility", folder: "TEST_27f18a86-94f8-1f5c-760c-18aaa41ab230", id: "27f18a86-94f8-1f5c-760c-18aaa41ab230" },
+      { name: "GustavX", folder: "GustavX", id: "cb555efe-2d9e-131f-8195-a89329d218ea" },
+    ];
+    const xml = `<save><version major="4" minor="8"/><region id="ModuleSettings"><node id="root"><children>
+      <node id="Mods"><children>
+        ${modules.map(moduleNode).join("\n")}
+      </children></node>
+    </children></node></region></save>`;
+    write(path.join(source, "PlayerProfiles", "Public", "modsettings.lsx"), xml);
+
+    const mods = parseModSettings(xml);
+    assert.ok(mods.some((mod) => mod.name === "Valkrana's Skeleton Crew"));
+    assert.ok(mods.some((mod) => mod.name === "Mystra's Spells"));
+
+    const contents = contentsFor({ recipe: loadRecipe("bg3-modded"), source, version: "2026.11.21" });
+    const byLabel = Object.fromEntries(contents.items.map((item) => [item.label, item.path]));
+    assert.equal(contents.count, 8);
+    assert.equal(byLabel["Path of Undeath"], "Mods/Path of Undeath.pak");
+    assert.equal(byLabel["Valkrana's Skeleton Crew"], "Mods/Valkrana's Skeleton Crew.pak");
+    assert.equal(byLabel["Valkrana's Spellbook"], "Mods/Valkrana's Spellbook.pak");
+    assert.equal(byLabel["Warlock Spell List Fixer"], "Mods/Warlock Spell List Fixer.pak");
+    assert.equal(byLabel["Whispers of the Divine: Aasimar Script Extender Edition"], "Mods/WotD-Aasimar.pak");
+    assert.equal(byLabel["Extra encounters and Minibosses"], "Mods/extra_encounters_plus_6324f71c7nct.pak");
+    assert.equal(byLabel["Mystra's Spells"], "Mods/test_4b516620-9c56-aa18-96ae-a-dk21.pak");
+    assert.equal(byLabel["Dread Overlord | Mystra's Spells - Compatibility"], "Mods/test_27f18a86-94f8-1f5c-760c-1-gxcc.pak");
+    assert.deepEqual(contents.inactive, ["CombatMod.pak"]);
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
 
 test("the BG3 driver records the active module list in the pack", async () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-bg3-driver-"));
@@ -75,8 +130,7 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.equal(result.pack.platforms["linux-native"].template, "games/bg3-native.sh");
     assert.equal(result.pack.platforms["linux-proton"].gameProcess, "bg3.exe");
     assert.match(result.pack.platforms["linux-proton"].dataDir, /^%PREFIX%/);
-    assert.equal(result.pack.install.options.bg3le.version, "0.4.6");
-    assert.equal(result.pack.install.options.bg3se, true);
+    assert.equal(result.pack.install.type, "bg3");
     assert.equal(result.pack.launch.profile, undefined);
     assert.equal(result.pack.launch.saveFile, undefined);
 

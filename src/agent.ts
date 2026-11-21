@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { URL } from "node:url";
+import { contentType, readJsonBody } from "./http";
 import * as util from "./util";
 import * as steam from "./steam";
 import * as installer from "./installer";
@@ -28,22 +29,9 @@ import type {
   Pack,
   PackSummary,
   Platforms,
-  PreconditionConfig,
   PreconditionsResult,
-  SteamGame,
   Variant,
 } from "./types";
-
-function contentType(p: string): string {
-  switch (path.extname(p).toLowerCase()) {
-    case ".png": return "image/png";
-    case ".jpg": case ".jpeg": return "image/jpeg";
-    case ".js": return "text/javascript";
-    case ".css": return "text/css";
-    case ".html": return "text/html";
-    default: return "application/octet-stream";
-  }
-}
 
 interface RequestBody {
   packId?: string;
@@ -52,24 +40,6 @@ interface RequestBody {
   scope?: string;
   dryRun?: boolean;
   [key: string]: unknown;
-}
-
-function readBody(req: http.IncomingMessage): Promise<RequestBody> {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (c: Buffer) => {
-      data += c;
-      if (data.length > 1e6) reject(new Error("body too large"));
-    });
-    req.on("end", () => {
-      if (!data) return resolve({});
-      try {
-        const parsed = JSON.parse(data) as unknown;
-        resolve(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as RequestBody : {});
-      } catch (e) { reject(e); }
-    });
-    req.on("error", reject);
-  });
 }
 
 export interface AgentConfig {
@@ -588,7 +558,7 @@ export function createAgent(config: AgentOptions): Agent {
           res.writeHead(409, { "content-type": "application/json" });
           return res.end(JSON.stringify({ error: "Cancel the running install first." }));
         }
-        const body = await readBody(req);
+        const body = await readJsonBody<RequestBody>(req);
         if (body.scope !== "logs" && body.packId) {
           try {
             const pack = util.readJson<Pack>(versionStore.packFile(versionStore.packRoot(root, body.packId)));
@@ -619,7 +589,7 @@ export function createAgent(config: AgentOptions): Agent {
         return res.end(JSON.stringify({ ok: true, ...out, storage: storage.computeStorage(root) }));
       }
       if (url.pathname === "/api/preconditions/confirm" && req.method === "POST") {
-        const body = await readBody(req);
+        const body = await readJsonBody<RequestBody>(req);
         if (!body.packId || !body.checkId) {
           res.writeHead(400, { "content-type": "application/json" });
           return res.end(JSON.stringify({ error: "packId and checkId required" }));
@@ -628,21 +598,21 @@ export function createAgent(config: AgentOptions): Agent {
         return res.end(JSON.stringify(setConfirmation(body.packId, body.checkId, body.confirmed !== false)));
       }
       if (url.pathname === "/api/install" && req.method === "POST") {
-        const body = await readBody(req);
+        const body = await readJsonBody<RequestBody>(req);
         if (!body.packId) { res.writeHead(400); return res.end(JSON.stringify({ error: "packId required" })); }
         const job = startInstallJob(body.packId);
         res.writeHead(202, { "content-type": "application/json" });
         return res.end(JSON.stringify({ jobId: job.id }));
       }
       if (url.pathname === "/api/launch" && req.method === "POST") {
-        const body = await readBody(req);
+        const body = await readJsonBody<RequestBody>(req);
         if (!body.packId) { res.writeHead(400); return res.end(JSON.stringify({ error: "packId required" })); }
         const out = await launchPack(body.packId);
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify(out));
       }
       if (url.pathname === "/api/rollback" && req.method === "POST") {
-        const body = await readBody(req);
+        const body = await readJsonBody<RequestBody>(req);
         if (!body.packId) { res.writeHead(400); return res.end(JSON.stringify({ error: "packId required" })); }
         const pack = localPack(body.packId);
         if (!pack) throw new Error("Pack is not installed on this TV.");

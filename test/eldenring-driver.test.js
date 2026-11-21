@@ -108,6 +108,43 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
   }
 });
 
+test("Elden Ring contents label every package and count only enabled ones", () => {
+  const src = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-er-contents-"));
+  try {
+    write(path.join(src, "profiles", "graceborne-1.0.0.me3"), `profileVersion = "v1"
+savefile = "ER0000.graceborne.sl2"
+
+[[packages]]
+enabled = true
+path = '../mods/graceborne/versions/1.0.0/mod'
+load_after = []
+load_before = []
+
+[[packages]]
+enabled = true
+path = '../mods/extra/versions/2.0.0/mod'
+load_after = []
+load_before = []
+
+[[packages]]
+enabled = false
+path = '../mods/optional/versions/3.0.0/mod'
+load_after = []
+load_before = []
+`);
+    const contents = contentsFor({
+      recipe: loadRecipe("eldenring-graceborne"),
+      source: src,
+      version: "1.0.0",
+    });
+    assert.equal(contents.count, 2);
+    assert.deepEqual(contents.items.map((item) => item.label), ["Graceborne", "extra", "optional"]);
+    assert.deepEqual(contents.items.map((item) => item.active), [true, true, false]);
+  } finally {
+    fs.rmSync(src, { recursive: true, force: true });
+  }
+});
+
 test("missing recipes are rejected", () => {
   assert.throws(() => loadRecipe("not-a-recipe"), /recipe not found/);
 });

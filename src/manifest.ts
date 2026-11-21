@@ -104,9 +104,6 @@ export function validatePack(pack: unknown): Pack {
   if (launch.mode != null && (typeof launch.mode !== "string" || !["default", "alternate-exe", "loader"].includes(launch.mode))) {
     throw new Error("pack.json.launch: mode must be default, alternate-exe, or loader");
   }
-  if (launch.defaultExe != null && typeof launch.defaultExe !== "string") {
-    throw new Error("pack.json.launch: defaultExe must be a string");
-  }
   requireString(p, "files", "pack.json");
   if (!p.art || typeof p.art !== "object" || Array.isArray(p.art)) throw new Error("pack.json: missing art");
   const art = p.art as Record<string, unknown>;

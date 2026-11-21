@@ -94,7 +94,6 @@ A pack never contains the base game or saves.
     "type": "me3",
     "mode": "loader",
     "exe": "Game/eldenring.exe",
-    "defaultExe": "Game/eldenring.exe",
     "gameProcess": "eldenring.exe",
     "steamAppId": 1245620
   },
@@ -269,10 +268,9 @@ shortcut is required:
 | `loader` | The pack starts through a loader (me3) | A non-Steam shortcut launches the loader |
 
 `game.exe` is the vanilla/default exe used for discovery. `launch.exe` is what
-the pack actually starts; `launch.defaultExe` records the vanilla target when
-they differ. This prevents a default-exe pack from silently getting a duplicate
-shortcut, and prevents an alternate-exe pack from being launched through the
-wrong Steam entry.
+the pack actually starts. `launch.mode` is explicit pack data, so a default-exe
+pack cannot silently get a duplicate non-Steam shortcut and an alternate-exe
+pack cannot be launched through the wrong Steam entry.
 
 ## Restrictions
 

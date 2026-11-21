@@ -1,13 +1,14 @@
 import {
   app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, safeStorage, shell, Tray,
 } from "electron";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createConsole } from "../src/console";
 import { errorMessage } from "../src/util";
 import { projectRoot } from "../src/root";
-import { RELEASES_PAGE, Updater } from "./updater";
+import { RELEASES_PAGE, Updater, windowsInstallerName } from "./updater";
 import type { ConsoleTokenStore, LoginItemResult } from "../src/console";
 import type { MenuItemConstructorOptions, OpenDialogOptions } from "electron";
 
@@ -326,9 +327,14 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     const updater = new Updater({
       currentVersion: () => app.getVersion(),
-      // The Server only checks for a newer release. Downloading the installer
-      // and replacing the running app stays a manual step from the releases page.
-      appImage: () => null,
+      // An installed Windows Server replaces itself with the latest NSIS
+      // installer. Other builds only report the newer release.
+      installer: app.isPackaged && process.platform === "win32"
+        ? {
+            assetName: (version) => windowsInstallerName("Server", version, process.arch),
+            downloadDir: () => app.getPath("temp"),
+          }
+        : undefined,
       fetch: (url, init) => net.fetch(url, init) as Promise<Response>,
     });
     ipcMain.handle("modsync:version", () => app.getVersion());
@@ -344,6 +350,22 @@ if (!app.requestSingleInstanceLock()) {
           error: errorMessage(err),
         };
       }
+    });
+    ipcMain.handle("modsync:update-install", async () => {
+      const installed = await updater.install();
+      if (installed.kind !== "installer") throw new Error("This copy of ModSync cannot install the update.");
+      // The NSIS installer waits for this process to exit, replaces the app in
+      // place, and reopens it because of --force-run.
+      const child = spawn(installed.path, ["--updated", "/S", "--force-run"], {
+        detached: true,
+        stdio: "ignore",
+      });
+      await new Promise<void>((resolve, reject) => {
+        child.once("spawn", resolve);
+        child.once("error", (err) => reject(new Error(`Could not start the update installer: ${errorMessage(err)}`)));
+      });
+      child.unref();
+      setTimeout(() => app.quit(), 800);
     });
     ipcMain.handle("modsync:releases", () => shell.openExternal(RELEASES_PAGE));
     ipcMain.handle("modsync:pick-folder", async (event, title?: string) => {

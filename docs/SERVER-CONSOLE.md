@@ -52,7 +52,9 @@ Settings; the same action appears in the empty state. It is disabled while a
 build runs, because the build writes into the current folder.
 
 Each pack card shows its game, mod version, file count, size, target platforms,
-build date, and folder. Actions:
+build date, and folder. When the pack records its contents, the card also shows
+a count such as **72 mods**; pressing it opens the full list and any inactive
+pak files from `pack.json`. Actions:
 
 - **Rebuild** builds the recipe into the packs folder. The working install is
   read-only. The build is staged under `.modsync-build/`; the old pack folder is
@@ -106,9 +108,12 @@ and **Quit**. Quit is the only action that fully stops the app and its server.
 
 The console footer shows the running version and a **Check for updates**
 button. It contacts GitHub only when pressed. If a newer release exists, an
-**Update** button with the new version appears next to it and opens the releases
-page; the Server does not replace its own executable. Otherwise the footer
-reports that the build is current.
+**Install x.y.z** button appears next to it on an installed Windows Server.
+Confirming it downloads the new NSIS installer, verifies its SHA-256 checksum,
+runs it silently, and reopens the Server when the install finishes. Packs,
+settings, and the token are kept. Elsewhere the button is **Update x.y.z** and
+opens the releases page. Otherwise the footer reports that the build is
+current.
 
 The Client has the same manual **Check for updates** chip in its header. It no
 longer checks at launch. On the Linux AppImage the Client downloads and verifies

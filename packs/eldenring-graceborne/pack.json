@@ -42,7 +42,6 @@
   "launch": {
     "type": "me3",
     "mode": "loader",
-    "defaultExe": "Game/eldenring.exe",
     "exe": "Game/eldenring.exe",
     "gameProcess": "eldenring.exe",
     "steamAppId": 1245620
@@ -124,8 +123,5 @@
     ],
     "inactive": []
   },
-  "files": "files.json",
-  "save": {
-    "transfer": "out-of-scope"
-  }
+  "files": "files.json"
 }

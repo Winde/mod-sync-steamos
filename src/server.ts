@@ -2,25 +2,13 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
+import { contentType, readJsonBody } from "./http";
 import { loadPack, packSummary } from "./manifest";
 import labels from "./labels";
 import { createPairingStore } from "./pairing";
 import { errorMessage, safeJoin } from "./util";
 import type { PairingStore } from "./pairing";
 import type { ArtInfo, PackSummary } from "./types";
-
-export function contentType(p: string): string {
-  switch (path.extname(p).toLowerCase()) {
-    case ".png": return "image/png";
-    case ".jpg": case ".jpeg": return "image/jpeg";
-    case ".json": return "application/json";
-    case ".js": return "text/javascript";
-    case ".css": return "text/css";
-    case ".html": return "text/html";
-    case ".desktop": return "text/plain";
-    default: return "application/octet-stream";
-  }
-}
 
 function sendJson(res: http.ServerResponse, code: number, value: unknown): void {
   const body = JSON.stringify(value);
@@ -31,29 +19,6 @@ function sendJson(res: http.ServerResponse, code: number, value: unknown): void 
 function sendText(res: http.ServerResponse, code: number, text: string, type = "text/plain; charset=utf-8"): void {
   res.writeHead(code, { "content-type": type, "content-length": Buffer.byteLength(text) });
   res.end(text);
-}
-
-function readJsonBody(req: http.IncomingMessage, limit = 8192): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk: Buffer) => {
-      data += chunk;
-      if (data.length > limit) {
-        reject(new Error("body too large"));
-        req.destroy();
-      }
-    });
-    req.on("end", () => {
-      if (!data) return resolve({});
-      try {
-        const parsed = JSON.parse(data) as unknown;
-        resolve(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {});
-      } catch {
-        reject(new Error("invalid JSON body"));
-      }
-    });
-    req.on("error", reject);
-  });
 }
 
 export type RangeResult =
@@ -164,7 +129,7 @@ export function createServer({
     if (url.pathname === "/api/pair/request" && req.method === "POST") {
       let body: Record<string, unknown> = {};
       try {
-        body = await readJsonBody(req);
+        body = await readJsonBody(req, 8192);
       } catch (err) {
         return sendJson(res, 400, { error: errorMessage(err) });
       }

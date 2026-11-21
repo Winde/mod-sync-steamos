@@ -69,7 +69,11 @@ generated `pack.json` remains the definition the agent serves.
   them to `buildPack` as `driverOptions`.
 - `contentsFor({ recipe, source, version })` — return the normalized contents
   summary. Every driver exposes the same method and emits `items`/`itemsLabel`,
-  so renderers and PC tooling do not branch on the game id.
+  so renderers and PC tooling do not branch on the game id. The BG3 summary
+  decodes `modsettings.lsx` entities and matches active mods to published paks
+  by UUID, folder, display name, and truncated filename prefixes; unmatched
+  paks are reported as inactive. The Elden Ring summary follows the me3
+  profile's `[[packages]]` and labels each package from its path.
 - Loader helpers live under `src/loaders/` (`me3`, `bg3le`) and own runtime
   layout, profile parsing, tool platform tags, and executable modes. Drivers
   supply the game-specific source paths.

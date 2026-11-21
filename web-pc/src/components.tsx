@@ -5,10 +5,13 @@ import type {
   BuildFormState,
   BuildJobState,
   ConsoleState,
+  ContentsItemState,
+  ContentsState,
   PackState,
   PairRequestState,
   SettingsDraft,
   ToastItem,
+  UpdateInfo,
 } from "./types";
 
 export function Header({ data, busy, onToggleServer }: {
@@ -50,6 +53,17 @@ export function Header({ data, busy, onToggleServer }: {
       </div>
     </header>
   );
+}
+
+function activeContents(contents: ContentsState | null | undefined): ContentsItemState[] {
+  return (contents?.items || []).filter((item) => item.active !== false);
+}
+
+function contentsCountLabel(contents: ContentsState): string {
+  const count = Array.isArray(contents.items) ? activeContents(contents).length : contents.count || 0;
+  const raw = (contents.itemsLabel || "items").replace(/^included\s+/i, "").trim() || "items";
+  const singular = /ies$/i.test(raw) ? raw.replace(/ies$/i, "y") : /s$/i.test(raw) ? raw.slice(0, -1) : raw;
+  return `${count} ${count === 1 ? singular : raw}`;
 }
 
 export function PackArt({ pack }: { pack: PackState }) {
@@ -127,6 +141,7 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
     ? `${valid.length} pack${valid.length === 1 ? "" : "s"} · ${formatBytes(bytes)}`
     : "Loading packs…";
   const buildName = data && job ? data.recipes.find((recipe) => recipe.id === job.recipeId)?.name || job.packId : "";
+  const [contentsPack, setContentsPack] = useState<PackState | null>(null);
 
   return (
     <section className="panel library">
@@ -201,6 +216,16 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
                 <div className="meta">
                   <span className="badge">{formatBytes(pack.totalBytes)}</span>
                   <span className="badge">{pack.files} files</span>
+                  {pack.contents ? (
+                    <button
+                      className="badge badgebtn"
+                      type="button"
+                      data-action="contents"
+                      data-id={pack.id}
+                      title="Show the mods recorded in this pack"
+                      onClick={() => setContentsPack(pack)}
+                    >{contentsCountLabel(pack.contents)}</button>
+                  ) : null}
                   <span className="badge">{pack.platforms.map(platformName).join(" · ")}</span>
                   {pack.modifiedAt ? <span className="badge">built {formatDate(pack.modifiedAt)}</span> : null}
                 </div>
@@ -226,7 +251,54 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
           );
         })}
       </div>
+      {contentsPack ? <ContentsModal pack={contentsPack} onClose={() => setContentsPack(null)} /> : null}
     </section>
+  );
+}
+
+export function ContentsModal({ pack, onClose }: {
+  pack: PackState;
+  onClose: () => void;
+}) {
+  const contents = pack.contents;
+  if (!contents) return null;
+  const items = contents.items || [];
+  const inactive = contents.inactive || [];
+  return (
+    <Modal onClose={onClose}>
+      <div className="modalhead">
+        <div>
+          <h2>{pack.name || pack.id}</h2>
+          <p className="muted">
+            {contents.itemsLabel || "Contents"}
+            {contents.source ? ` · from ${contents.source}` : ""}
+            {` · ${contentsCountLabel(contents)}`}
+          </p>
+        </div>
+        <button className="btn small" data-action="close-modal" onClick={onClose}>Close</button>
+      </div>
+      {items.length ? (
+        <div className="contentslist">
+          {items.map((item, index) => (
+            <div className={`contentsitem${item.active === false ? " inactive" : ""}`} key={`${item.label}-${index}`}>
+              <span>{item.label || item.path || "Unnamed item"}{item.active === false ? " (inactive)" : ""}</span>
+              {item.path ? <code>{item.path}</code> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="callout">This pack has no item list recorded. Rebuild it or run the contents refresh to add one.</div>
+      )}
+      {inactive.length ? (
+        <>
+          <p className="contentsnote"><b>{inactive.length} inactive file{inactive.length === 1 ? "" : "s"}</b> in the pack</p>
+          <div className="contentsinactive">{inactive.join(", ")}</div>
+        </>
+      ) : null}
+      <div className="actions">
+        <button className="btn primary" data-action="close-contents" onClick={onClose}>Close</button>
+      </div>
+    </Modal>
   );
 }
 
@@ -703,6 +775,39 @@ export function RemoveModal({ pack, busy, onConfirm, onClose }: {
         <button className="btn danger" data-action="confirm-remove" data-id={pack.id} disabled={busy} onClick={onConfirm}>Remove pack</button>
         <button className="btn small" data-action="close-modal" onClick={onClose}>Keep it</button>
       </div>
+    </Modal>
+  );
+}
+
+export function UpdateModal({ info, installing, onInstall, onClose }: {
+  info: UpdateInfo;
+  installing: boolean;
+  onInstall: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal onClose={() => { if (!installing) onClose(); }}>
+      <div className="modalhead">
+        <div>
+          <h2>Update ModSync Server to {info.latest}?</h2>
+          <p className="muted">Currently running {info.current}.</p>
+        </div>
+        {installing ? null : <button className="btn small" data-action="close-modal" onClick={onClose}>Not now</button>}
+      </div>
+      {installing ? (
+        <div className="callout installing">
+          <span className="spinner" />
+          <span>Downloading and installing {info.latest}. ModSync Server will restart on its own.</span>
+        </div>
+      ) : (
+        <>
+          <p>The pack server stops while the new version installs. Packs, settings, and the token stay in place, and the Server reopens when the install is done.</p>
+          <div className="actions">
+            <button className="btn primary" data-action="install-update" onClick={onInstall}>Install and restart</button>
+            <button className="btn small" onClick={onClose}>Not now</button>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }

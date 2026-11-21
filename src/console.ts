@@ -4,6 +4,7 @@ import http from "node:http";
 import path from "node:path";
 import { URL } from "node:url";
 import * as drivers from "./drivers";
+import { contentType, readJsonBody } from "./http";
 import labels from "./labels";
 import { loadPack, packSummary } from "./manifest";
 import * as recipes from "./recipes";
@@ -12,7 +13,7 @@ import { createServer } from "./server";
 import * as util from "./util";
 import type { Driver } from "./drivers";
 import type { PairingStore, PairRequestView } from "./pairing";
-import type { BuildOption, BuildProgress, PackSummary, Recipe, Variant } from "./types";
+import type { BuildOption, BuildProgress, ContentsSummary, PackSummary, Recipe, Variant } from "./types";
 
 /**
  * PC-side pack console.
@@ -51,6 +52,7 @@ export interface ConsolePack {
   mod: { id: string; version: string };
   files: number;
   totalBytes: number;
+  contents: ContentsSummary | null;
   platforms: Variant[];
   root: string;
   modifiedAt: string;
@@ -249,29 +251,6 @@ function modeValue(value: unknown): BindMode {
   return value === "loopback" || value === "host" ? value : "lan";
 }
 
-function readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk: Buffer) => {
-      data += chunk;
-      if (data.length > 1_000_000) {
-        reject(new Error("body too large"));
-        req.destroy();
-      }
-    });
-    req.on("end", () => {
-      if (!data) return resolve({});
-      try {
-        const parsed = JSON.parse(data) as unknown;
-        resolve(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {});
-      } catch (err) {
-        reject(err);
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
 function sendJson(res: http.ServerResponse, code: number, value: unknown): void {
   const body = JSON.stringify(value);
   res.writeHead(code, {
@@ -284,20 +263,6 @@ function sendJson(res: http.ServerResponse, code: number, value: unknown): void 
 
 function sendError(res: http.ServerResponse, err: unknown, code = 500): void {
   sendJson(res, code, { error: util.errorMessage(err) });
-}
-
-function contentType(file: string): string {
-  switch (path.extname(file).toLowerCase()) {
-    case ".png": return "image/png";
-    case ".jpg": case ".jpeg": return "image/jpeg";
-    case ".svg": return "image/svg+xml";
-    case ".json": return "application/json";
-    case ".js": return "text/javascript; charset=utf-8";
-    case ".css": return "text/css; charset=utf-8";
-    case ".html": return "text/html; charset=utf-8";
-    case ".ico": return "image/x-icon";
-    default: return "application/octet-stream";
-  }
 }
 
 function isInside(root: string, target: string): boolean {
@@ -544,6 +509,7 @@ export function createConsole(options: ConsoleOptions): Console {
           mod: { id: summary.mod.id, version: summary.mod.version },
           files: summary.files,
           totalBytes: summary.totalBytes,
+          contents: summary.contents,
           platforms: summary.platforms ? Object.keys(summary.platforms) as Variant[] : ["windows", "linux-proton"],
           root,
           modifiedAt,
@@ -561,6 +527,7 @@ export function createConsole(options: ConsoleOptions): Console {
           mod: { id: "", version: "" },
           files: 0,
           totalBytes: 0,
+          contents: null,
           platforms: [],
           root,
           modifiedAt,
@@ -1000,7 +967,7 @@ export function createConsole(options: ConsoleOptions): Console {
       return sendJson(res, 200, await stopServer());
     }
     if ((url.pathname === "/api/pair/approve" || url.pathname === "/api/pair/deny") && method === "POST") {
-      const body = await readBody(req);
+      const body = await readJsonBody(req);
       const id = String(body.id || "");
       if (!runtime) return sendJson(res, 409, { error: "Start the pack server before approving a TV." });
       const accepted = url.pathname.endsWith("/approve")
@@ -1010,11 +977,11 @@ export function createConsole(options: ConsoleOptions): Console {
       return sendJson(res, 200, { ok: true, pairRequests: runtime.pairing.list() });
     }
     if (url.pathname === "/api/settings" && method === "POST") {
-      const body = await readBody(req);
+      const body = await readJsonBody(req);
       return sendJson(res, 200, await updateSettings(body as Partial<ConsoleConfig> & { workingSource?: { recipeId: string; source: string } }));
     }
     if (url.pathname === "/api/build" && method === "POST") {
-      const body = await readBody(req);
+      const body = await readJsonBody(req);
       return sendJson(res, 202, startBuild({
         recipeId: String(body.recipeId || ""),
         source: body.source == null ? undefined : String(body.source),
@@ -1026,7 +993,7 @@ export function createConsole(options: ConsoleOptions): Console {
       }));
     }
     if (url.pathname === "/api/packs/remove" && method === "POST") {
-      const body = await readBody(req);
+      const body = await readJsonBody(req);
       if (body.confirm !== true) {
         return sendJson(res, 400, { error: "Pack removal needs explicit confirmation." });
       }

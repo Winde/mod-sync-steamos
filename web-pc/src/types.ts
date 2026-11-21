@@ -23,6 +23,22 @@ export interface SettingsState {
   working: Record<string, { source: string }>;
 }
 
+export interface ContentsItemState {
+  label: string;
+  path?: string;
+  active?: boolean;
+  optional?: boolean;
+}
+
+export interface ContentsState {
+  count: number;
+  source?: string;
+  generatedAt?: string;
+  itemsLabel?: string;
+  items?: ContentsItemState[];
+  inactive?: string[];
+}
+
 export interface PackState {
   valid: boolean;
   id: string;
@@ -32,6 +48,7 @@ export interface PackState {
   mod: { id: string; version: string };
   files: number;
   totalBytes: number;
+  contents: ContentsState | null;
   platforms: string[];
   root: string;
   modifiedAt: string;
@@ -145,6 +162,7 @@ export interface UpdateInfo {
 export interface DesktopBridge {
   pickFolder?(title?: string): Promise<string | null>;
   checkUpdate?(): Promise<UpdateInfo | null>;
+  installUpdate?(): Promise<void>;
   openReleases?(): Promise<void>;
 }
 
