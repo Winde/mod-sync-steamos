@@ -6,7 +6,8 @@ A driver describes one game family for the pack builder and the agent.
 
 - `id` — `eldenring`
 - `buildPack({ source, out, link })` — read the working install and write
-  `pack.json`, `files.json`, payload, profile, tools, art.
+  `pack.json`, `files.json`, payload, profile, tools, art. The driver owns the
+  pack's `notes` and `preconditions`; they are data, not core code.
 - The agent does not execute driver code; it uses the generic `pack.json` fields:
   - `game` — Steam app id, install dir, build, prefix requirement.
   - `launch` — exe, process name, loader binary, profile, save file.
@@ -19,7 +20,7 @@ custom install steps (e.g. WeiDU).
 
 | Game | Shape | Driver | Loader | Notes |
 |---|---|---|---|---|
-| ELDEN RING | Overlay | `eldenring` | me3 | v1; build 25827938 / 1.17 |
+| ELDEN RING | Overlay | `eldenring` | me3 | v1; build 25827938 / 1.17; see `docs/packs/eldenring-graceborne.md` |
 | Skyrim SE | Overlay/profile | `skyrim-se` | SKSE + MO2/Vortex | save paths/MO2 profile later |
 | Baldur's Gate 3 | Profile | `bg3` | BG3MM | `modsettings.lsx` + profile |
 | Baldur's Gate 2 EE | In-place recipe | `bg2-weidu` | WeiDU | needs clean game backup + install order |

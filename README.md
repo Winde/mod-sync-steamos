@@ -39,17 +39,16 @@ The TV does **not** need Node or SSH; it pulls over HTTP.
 
 ## Quick start (Steam Machine)
 
-1. Install ELDEN RING via Steam; launch vanilla once (creates the Proton prefix).
-2. Set **Only update this game when I launch it**; keep 1.17.
-3. In Desktop Mode, run the one-liner printed by `serve`:
+1. Install the pack's game via Steam and launch it once so its Proton prefix
+   exists. Pack-specific prerequisites live in `docs/packs/<pack-id>.md`.
+2. In Desktop Mode, run the one-liner printed by `serve`:
    ```bash
    curl -fsSL 'http://192.168.1.98:8787/bootstrap.sh?token=...' | bash
    ```
-4. Add `~/Desktop/ModSync.desktop` to Steam as a non-Steam game.
-5. Open ModSync, install Graceborne, and add the generated Graceborne shortcut
-   to Steam (the agent writes `~/Desktop/Graceborne.desktop`).
-6. Launch from Game Mode. First run creates the TV's own `ER0000.graceborne.sl2`;
-   the PC save is not transferred in v1.
+3. Add `~/Desktop/ModSync.desktop` to Steam as a non-Steam game.
+4. Open ModSync and install the pack. The agent writes a launch shortcut for the
+   pack (`~/Desktop/<Pack>.desktop`); add it to Steam if it is not there.
+5. Launch from Game Mode. Saves stay local to each machine in v1.
 
 ## Network (one-time)
 
@@ -90,8 +89,9 @@ the game is closed.
 
 ## What the agent does
 
-- Reads the pack manifest from the PC.
-- Verifies the game build (`25827938` = 1.17) and the Proton prefix.
+- Reads the pack manifest from the PC, shows its notes, and evaluates its
+  structured preconditions (game installed/build, prefix, disk, DLC files).
+- Verifies the game build declared by the pack and the Proton prefix.
 - Refuses to install while the game is running.
 - Downloads each file with SHA-256 verification; writes to a staging version.
 - Writes a me3 profile, a Linux launcher, and a `.desktop` shortcut.
@@ -110,3 +110,4 @@ the game is closed.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — pack/driver/platform model and restrictions
 - [`docs/TRANSPORT.md`](docs/TRANSPORT.md) — HTTP pull, token, firewall/VPN
 - [`docs/DRIVERS.md`](docs/DRIVERS.md) — adding Skyrim/BG3/BG2 drivers
+- [`docs/packs/eldenring-graceborne.md`](docs/packs/eldenring-graceborne.md) — pack-specific setup

@@ -83,6 +83,70 @@ A pack never contains the base game or saves.
 }
 ```
 
+### Notes
+
+`notes` is optional, human-readable guidance for steps the core does not
+automate. The dashboard shows it before install and in Details; the Electron
+client renders the same array.
+
+```json
+"notes": [
+  {
+    "title": "Stay on build 25827938",
+    "body": "Set Only update this game when I launch it in Steam.",
+    "tone": "warning"
+  }
+]
+```
+
+A note is either a string or `{ title?, body, tone? }`, where `tone` is
+`info` (default), `warning`, `error`, or `success`.
+
+### Preconditions
+
+`preconditions` is optional, structured and machine-checked. Each entry has an
+`id`, a `type`, and `required` (default `false`).
+
+```json
+"preconditions": [
+  { "id": "game", "type": "game-installed", "required": true },
+  { "id": "build", "type": "game-build", "required": true, "build": "25827938" },
+  { "id": "prefix", "type": "proton-prefix", "required": true,
+    "hint": "Launch the vanilla game once from Steam." },
+  { "id": "space", "type": "disk-free", "required": true, "reserveBytes": 1073741824 }
+]
+```
+
+Supported types:
+
+| Type | Checks | Fields |
+|---|---|---|
+| `game-installed` | Game root exists in a Steam library | — |
+| `game-build` | Steam `buildid` matches | `build` (defaults to `game.build`) |
+| `game-not-running` | Game process is not running | — |
+| `proton-prefix` | `compatdata/<appId>/pfx` exists on Linux | — |
+| `disk-free` | Free space at the TV root is enough | `bytes` or `reserveBytes` |
+| `path-exists` | A file/dir exists under the game or TV root | `path` or `paths`, `scope: "game" \| "tv"` |
+| `dlc-installed` | Steam manifest, installed depot, or DLC paths | `dlcAppId`, `depotIds`, `paths` |
+| `manual` | User confirms in the app | `hint` |
+
+Each check returns `pass`, `fail`, or `unknown`. A required `fail` blocks the
+install. A required `unknown` also blocks unless the pack sets
+`"allowUnknown": true`. Non-required checks are advisory.
+
+Steam does not expose DLC ownership offline. `dlc-installed` therefore checks
+**installation**: a DLC app manifest, one of the declared `depotIds` in the base
+game's `InstalledDepots`, or a declared file path. When none of those are
+configured the check is `unknown`. Use `manual` for purchase-only confirmation.
+
+`"confirmable": true` lets the user confirm any failed/unknown check from the
+dashboard; confirmations are stored on the TV at
+`state/preconditions.json`. `manual` checks are confirmable by definition.
+
+The agent evaluates the checks for the dashboard and again in the installer, so
+an install cannot start from a stale or bypassed dashboard. The same
+`src/preconditions.js` module is used by the Electron client.
+
 The agent writes files whose target starts with
 `mods/<mod>/versions/<version>/` into a staging directory, then swaps it in.
 Profiles/tools/art are written directly under the pack install root.

@@ -5,6 +5,7 @@ const { validatePack, validateFiles } = require("../src/manifest");
 const { safeJoin, formatBytes } = require("../src/util");
 const { compareVersions } = require("../src/installer");
 const { shortcutId } = require("../src/steam");
+const { parseRange } = require("../src/server");
 
 const pack = {
   schema: 1,
@@ -48,4 +49,14 @@ test("shortcut ids are stable and unsigned", () => {
 test("formatBytes", () => {
   assert.equal(formatBytes(0), "0 B");
   assert.match(formatBytes(1024 * 1024), /MB/);
+});
+
+test("HTTP Range parsing supports resume", () => {
+  assert.deepEqual(parseRange("bytes=0-99", 1000), { start: 0, end: 99 });
+  assert.deepEqual(parseRange("bytes=100-", 1000), { start: 100, end: 999 });
+  assert.deepEqual(parseRange("bytes=-100", 1000), { start: 900, end: 999 });
+  assert.deepEqual(parseRange("bytes=900-2000", 1000), { start: 900, end: 999 });
+  assert.deepEqual(parseRange("bytes=1000-", 1000), { invalid: true });
+  assert.deepEqual(parseRange("chunks=1-2", 1000), { invalid: true });
+  assert.equal(parseRange(null, 1000), null);
 });

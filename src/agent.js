@@ -8,6 +8,7 @@ const { spawn } = require("node:child_process");
 const util = require("./util");
 const steam = require("./steam");
 const installer = require("./installer");
+const preconditions = require("./preconditions");
 
 function contentType(p) {
   switch (path.extname(p).toLowerCase()) {
@@ -45,6 +46,7 @@ function jobSummary(job) {
     bytesDone: job.bytesDone || 0,
     bytesTotal: job.bytesTotal || 0,
     error: job.error || null,
+    startedAt: job.startedAt || null,
     log: (job.log || []).slice(-60),
   };
 }
@@ -60,8 +62,23 @@ function createAgent(config) {
   let lastJob = null;
   let remoteCache = { at: 0, packs: [], error: null };
   const artCache = new Map();
+  const confirmFile = path.join(root, "state", "preconditions.json");
 
   const packRoot = (id) => path.join(root, "packs", id);
+
+  function readConfirmations() {
+    try { return util.readJson(confirmFile); } catch { return {}; }
+  }
+
+  function setConfirmation(packId, checkId, confirmed) {
+    const all = readConfirmations();
+    const forPack = all[packId] || (all[packId] = {});
+    if (confirmed) forPack[checkId] = { confirmedAt: new Date().toISOString() };
+    else delete forPack[checkId];
+    util.ensureDir(path.dirname(confirmFile));
+    util.writeJson(confirmFile, all);
+    return { packId, checkId, confirmed };
+  }
 
   async function fetchRemote(force = false) {
     if (!force && Date.now() - remoteCache.at < 2500) return remoteCache;
@@ -93,6 +110,7 @@ function createAgent(config) {
       installedVersion: current || null,
       versions,
       status: !current ? "not-installed" : (current === pack.mod.version ? "up-to-date" : "update-available"),
+      staging: fs.existsSync(path.join(versionsDir, `.staging-${pack.mod.version}`)),
       packRoot: pr,
       launcher: fs.existsSync(launcher) ? launcher : null,
       desktopFile: fs.existsSync(desktop) ? desktop : null,
@@ -118,13 +136,26 @@ function createAgent(config) {
 
   async function state() {
     const remote = await fetchRemote();
-    const packs = (remote.packs || []).map((p) => ({ ...p, ...localInfo(p) }));
+    const confirmed = readConfirmations();
+    const packs = (remote.packs || []).map((p) => {
+      const li = localInfo(p);
+      const game = steam.findGame(p.game);
+      const pre = preconditions.evaluatePreconditions({
+        pack: p,
+        game,
+        root,
+        totalBytes: p.totalBytes,
+        confirmed: confirmed[p.id] || {},
+      });
+      return { ...p, ...li, preconditions: pre, blocked: pre.blocked };
+    });
     const first = (remote.packs || [])[0];
     return {
       agent: { version: "0.1.0", root, port },
       pc: { url: pcUrl, online: !remote.error && !!pcUrl, error: remote.error || null },
       game: await gameState(first),
       packs,
+      diskFreeBytes: util.freeBytes(root),
       job: activeJob ? jobSummary(activeJob) : (lastJob ? jobSummary(lastJob) : null),
     };
   }
@@ -151,6 +182,7 @@ function createAgent(config) {
       bytesDone: 0,
       bytesTotal: 0,
       log: [],
+      controller: new AbortController(),
       startedAt: new Date().toISOString(),
     };
     jobs.set(job.id, job);
@@ -172,6 +204,8 @@ function createAgent(config) {
       log(`Installing ${pack.name} ${pack.mod.version}`);
       await installer.installPack({
         pack, filesDoc: files, remoteBase: pcUrl, token, root, game,
+        signal: job.controller.signal,
+        confirmed: readConfirmations()[packId] || {},
         progress: (p) => Object.assign(job, p),
         log,
       });
@@ -179,14 +213,27 @@ function createAgent(config) {
       job.phase = "done";
       log("Install complete.");
     })().catch((err) => {
-      job.status = "error";
-      job.phase = "error";
-      job.error = err.message;
-      log(`ERROR: ${err.message}`);
+      if (err.name === "AbortError" || job.controller.signal.aborted) {
+        job.status = "canceled";
+        job.phase = "canceled";
+        log("Canceled. Completed files are kept; Resume continues.");
+      } else {
+        job.status = "error";
+        job.phase = "error";
+        job.error = err.message;
+        log(`ERROR: ${err.message}`);
+      }
     }).finally(() => {
       activeJob = null;
     });
     return job;
+  }
+
+  function cancelJob(id) {
+    const job = jobs.get(id) || activeJob;
+    if (!job || job.status !== "running") throw new Error("No running job.");
+    job.controller.abort();
+    return { ok: true };
   }
 
   async function launchPack(packId) {
@@ -250,12 +297,26 @@ function createAgent(config) {
         res.writeHead(200, { "content-type": "image/png" });
         return res.end(buf);
       }
+      if (url.pathname.startsWith("/api/jobs/") && url.pathname.endsWith("/cancel") && req.method === "POST") {
+        const id = url.pathname.split("/")[3];
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify(cancelJob(id)));
+      }
       if (url.pathname.startsWith("/api/jobs/")) {
         const id = url.pathname.split("/")[3];
         const job = jobs.get(id);
         if (!job) { res.writeHead(404); return res.end("{}"); }
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify(jobSummary(job)));
+      }
+      if (url.pathname === "/api/preconditions/confirm" && req.method === "POST") {
+        const body = await readBody(req);
+        if (!body.packId || !body.checkId) {
+          res.writeHead(400, { "content-type": "application/json" });
+          return res.end(JSON.stringify({ error: "packId and checkId required" }));
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify(setConfirmation(body.packId, body.checkId, body.confirmed !== false)));
       }
       if (url.pathname === "/api/install" && req.method === "POST") {
         const body = await readBody(req);

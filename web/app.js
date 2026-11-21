@@ -16,6 +16,10 @@
     offline: false,
     confirm: null,
     details: null,
+    download: null,
+    wakeLock: null,
+    rate: [],
+    polling: false,
     focusKey: null,
     lastRefresh: 0,
   };
@@ -24,6 +28,20 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const pct = (a, b) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
   const gb = (n) => (n / 1024 / 1024 / 1024).toFixed(2);
+  const fmtBytes = (n) => {
+    let v = Number(n) || 0;
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
+  };
+  const fmtDuration = (sec) => {
+    if (sec == null || !Number.isFinite(sec)) return "—";
+    const s = Math.max(0, Math.round(sec));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h ? `${h} h ${m} min` : m ? `${m} min` : `${s} s`;
+  };
 
   async function api(path, options = {}) {
     const res = await fetch(path, { headers: { "content-type": "application/json" }, ...options });
@@ -42,7 +60,7 @@
       const packs = S.data.packs || [];
       if (!S.selected || !packs.some((p) => p.id === S.selected)) S.selected = packs[0] ? packs[0].id : null;
       if (S.data.job && S.data.job.status === "running") S.job = await api(`/api/jobs/${S.data.job.id}`);
-      S.lastRefresh = Date.now();
+      else if (!S.polling && S.job && S.job.status === "running") S.job = S.data.job || null;
     } catch (err) {
       S.error = err.message;
       S.offline = true;
@@ -57,23 +75,64 @@
   function gameWarning() {
     const g = S.data?.game;
     if (!g) return null;
-    if (!g.path) return "ELDEN RING was not found on this TV. Install it in Steam, then refresh.";
+    const title = g.title || "This game";
+    if (!g.path) return `${title} was not found on this TV. Install it in Steam, then refresh.`;
     if (g.expectedBuild && g.build && String(g.build) !== String(g.expectedBuild)) {
-      return `ELDEN RING is on build ${g.build}; this pack needs ${g.expectedBuild} (1.17).`;
+      return `${title} is on build ${g.build}; this pack needs ${g.expectedBuild}.`;
     }
-    if (g.prefixReady === false) return "Launch ELDEN RING once from Steam so its Proton prefix exists, then refresh.";
+    if (g.prefixReady === false) return `Launch ${title} once from Steam so its Proton prefix exists, then refresh.`;
     return null;
   }
 
   function packState(p) {
     if (!p) return { label: "No pack", primary: null };
     if (p.status === "up-to-date") return { label: `Installed ${p.installedVersion} · up to date`, primary: { action: "launch", label: "Play" } };
-    if (p.status === "update-available") return { label: `Installed ${p.installedVersion} · update ${p.mod.version} available`, primary: { action: "install", label: "Update" } };
-    return { label: "Ready to install", primary: { action: "install", label: "Install" } };
+    if (p.staging) return { label: p.installed ? `Update ${p.mod.version} paused` : "Download paused", primary: { action: "download", label: "Resume install" } };
+    if (p.status === "update-available") return { label: `Installed ${p.installedVersion} · update ${p.mod.version} available`, primary: { action: "download", label: "Update" } };
+    return { label: "Ready to install", primary: { action: "download", label: "Install" } };
   }
 
   function art(p, key) {
     return `/api/art/${encodeURIComponent(p.id)}/${key}`;
+  }
+
+  function noteList(p) {
+    return (p.notes || []).map((n) => typeof n === "string" ? { body: n, tone: "info", title: "" } : n).filter((n) => n && n.body);
+  }
+
+  function preconditionChecks(p) {
+    return (p.preconditions && p.preconditions.checks) || [];
+  }
+
+  function firstBlocker(p) {
+    return preconditionChecks(p).find((c) => c.blocked) || null;
+  }
+
+  function renderNotes(p) {
+    const notes = noteList(p);
+    if (!notes.length) return "";
+    return `<div class="notes">${notes.map((n) => `
+      <div class="noteitem ${esc(n.tone || "info")}">
+        ${n.title ? `<b>${esc(n.title)}</b>` : ""}
+        <div>${esc(n.body)}</div>
+      </div>`).join("")}</div>`;
+  }
+
+  function renderChecks(p, allowConfirm) {
+    const checks = preconditionChecks(p);
+    if (!checks.length) return "";
+    return `<div class="checks">${checks.map((c) => `
+      <div class="check ${esc(c.status)}">
+        <span class="dot"></span>
+        <div class="ctext">
+          <b>${esc(c.title)}</b>
+          <div class="cdetail">${esc(c.detail || "")}</div>
+          ${c.hint ? `<div class="chint">${esc(c.hint)}</div>` : ""}
+        </div>
+        ${allowConfirm && c.confirmable && c.status !== "pass"
+          ? `<button class="btn ghost small" data-action="confirm-check" data-pack="${esc(p.id)}" data-check="${esc(c.id)}" data-focusable>Confirm</button>`
+          : ""}
+      </div>`).join("")}</div>`;
   }
 
   function renderLibrary() {
@@ -127,11 +186,12 @@
     if (!p) return renderNoPacks();
     const st = packState(p);
     const warn = gameWarning();
-    const job = S.job && S.job.status === "running" ? S.job : null;
+    const blocker = firstBlocker(p);
+    const job = S.job && (S.job.status === "running" || S.job.status === "error") ? S.job : null;
     if (job) return renderProgress(job, p);
 
     const installed = p.installed;
-    const canAct = !warn;
+    const canAct = !warn && !blocker;
     const primary = st.primary;
     const primaryHtml = primary
       ? `<button class="btn primary" data-action="${primary.action}" data-pack="${esc(p.id)}" ${canAct ? "" : "disabled"} data-autofocus data-focusable data-key="primary">${primary.label}</button>`
@@ -154,6 +214,7 @@
           <div class="bigstatus">${installed ? `Installed ${esc(p.installedVersion)}` : "Ready to install"}</div>
           <div class="meta">${esc(st.label)} · ${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</div>
           ${warn ? `<div class="callout error">${esc(warn)}</div>` : ""}
+          ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? ` (+${p.preconditions.failedRequired.length - 1} more)` : ""}</div>` : ""}
           <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${refreshHtml}</div>
           <div class="hint">${installed ? "Saves stay on this TV · Steam Cloud handles the vanilla save" : `${gb(p.totalBytes)} · ${p.files} files · me3 profile included`}</div>
         </div>
@@ -161,26 +222,98 @@
     renderLibrary();
   }
 
+  function rateInfo(job) {
+    const now = Date.now();
+    const bytes = job.bytesDone || 0;
+    S.rate.push({ t: now, b: bytes });
+    while (S.rate.length > 2 && now - S.rate[0].t > 6000) S.rate.shift();
+    const first = S.rate[0];
+    const dt = (now - first.t) / 1000;
+    const speed = dt > 0.5 ? (bytes - first.b) / dt : 0;
+    const remain = (job.bytesTotal || 0) - bytes;
+    return { speed, eta: speed > 0 && remain > 0 ? remain / speed : null };
+  }
+
+  async function acquireWakeLock() {
+    try {
+      if (!("wakeLock" in navigator) || S.wakeLock) return;
+      S.wakeLock = await navigator.wakeLock.request("screen");
+      S.wakeLock.addEventListener("release", () => { S.wakeLock = null; });
+    } catch { S.wakeLock = null; }
+  }
+
+  async function releaseWakeLock() {
+    try { await S.wakeLock?.release(); } catch { }
+    S.wakeLock = null;
+  }
+
   function renderProgress(job, pack) {
     const p = pack || selectedPack();
+    const failed = job.status === "error";
     const percent = job.bytesTotal ? pct(job.bytesDone, job.bytesTotal) : pct(job.done, job.total);
-    const line = (job.log && job.log[job.log.length - 1]) || job.phase || "Working";
+    const rate = failed ? { speed: 0, eta: null } : rateInfo(job);
+    const line = job.phase === "launcher"
+      ? "Writing launcher, shortcut, and Steam art..."
+      : (job.log && job.log[job.log.length - 1]) || job.phase || "Working";
+    const status = failed
+      ? `${esc(job.error || "Unknown error")}`
+      : `${fmtBytes(job.bytesDone)} of ${fmtBytes(job.bytesTotal)} · ${job.done || 0}/${job.total || 0} files`;
+    const speed = !failed && job.status === "running"
+      ? `<div class="meta">${rate.speed > 0 ? `${fmtBytes(rate.speed)}/s · ${fmtDuration(rate.eta)} left` : "Measuring speed..."}</div>`
+      : "";
     main.innerHTML = `
       <section class="progresswrap">
-        <div class="kicker">${job.status === "error" ? "INSTALL FAILED" : "INSTALLING"}</div>
-        <h1>${job.status === "error" ? "Something went wrong" : `${esc(p ? p.name : "Pack")}`}</h1>
+        <div class="kicker">${failed ? "INSTALL FAILED" : "INSTALLING"}</div>
+        <h1>${failed ? "Something went wrong" : `${esc(p ? p.name : "Pack")}`}</h1>
         <div class="progress">
-          <div class="big">${job.status === "error" ? "ERROR" : percent + "%"}</div>
-          <div class="bar"><div class="fill" style="width:${job.status === "error" ? 100 : percent}%"></div></div>
-          <div class="small">${job.status === "error" ? esc(job.error || "Unknown error") : `${gb(job.bytesDone || 0)} GB of ${gb(job.bytesTotal || 0)} GB · ${job.done || 0}/${job.total || 0} files`}</div>
+          <div class="big">${failed ? "ERROR" : percent + "%"}</div>
+          <div class="bar"><div class="fill" style="width:${failed ? 100 : percent}%"></div></div>
+          <div class="small">${status}</div>
+          ${speed}
           <div class="log">${esc(line)}</div>
         </div>
         <div class="actions">
-          ${job.status === "error" ? `<button class="btn primary" data-action="install" data-pack="${esc(job.packId)}" data-autofocus data-focusable data-key="primary">Retry</button><button class="btn ghost" data-action="cancel-job" data-focusable data-key="back">Back</button>` : `<button class="btn ghost" data-action="refresh" data-focusable data-key="refresh">Refresh</button>`}
+          ${failed
+            ? `<button class="btn primary" data-action="start-download" data-pack="${esc(job.packId)}" data-autofocus data-focusable data-key="primary">Retry</button><button class="btn ghost" data-action="dismiss-job" data-focusable data-key="back">Back</button>`
+            : `<button class="btn" data-action="cancel-download" data-autofocus data-focusable data-key="cancel">Cancel download</button>`}
         </div>
-        <div class="hint">${job.status === "error" ? "The TV save was not touched. The previous version is still installed." : "Keep the TV on. The dashboard will show Play when it is done."}</div>
+        <div class="hint">${failed ? "The TV save was not touched. The previous version is still installed." : "You can cancel and resume later. Completed files stay on the TV."}</div>
       </section>`;
     library.innerHTML = "";
+  }
+
+  function renderDownloadSheet() {
+    const p = (S.data?.packs || []).find((x) => x.id === S.download.packId) || selectedPack();
+    if (!p) { S.download = null; return renderHome(); }
+    const free = S.data?.diskFreeBytes;
+    const need = (p.totalBytes || 0) + 1024 * 1024 * 1024;
+    const low = free != null && free < need;
+    const resume = !!p.staging;
+    const update = !!(p.installed && p.installedVersion && p.installedVersion !== p.mod.version);
+    const blocker = firstBlocker(p);
+    const notes = noteList(p);
+    const kicker = resume ? "RESUME DOWNLOAD" : update ? "UPDATE" : "INSTALL";
+    const title = resume ? "Resume install" : update ? `Update to ${p.mod.version}` : "Install pack";
+    overlay.classList.remove("hidden");
+    overlay.innerHTML = `<div class="panel" style="width:min(66vw,820px)">
+      <div class="kicker">${kicker}</div>
+      <h2>${esc(p.name)}</h2>
+      <p>${esc(p.description || "")}</p>
+      <div class="row"><span>Download</span><b>${gb(p.totalBytes)} GB · ${p.files} files</b></div>
+      <div class="row"><span>Version</span><b>${esc(p.mod.version)}</b></div>
+      ${update ? `<div class="row"><span>Current</span><b>${esc(p.installedVersion)}</b></div>` : ""}
+      <div class="row"><span>Free on TV</span><b>${free == null ? "unknown" : gb(free) + " GB"}</b></div>
+      <div class="row"><span>Kept</span><b>Previous version and saves stay on this TV</b></div>
+      ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}</div>` : low ? `<div class="callout error">Not enough space: this pack needs about ${gb(need)} GB free.</div>` : ""}
+      ${notes.length ? `<p style="margin-top:2vh"><b>Before you install</b></p>${renderNotes(p)}` : ""}
+      ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>Checks</b></p>${renderChecks(p, true)}` : ""}
+      <div class="actions">
+        <button class="btn primary" data-action="start-download" data-pack="${esc(p.id)}" ${low || blocker ? "disabled" : ""} data-autofocus data-focusable data-key="start">${resume ? "Resume download" : update ? "Download update" : "Start download"}</button>
+        ${update ? `<button class="btn" data-action="launch" data-pack="${esc(p.id)}" data-focusable data-key="play">Play ${esc(p.installedVersion)}</button>` : ""}
+        <button class="btn ghost" data-action="close-download" data-focusable data-key="cancel">Not now</button>
+      </div>
+      <div class="hint">Large pack: you can cancel anytime and resume later. The TV stays awake during the download.</div>
+    </div>`;
   }
 
   function renderDetails() {
@@ -204,6 +337,8 @@
       <div class="row"><span>Launcher</span><b>${esc(p.launcher || "not installed")}</b></div>
       <div class="row"><span>Shortcut</span><b>${esc(p.desktopFile || "add the .desktop to Steam")}</b></div>
       <div class="row"><span>Saves</span><b>Stay on this TV. Steam Cloud handles the vanilla save.</b></div>
+      ${noteList(p).length ? `<p style="margin-top:2vh"><b>Before you install</b></p>${renderNotes(p)}` : ""}
+      ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>Checks</b></p>${renderChecks(p, true)}` : ""}
       <p style="margin-top:2vh"><b>Recent log</b></p>
       <pre class="log" style="white-space:pre-wrap;font-size:.9vw;color:#8b96a8;max-height:18vh;overflow:auto">${esc(logs || "No log yet.")}</pre>
       <div class="actions">
@@ -231,6 +366,7 @@
     pc.classList.toggle("online", !!S.data?.pc?.online);
     pc.querySelector("span:last-child").textContent = S.data?.pc?.online ? "PC online" : "PC offline";
     if (S.confirm) return renderConfirm();
+    if (S.download) return renderDownloadSheet();
     if (S.view === "details") return renderDetails();
     overlay.classList.add("hidden");
     if (S.offline || S.error) return renderOffline();
@@ -243,33 +379,87 @@
     else document.querySelector("[data-autofocus]")?.focus() || document.querySelector("[data-focusable]")?.focus();
   }
 
+  function requestDownload(packId) {
+    S.download = { packId };
+    S.view = "home";
+    render();
+  }
+
   async function startInstall(packId) {
+    S.download = null;
+    S.rate = [];
     try {
       const out = await api("/api/install", { method: "POST", body: JSON.stringify({ packId }) });
-      S.job = { id: out.jobId, status: "running", phase: "preparing", done: 0, total: 0, bytesDone: 0, bytesTotal: 0, log: [] };
+      S.job = { id: out.jobId, packId, status: "running", phase: "preparing", done: 0, total: 0, bytesDone: 0, bytesTotal: 0, log: [] };
       S.view = "home";
+      await acquireWakeLock();
       render();
       await pollJob(out.jobId);
     } catch (err) {
-      S.job = { packId, status: "error", error: err.message, log: [err.message] };
+      S.job = { packId, status: "error", error: err.message, done: 0, total: 0, bytesDone: 0, bytesTotal: 0, log: [err.message] };
+      render();
+    }
+  }
+
+  async function cancelDownload() {
+    if (!S.job || S.job.status !== "running") return;
+    try {
+      await api(`/api/jobs/${encodeURIComponent(S.job.id)}/cancel`, { method: "POST", body: "{}" });
+    } catch (err) {
+      S.confirm = { title: "Could not cancel", message: err.message, simple: true };
       render();
     }
   }
 
   async function pollJob(id) {
-    while (true) {
-      try {
-        const job = await api(`/api/jobs/${id}`);
-        S.job = job;
-        if (job.status !== "running") break;
-        render();
-      } catch (err) { S.error = err.message; break; }
-      await sleep(1000);
+    const pack = selectedPack();
+    const packName = pack?.name || "Pack";
+    const packVersion = pack?.mod?.version || "";
+    S.polling = true;
+    S.rate = [];
+    try {
+      while (true) {
+        try {
+          const job = await api(`/api/jobs/${encodeURIComponent(id)}`);
+          S.job = job;
+          if (job.status === "done") {
+            await releaseWakeLock();
+            await refresh();
+            S.confirm = { title: "Installed", message: `${packName} ${packVersion} is ready.`, simple: true };
+            render();
+            setTimeout(() => { S.confirm = null; render(); }, 3500);
+            return;
+          }
+          if (job.status === "error") {
+            await releaseWakeLock();
+            render();
+            return;
+          }
+          if (job.status === "canceled") {
+            await releaseWakeLock();
+            S.job = null;
+            await refresh();
+            S.confirm = { title: "Download paused", message: "Completed files stay on the TV. Use Resume install to continue.", simple: true };
+            render();
+            setTimeout(() => { S.confirm = null; render(); }, 4000);
+            return;
+          }
+          render();
+        } catch (err) {
+          S.error = err.message;
+          render();
+          return;
+        }
+        await sleep(1000);
+      }
+    } finally {
+      S.polling = false;
     }
-    await refresh();
   }
 
   async function launch(packId) {
+    S.download = null;
+    S.view = "home";
     try {
       await api("/api/launch", { method: "POST", body: JSON.stringify({ packId }) });
       S.confirm = { title: "Launching", message: `${selectedPack()?.name || "Game"} is starting on this TV. Use the Guide button to return to Steam.`, simple: true };
@@ -307,6 +497,19 @@
     }
   }
 
+  async function confirmCheck(packId, checkId) {
+    try {
+      await api("/api/preconditions/confirm", {
+        method: "POST",
+        body: JSON.stringify({ packId, checkId, confirmed: true }),
+      });
+      await refresh();
+    } catch (err) {
+      S.confirm = { title: "Could not confirm", message: err.message, simple: true };
+      render();
+    }
+  }
+
   app.addEventListener("click", (event) => {
     const tile = event.target.closest("[data-select]");
     if (tile) { S.selected = tile.getAttribute("data-select"); render(); return; }
@@ -314,7 +517,11 @@
     if (!el) return;
     const action = el.getAttribute("data-action");
     const packId = el.getAttribute("data-pack") || S.selected;
-    if (action === "install") startInstall(packId);
+    if (action === "download") requestDownload(packId);
+    else if (action === "start-download") startInstall(packId);
+    else if (action === "cancel-download") cancelDownload();
+    else if (action === "dismiss-job") { S.job = null; S.view = "home"; render(); }
+    else if (action === "close-download") { S.download = null; S.view = "home"; render(); }
     else if (action === "launch") launch(packId);
     else if (action === "details") openDetails(packId);
     else if (action === "retry" || action === "refresh") refresh();
@@ -326,9 +533,9 @@
       S.confirm = { title: "Roll back?", message: `Switch to ${prev || "the previous version"}? The current version stays on disk.`, packId };
       render();
     }
+    else if (action === "confirm-check") confirmCheck(packId, el.getAttribute("data-check"));
     else if (action === "confirm-yes") { const c = S.confirm; S.confirm = null; if (c.packId) rollback(c.packId); else render(); }
     else if (action === "confirm-no") { S.confirm = null; render(); }
-    else if (action === "cancel-job") { S.job = null; S.view = "home"; render(); }
   });
 
   function focusables() {
@@ -353,6 +560,7 @@
 
   function back() {
     if (S.confirm) { S.confirm = null; render(); return; }
+    if (S.download) { S.download = null; render(); return; }
     if (S.view === "details") { S.view = "home"; render(); return; }
   }
 
@@ -395,6 +603,11 @@
   }
 
   setInterval(pollPad, 100);
-  setInterval(() => { if (!S.confirm && S.view !== "details") refresh(); }, 3000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && S.job?.status === "running") acquireWakeLock();
+  });
+  setInterval(() => {
+    if (!S.confirm && !S.download && !S.polling && S.view !== "details") refresh();
+  }, 3000);
   refresh();
 })();

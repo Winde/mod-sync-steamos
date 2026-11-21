@@ -41,6 +41,23 @@ function readBuild(library, appId) {
   return m ? m[1] : null;
 }
 
+function findAppManifest(appId) {
+  for (const lib of libraries()) {
+    const manifest = path.join(lib, "steamapps", `appmanifest_${appId}.acf`);
+    if (fs.existsSync(manifest)) return manifest;
+  }
+  return null;
+}
+
+function readInstalledDepots(library, appId) {
+  const manifest = path.join(library, "steamapps", `appmanifest_${appId}.acf`);
+  if (!fs.existsSync(manifest)) return null;
+  const txt = fs.readFileSync(manifest, "utf8");
+  const block = txt.match(/"InstalledDepots"\s*\{([\s\S]*?)\n\t\}/);
+  if (!block) return [];
+  return [...block[1].matchAll(/"(\d+)"\s*\{/g)].map((m) => Number(m[1]));
+}
+
 function findGame(game) {
   if (!game || !game.appId) return null;
   for (const lib of libraries()) {
@@ -144,4 +161,7 @@ async function registerShortcut({ exePath, name, icon, art }) {
   return { appId: id.unsigned, configDir: ud.configDir, userId: ud.userId, file };
 }
 
-module.exports = { steamRoots, libraries, findGame, findUserData, registerShortcut, shortcutId };
+module.exports = {
+  steamRoots, libraries, findGame, findUserData, findAppManifest,
+  readInstalledDepots, registerShortcut, shortcutId,
+};

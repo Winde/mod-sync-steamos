@@ -29,10 +29,46 @@ function sendText(res, code, text, type = "text/plain; charset=utf-8") {
   res.end(text);
 }
 
-function sendFile(res, file) {
+function parseRange(header, size) {
+  if (!header) return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
+  if (!m) return { invalid: true };
+  let start;
+  let end;
+  if (m[1] === "") {
+    const n = Number(m[2]);
+    if (!n) return { invalid: true };
+    start = Math.max(0, size - n);
+    end = size - 1;
+  } else {
+    start = Number(m[1]);
+    end = m[2] ? Number(m[2]) : size - 1;
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return { invalid: true };
+  if (end >= size) end = size - 1;
+  return { start, end };
+}
+
+function sendFile(req, res, file) {
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return false;
   const stat = fs.statSync(file);
-  res.writeHead(200, { "content-type": contentType(file), "content-length": stat.size });
+  const range = parseRange(req && req.headers ? req.headers.range : null, stat.size);
+  if (range && range.invalid) {
+    res.writeHead(416, { "content-range": `bytes */${stat.size}`, "accept-ranges": "bytes" });
+    res.end();
+    return true;
+  }
+  if (range) {
+    res.writeHead(206, {
+      "content-type": contentType(file),
+      "content-length": range.end - range.start + 1,
+      "content-range": `bytes ${range.start}-${range.end}/${stat.size}`,
+      "accept-ranges": "bytes",
+    });
+    fs.createReadStream(file, { start: range.start, end: range.end }).pipe(res);
+    return true;
+  }
+  res.writeHead(200, { "content-type": contentType(file), "content-length": stat.size, "accept-ranges": "bytes" });
   fs.createReadStream(file).pipe(res);
   return true;
 }
@@ -75,7 +111,7 @@ function createServer({ packsDir, token, baseUrl, bootstrapTar, bootstrapTemplat
     }
     if (url.pathname === "/bootstrap.tar.gz") {
       if (!fs.existsSync(bootstrapTar)) return sendJson(res, 404, { error: "bootstrap not built" });
-      return sendFile(res, bootstrapTar);
+      return sendFile(req, res, bootstrapTar);
     }
     if (url.pathname === "/api/packs") {
       return sendJson(res, 200, loadPacks(packsDir).map((p) => p.summary));
@@ -97,7 +133,7 @@ function createServer({ packsDir, token, baseUrl, bootstrapTar, bootstrapTemplat
         const rel = pack.art[decodeURIComponent(parts[4])];
         if (!rel) return sendJson(res, 404, { error: "art not found" });
         const file = safeJoin(entry.root, rel);
-        if (!sendFile(res, file)) return sendJson(res, 404, { error: "art missing" });
+        if (!sendFile(req, res, file)) return sendJson(res, 404, { error: "art missing" });
         return;
       }
       if (parts[3] === "file") {
@@ -107,7 +143,7 @@ function createServer({ packsDir, token, baseUrl, bootstrapTar, bootstrapTemplat
         const f = files.files.find((x) => x.source === rel);
         if (!f) return sendJson(res, 404, { error: "file not in manifest" });
         const file = safeJoin(entry.root, f.source);
-        if (!sendFile(res, file)) return sendJson(res, 404, { error: "file missing" });
+        if (!sendFile(req, res, file)) return sendJson(res, 404, { error: "file missing" });
         return;
       }
     }
@@ -115,4 +151,4 @@ function createServer({ packsDir, token, baseUrl, bootstrapTar, bootstrapTemplat
   });
 }
 
-module.exports = { createServer, loadPacks };
+module.exports = { createServer, loadPacks, parseRange };

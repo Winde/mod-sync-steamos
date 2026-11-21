@@ -163,6 +163,20 @@ function tailFile(p, lines = 200) {
   return tailText(readText(p), lines);
 }
 
+function freeBytes(dir) {
+  let p = path.resolve(dir);
+  while (p) {
+    try {
+      const s = fs.statfsSync(p);
+      return Number(s.bavail) * Number(s.bsize);
+    } catch { }
+    const parent = path.dirname(p);
+    if (parent === p) break;
+    p = parent;
+  }
+  return null;
+}
+
 async function fetchJson(url, options = {}) {
   const res = await fetch(url, options);
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
@@ -181,5 +195,5 @@ module.exports = {
   sha256File, walkFiles, safeJoin, relPosix, formatBytes,
   nowStamp, randomToken, detectLanIp, isGameRunning, mapLimit,
   materialize, modeFor, tailText, tailFile, fetchJson, fetchToFile,
-  fsp,
+  freeBytes, fsp,
 };

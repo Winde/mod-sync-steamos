@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { readJson, safeJoin } = require("./util");
+const { validateNotes, validatePreconditions } = require("./preconditions");
 
 function requireString(obj, key, where) {
   if (!obj || typeof obj[key] !== "string" || !obj[key]) throw new Error(`${where}: missing ${key}`);
@@ -32,6 +33,8 @@ function validatePack(pack) {
       if (key === "grid" || key === "icon") throw new Error(`pack.json.art: missing ${key}`);
     }
   }
+  validateNotes(pack.notes);
+  validatePreconditions(pack.preconditions);
   return pack;
 }
 
@@ -68,7 +71,10 @@ function packSummary(packRoot) {
     description: pack.description || "",
     game: pack.game,
     mod: pack.mod,
+    launch: pack.launch,
     art: pack.art,
+    notes: pack.notes || [],
+    preconditions: pack.preconditions || [],
     files: files.files.length,
     totalBytes,
   };

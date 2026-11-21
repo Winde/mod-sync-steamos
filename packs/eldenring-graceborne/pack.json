@@ -37,6 +37,63 @@
     "logo": "art/graceborne/logo.png",
     "icon": "art/graceborne/icon.png"
   },
+  "notes": [
+    {
+      "title": "Install 1.17 and launch vanilla once",
+      "body": "Install ELDEN RING via Steam, then start the vanilla game once so its Proton prefix exists. The installer refuses to run without it.",
+      "tone": "info"
+    },
+    {
+      "title": "Stay on build 25827938",
+      "body": "In the game's Steam properties choose Only update this game when I launch it. This pack is built for 1.17; a newer build may break the mod.",
+      "tone": "warning"
+    },
+    {
+      "title": "Play offline",
+      "body": "Launch through the ModSync shortcut. Playing online with mods can get the account banned; the launcher starts the game with online disabled.",
+      "tone": "warning"
+    },
+    {
+      "title": "Saves are separate",
+      "body": "The mod uses ER0000.graceborne.sl2. Vanilla ER0000.sl2 and Steam Cloud are untouched. v1 does not transfer saves between machines.",
+      "tone": "info"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "game-installed",
+      "type": "game-installed",
+      "required": true,
+      "title": "ELDEN RING is installed"
+    },
+    {
+      "id": "game-build",
+      "type": "game-build",
+      "required": true,
+      "build": "25827938",
+      "title": "Game is build 25827938 (1.17)"
+    },
+    {
+      "id": "proton-prefix",
+      "type": "proton-prefix",
+      "required": true,
+      "title": "Proton prefix exists",
+      "hint": "Launch the vanilla game once from Steam."
+    },
+    {
+      "id": "game-closed",
+      "type": "game-not-running",
+      "required": true,
+      "title": "Game is closed"
+    },
+    {
+      "id": "disk-free",
+      "type": "disk-free",
+      "required": true,
+      "reserveBytes": 1073741824,
+      "title": "Enough free space"
+    }
+  ],
   "files": "files.json",
   "save": {
     "transfer": "out-of-scope"

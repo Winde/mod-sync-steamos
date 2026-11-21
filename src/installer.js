@@ -1,11 +1,14 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { Readable } = require("node:stream");
+const { pipeline } = require("node:stream/promises");
 const {
   ensureDir, readText, writeText, writeJson, sha256File, safeJoin, mapLimit,
-  fetchToFile, nowStamp, isGameRunning,
+  nowStamp, isGameRunning, freeBytes, formatBytes,
 } = require("./util");
 const steam = require("./steam");
+const preconditions = require("./preconditions");
 
 function semverParts(v) {
   return String(v).split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
@@ -43,12 +46,32 @@ function renderTemplate(file, values) {
   return text;
 }
 
-async function installPack({ pack, filesDoc, remoteBase, token, root, game, progress = () => {}, log = () => {} }) {
+function abortError() {
+  const err = new Error("Canceled");
+  err.name = "AbortError";
+  return err;
+}
+
+async function downloadResumable(url, dest, token, signal) {
+  let start = 0;
+  try { start = fs.statSync(dest).size; } catch { }
+  const headers = { "x-modsync-token": token };
+  if (start > 0) headers.Range = `bytes=${start}-`;
+  const res = await fetch(url, { headers, signal });
+  if (res.status === 416) return; // already complete; caller verifies hash
+  if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
+  const append = res.status === 206 && start > 0;
+  await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(dest, { flags: append ? "a" : "w" }));
+}
+
+async function installPack({ pack, filesDoc, remoteBase, token, root, game, signal, confirmed = {}, progress = () => {}, log = () => {} }) {
   const version = pack.mod.version;
   const packRoot = packRootFor(root, pack);
   const payloadPrefix = `mods/${pack.mod.id}/versions/${version}/`;
   const staging = path.join(packRoot, "mods", pack.mod.id, "versions", `.staging-${version}`);
   const versionDir = path.join(packRoot, "mods", pack.mod.id, "versions", version);
+  const files = filesDoc.files;
+  const totalBytes = files.reduce((n, f) => n + f.size, 0);
 
   if (isGameRunning(pack.launch.gameProcess)) {
     throw new Error(`${pack.game.title} is running. Close it before installing.`);
@@ -60,39 +83,28 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, prog
     throw new Error("Launch ELDEN RING once via Steam first so the Proton prefix exists.");
   }
 
-  fs.rmSync(staging, { recursive: true, force: true });
+  const pre = preconditions.evaluatePreconditions({ pack, game, root, totalBytes, confirmed });
+  if (pre.blocked) {
+    const first = pre.failedRequired[0];
+    throw new Error(`Precondition failed: ${first.title}${first.detail ? ` — ${first.detail}` : ""}`);
+  }
+
+  if (signal?.aborted) throw abortError();
+  ensureDir(root);
   ensureDir(staging);
   ensureDir(path.join(packRoot, "logs"));
   writeJson(path.join(packRoot, "pack.json"), pack);
   writeJson(path.join(packRoot, "files.json"), filesDoc);
 
-  const files = filesDoc.files;
-  const totalBytes = files.reduce((n, f) => n + f.size, 0);
+  const free = freeBytes(root);
+  const need = totalBytes + 1024 * 1024 * 1024;
+  if (free != null && free < need) {
+    throw new Error(`Not enough space on the TV: ${formatBytes(free)} free, need about ${formatBytes(need)}.`);
+  }
   let done = 0;
   let bytesDone = 0;
   let lastReport = 0;
-
-  log(`Installing ${pack.name} ${version}: ${files.length} files, ${(totalBytes / 1024 / 1024 / 1024).toFixed(2)} GB`);
-
-  await mapLimit(files, 6, async (file) => {
-    const isPayload = file.target.startsWith(payloadPrefix);
-    const target = isPayload
-      ? path.join(staging, file.target.slice(payloadPrefix.length))
-      : safeJoin(packRoot, file.target);
-    ensureDir(path.dirname(target));
-    const tmp = `${target}.part`;
-    const url = `${remoteBase}/api/packs/${encodeURIComponent(pack.id)}/file?path=${encodeURIComponent(file.source)}`;
-    await fetchToFile(url, tmp, { headers: { "x-modsync-token": token } });
-    const hash = await sha256File(tmp);
-    if (hash !== file.sha256) {
-      fs.rmSync(tmp, { force: true });
-      throw new Error(`Hash mismatch: ${file.source}`);
-    }
-    if (fs.existsSync(target)) fs.rmSync(target, { force: true });
-    fs.renameSync(tmp, target);
-    if (file.mode) fs.chmodSync(target, Number.parseInt(file.mode, 8));
-    done++;
-    bytesDone += file.size;
+  const report = (file) => {
     const now = Date.now();
     if (now - lastReport > 750 || done === files.length) {
       lastReport = now;
@@ -102,9 +114,63 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, prog
         total: files.length,
         bytesDone,
         bytesTotal: totalBytes,
-        file: file.target,
+        file,
       });
     }
+  };
+
+  log(`Installing ${pack.name} ${version}: ${files.length} files, ${formatBytes(totalBytes)}`);
+  log(free != null ? `Free space: ${formatBytes(free)}` : "Free space: unknown");
+
+  await mapLimit(files, 6, async (file) => {
+    if (signal?.aborted) throw abortError();
+    const isPayload = file.target.startsWith(payloadPrefix);
+    const target = isPayload
+      ? path.join(staging, file.target.slice(payloadPrefix.length))
+      : safeJoin(packRoot, file.target);
+    ensureDir(path.dirname(target));
+    const tmp = `${target}.part`;
+    const url = `${remoteBase}/api/packs/${encodeURIComponent(pack.id)}/file?path=${encodeURIComponent(file.source)}`;
+
+    // Resume: a file that is already complete is skipped.
+    if (fs.existsSync(target)) {
+      try {
+        if ((await sha256File(target)) === file.sha256) {
+          done++;
+          bytesDone += file.size;
+          report(file.target);
+          return;
+        }
+      } catch { }
+      fs.rmSync(target, { force: true });
+    }
+
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (signal?.aborted) throw abortError();
+      try {
+        await downloadResumable(url, tmp, token, signal);
+        const hash = await sha256File(tmp);
+        if (hash !== file.sha256) {
+          fs.rmSync(tmp, { force: true });
+          throw new Error("hash mismatch");
+        }
+        if (fs.existsSync(target)) fs.rmSync(target, { force: true });
+        fs.renameSync(tmp, target);
+        if (file.mode) fs.chmodSync(target, Number.parseInt(file.mode, 8));
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err;
+        if (signal?.aborted || err.name === "AbortError") throw abortError();
+        if (attempt === 3) throw new Error(`${file.source}: ${err.message}`);
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
+    }
+    if (lastError) throw lastError;
+    done++;
+    bytesDone += file.size;
+    report(file.target);
   });
 
   if (fs.existsSync(versionDir)) {
