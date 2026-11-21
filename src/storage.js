@@ -1,7 +1,8 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { readJson, readText, freeBytes } = require("./util");
+const { readJson, freeBytes } = require("./util");
+const versionStore = require("./version-store");
 
 function dirBytes(dir) {
   if (!fs.existsSync(dir)) return 0;
@@ -26,11 +27,11 @@ function modIdFor(packRoot, pack) {
 
 function packStorage(packRoot) {
   let pack = null;
-  try { pack = readJson(path.join(packRoot, "pack.json")); } catch { }
+  try { pack = readJson(versionStore.packFile(packRoot)); } catch { }
   const id = pack && pack.id ? pack.id : path.basename(packRoot);
   const modId = modIdFor(packRoot, pack);
-  const versionsDir = modId ? path.join(packRoot, "mods", modId, "versions") : "";
-  const current = modId ? readText(path.join(packRoot, "mods", modId, "current.txt")).trim() : "";
+  const versionsDir = modId ? versionStore.versionsDir(packRoot, modId) : "";
+  const current = modId ? versionStore.readCurrent(packRoot, modId) : "";
   const totalBytes = dirBytes(packRoot);
 
   const versions = [];
@@ -41,12 +42,12 @@ function packStorage(packRoot) {
       if (!entry.isDirectory()) continue;
       const abs = path.join(versionsDir, entry.name);
       const bytes = dirBytes(abs);
-      if (entry.name.startsWith(".staging-")) stagingBytes += bytes;
-      else if (entry.name.includes(".bak-")) backupBytes += bytes;
+      if (versionStore.isStaging(entry.name)) stagingBytes += bytes;
+      else if (versionStore.isBackup(entry.name)) backupBytes += bytes;
       else versions.push({ version: entry.name, bytes, current: entry.name === current });
     }
   }
-  versions.sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }));
+  versions.sort((a, b) => versionStore.compareVersions(a.version, b.version));
 
   const versionsBytes = versions.reduce((n, v) => n + v.bytes, 0);
   const oldBytes = versions.filter((v) => !v.current).reduce((n, v) => n + v.bytes, 0) + backupBytes;
@@ -69,7 +70,7 @@ function packStorage(packRoot) {
 }
 
 function computeStorage(root) {
-  const packsDir = path.join(root, "packs");
+  const packsDir = versionStore.packsDir(root);
   const packs = [];
   if (fs.existsSync(packsDir)) {
     for (const entry of fs.readdirSync(packsDir, { withFileTypes: true })) {
@@ -97,7 +98,7 @@ function validPackId(id) {
 
 function removeProfile(packRoot, modId, version) {
   if (!modId || !version) return;
-  const profile = path.join(packRoot, "profiles", `${modId}-${version}.me3`);
+  const profile = versionStore.profileFile(packRoot, modId, version);
   if (fs.existsSync(profile)) fs.rmSync(profile, { force: true });
 }
 
@@ -124,19 +125,19 @@ function clearStorage(root, { packId, scope }) {
   }
 
   if (!validPackId(packId)) throw new Error("invalid pack id");
-  const packRoot = path.join(root, "packs", packId);
+  const packRoot = versionStore.packRoot(root, packId);
   if (!fs.existsSync(packRoot)) throw new Error(`Pack is not installed: ${packId}`);
   let pack = null;
-  try { pack = readJson(path.join(packRoot, "pack.json")); } catch { }
+  try { pack = readJson(versionStore.packFile(packRoot)); } catch { }
   const modId = modIdFor(packRoot, pack);
-  const versionsDir = modId ? path.join(packRoot, "mods", modId, "versions") : "";
-  const current = modId ? readText(path.join(packRoot, "mods", modId, "current.txt")).trim() : "";
+  const versionsDir = modId ? versionStore.versionsDir(packRoot, modId) : "";
+  const current = modId ? versionStore.readCurrent(packRoot, modId) : "";
   const before = dirBytes(packRoot);
 
   if (scope === "staging") {
     if (versionsDir && fs.existsSync(versionsDir)) {
       for (const entry of fs.readdirSync(versionsDir, { withFileTypes: true })) {
-        if (entry.name.startsWith(".staging-")) {
+        if (versionStore.isStaging(entry.name)) {
           fs.rmSync(path.join(versionsDir, entry.name), { recursive: true, force: true });
         }
       }
@@ -147,12 +148,15 @@ function clearStorage(root, { packId, scope }) {
       for (const entry of fs.readdirSync(versionsDir, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         if (entry.name === current) continue;
-        if (entry.name.startsWith(".staging-")) continue;
+        if (versionStore.isStaging(entry.name)) continue;
         fs.rmSync(path.join(versionsDir, entry.name), { recursive: true, force: true });
-        if (!entry.name.includes(".bak-")) removeProfile(packRoot, modId, entry.name);
+        if (!versionStore.isBackup(entry.name)) removeProfile(packRoot, modId, entry.name);
       }
     }
   } else if (scope === "pack") {
+    if (pack && pack.install && pack.install.type === "bg3") {
+      try { require("./installers/bg3").revertBg3({ pack, root, log: () => { } }); } catch { }
+    }
     fs.rmSync(packRoot, { recursive: true, force: true });
     removeDesktopShortcuts(modId);
   } else {

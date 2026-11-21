@@ -4,6 +4,7 @@ const { parseArgs } = require("node:util");
 const readline = require("node:readline/promises");
 const util = require("./util");
 const { buildPack } = require("./drivers/eldenring");
+const bg3 = require("./drivers/bg3");
 const { loadPack, packSummary } = require("./manifest");
 const { createServer } = require("./server");
 const { createAgent } = require("./agent");
@@ -26,12 +27,15 @@ Commands:
   help      This help
 
 pack:
-  --source <dir>    Working install (default: state/config.json or D:\\EldenRingMods)
-  --out <dir>       Pack output (default: config or packs/eldenring-graceborne)
-  --version <ver>   Mod version (default: current.txt)
+  --game <id>       eldenring (default) or bg3
+  --source <dir>    Working install (default: state/config.json or the game's data dir)
+  --out <dir>       Pack output (default: config or packs/<game>)
+  --version <ver>   Mod version (default: current.txt for ER, date for BG3)
+  --game-root <dir> BG3 game install (default: detected Steam library)
   --copy            Copy payload instead of hardlinking
 
 init:
+  --game <id>       eldenring (default) or bg3
   Asks once for the working install and pack output, then writes state/config.json.
   After that, \`modsync pack\` needs no arguments.
 
@@ -64,19 +68,30 @@ function readConfig() {
 
 async function cmdInit(values = {}) {
   const current = readConfig();
-  const defaultSource = values.source || current.source || "D:\\EldenRingMods";
-  const defaultOut = values.out || current.out || path.join("packs", "eldenring-graceborne");
+  const game = String(values.game || current.game || "eldenring");
+  const defaultSource = values.source || current.source
+    || (game === "bg3" ? bg3.defaultSource() : "D:\\EldenRingMods");
+  const defaultOut = values.out || current.out
+    || path.join("packs", game === "bg3" ? "bg3-modded" : "eldenring-graceborne");
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const sourceAnswer = await rl.question(`Working install [${defaultSource}]: `);
-    const source = sourceAnswer.trim() || defaultSource;
-    const outAnswer = await rl.question(`Pack output [${defaultOut}]: `);
-    const out = outAnswer.trim() || defaultOut;
+    const gameAnswer = await rl.question(`Game (eldenring/bg3) [${game}]: `);
+    const chosen = (gameAnswer.trim() || game).toLowerCase();
+    const sourceDefault = chosen === game
+      ? defaultSource
+      : (chosen === "bg3" ? bg3.defaultSource() : "D:\\EldenRingMods");
+    const outDefault = chosen === game
+      ? defaultOut
+      : path.join("packs", chosen === "bg3" ? "bg3-modded" : "eldenring-graceborne");
+    const sourceAnswer = await rl.question(`Working install [${sourceDefault}]: `);
+    const source = sourceAnswer.trim() || sourceDefault;
+    const outAnswer = await rl.question(`Pack output [${outDefault}]: `);
+    const out = outAnswer.trim() || outDefault;
     util.ensureDir(path.dirname(configPath));
-    util.writeJson(configPath, { source, out });
+    util.writeJson(configPath, { game: chosen, source, out });
     console.log(`Wrote ${configPath}`);
     if (!fs.existsSync(source)) console.log(`WARNING: ${source} does not exist yet.`);
-    return { source, out };
+    return { game: chosen, source, out };
   } finally {
     rl.close();
   }
@@ -89,15 +104,22 @@ async function cmdPack(values) {
     console.log("");
   }
   const config = readConfig();
-  const source = values.source || config.source || "D:\\EldenRingMods";
-  const out = path.resolve(values.out || config.out || path.join(repoRoot, "packs", "eldenring-graceborne"));
+  const game = String(values.game || config.game || "eldenring");
+  const isBg3 = game === "bg3";
+  if (game !== "eldenring" && !isBg3) fail(`Unknown game: ${game} (use eldenring or bg3)`);
+  const source = values.source || config.source
+    || (isBg3 ? bg3.defaultSource() : "D:\\EldenRingMods");
+  const out = path.resolve(values.out || config.out || path.join(repoRoot, "packs", isBg3 ? "bg3-modded" : "eldenring-graceborne"));
+  console.log(`Game: ${isBg3 ? "Baldur's Gate 3" : "ELDEN RING"}`);
   console.log(`Source: ${source}`);
   console.log(`Output: ${out}`);
-  const result = await buildPack({
+  const build = isBg3 ? bg3.buildPack : buildPack;
+  const result = await build({
     source,
     out,
     link: !values.copy,
     version: values.version || config.version,
+    gameRoot: values["game-root"],
     log: (m) => console.log(m),
   });
   console.log(`\nPack: ${result.packRoot}`);
@@ -225,6 +247,7 @@ async function main(argv) {
     allowPositionals: true,
     options: {
       source: { type: "string" }, out: { type: "string" }, version: { type: "string" },
+      game: { type: "string" }, "game-root": { type: "string" },
       copy: { type: "boolean" }, packs: { type: "string" }, host: { type: "string" }, lan: { type: "boolean" },
       port: { type: "string" }, token: { type: "string" }, config: { type: "string" },
       "rebuild-bootstrap": { type: "boolean" }, "skip-bootstrap": { type: "boolean" },

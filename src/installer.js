@@ -4,39 +4,13 @@ const path = require("node:path");
 const { Readable } = require("node:stream");
 const { pipeline } = require("node:stream/promises");
 const {
-  ensureDir, readText, writeText, writeJson, sha256File, safeJoin, mapLimit,
+  ensureDir, writeText, writeJson, sha256File, safeJoin, mapLimit,
   nowStamp, isGameRunning, freeBytes, formatBytes,
 } = require("./util");
 const steam = require("./steam");
 const preconditions = require("./preconditions");
-
-function semverParts(v) {
-  return String(v).split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
-}
-
-function compareVersions(a, b) {
-  const pa = semverParts(a);
-  const pb = semverParts(b);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d) return d;
-  }
-  return 0;
-}
-
-function packRootFor(root, pack) {
-  return path.join(root, "packs", pack.id);
-}
-
-function listVersions(packRoot, pack) {
-  const dir = path.join(packRoot, "mods", pack.mod.id, "versions");
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name)
-    .filter((n) => !n.startsWith(".") && !n.includes(".bak-"))
-    .sort(compareVersions);
-}
+const versionStore = require("./version-store");
+const bg3 = require("./installers/bg3");
 
 function renderTemplate(file, values) {
   let text = fs.readFileSync(file, "utf8");
@@ -66,10 +40,10 @@ async function downloadResumable(url, dest, token, signal) {
 
 async function installPack({ pack, filesDoc, remoteBase, token, root, game, signal, confirmed = {}, progress = () => {}, log = () => {} }) {
   const version = pack.mod.version;
-  const packRoot = packRootFor(root, pack);
-  const payloadPrefix = `mods/${pack.mod.id}/versions/${version}/`;
-  const staging = path.join(packRoot, "mods", pack.mod.id, "versions", `.staging-${version}`);
-  const versionDir = path.join(packRoot, "mods", pack.mod.id, "versions", version);
+  const packRoot = versionStore.packRoot(root, pack.id);
+  const payloadPrefix = versionStore.payloadPrefix(pack.mod.id, version);
+  const staging = versionStore.stagingDir(packRoot, pack.mod.id, version);
+  const versionDir = versionStore.versionDir(packRoot, pack.mod.id, version);
   const files = filesDoc.files;
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
 
@@ -93,8 +67,8 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   ensureDir(root);
   ensureDir(staging);
   ensureDir(path.join(packRoot, "logs"));
-  writeJson(path.join(packRoot, "pack.json"), pack);
-  writeJson(path.join(packRoot, "files.json"), filesDoc);
+  writeJson(versionStore.packFile(packRoot), pack);
+  writeJson(versionStore.filesDocFile(packRoot, pack), filesDoc);
 
   const free = freeBytes(root);
   const need = totalBytes + 1024 * 1024 * 1024;
@@ -210,28 +184,44 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   });
 
   if (fs.existsSync(versionDir)) {
-    const backup = `${versionDir}.bak-${nowStamp()}`;
+    const backup = versionStore.backupDir(packRoot, pack.mod.id, version, nowStamp());
     fs.renameSync(versionDir, backup);
     log(`Previous ${version} moved to ${backup}`);
   }
   fs.renameSync(staging, versionDir);
-  writeText(path.join(packRoot, "mods", pack.mod.id, "current.txt"), `${version}\n`);
+  versionStore.writeCurrent(packRoot, pack.mod.id, version);
+
+  if (pack.install && pack.install.type === "bg3") {
+    progress({ phase: "apply" });
+    bg3.applyBg3({ pack, root, game, version, log });
+  }
 
   progress({ phase: "launcher" });
   const templates = path.join(__dirname, "..", "templates", "linux");
   const gameExe = game && game.exe ? game.exe : path.join(packRoot, "..", "..", "Game", "eldenring.exe");
-  const launcher = path.join(packRoot, "launchers", `launch-${pack.mod.id}.sh`);
-  const launcherText = renderTemplate(path.join(templates, "launch-mod.sh"), {
-    ROOT: packRoot,
-    MOD: pack.mod.id,
-    GAME: game ? game.root : "",
-    EXE: pack.launch.exe,
-    GAME_PROCESS: pack.launch.gameProcess,
-    STEAM_APP_ID: pack.launch.steamAppId,
-    SAVE_FILE: pack.launch.saveFile,
-    ME3: path.join(packRoot, pack.launch.me3),
-    WIN64: path.join(packRoot, pack.launch.windowsBinaries),
-  });
+  const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
+  const isSteam = pack.launch.type === "steam";
+  const launcherText = isSteam
+    ? renderTemplate(path.join(templates, "launch-bg3.sh"), {
+      ROOT: packRoot,
+      MOD: pack.mod.id,
+      GAME: game ? game.root : "",
+      PREFIX: game && game.prefix ? game.prefix : "",
+      DATA_DIR: game && game.prefix ? path.join(game.prefix, pack.launch.dataDir) : "",
+      STEAM_APP_ID: pack.launch.steamAppId,
+      GAME_PROCESS: pack.launch.gameProcess,
+    })
+    : renderTemplate(path.join(templates, "launch-mod.sh"), {
+      ROOT: packRoot,
+      MOD: pack.mod.id,
+      GAME: game ? game.root : "",
+      EXE: pack.launch.exe,
+      GAME_PROCESS: pack.launch.gameProcess,
+      STEAM_APP_ID: pack.launch.steamAppId,
+      SAVE_FILE: pack.launch.saveFile,
+      ME3: path.join(packRoot, pack.launch.me3),
+      WIN64: path.join(packRoot, pack.launch.windowsBinaries),
+    });
   writeText(launcher, launcherText, 0o755);
 
   const icon = path.join(packRoot, pack.art.icon);
@@ -281,17 +271,23 @@ Categories=Game;
 }
 
 function rollback({ pack, root, log = () => {} }) {
-  const packRoot = packRootFor(root, pack);
-  const current = readText(path.join(packRoot, "mods", pack.mod.id, "current.txt")).trim();
-  const versions = listVersions(packRoot, pack);
+  const packRoot = versionStore.packRoot(root, pack.id);
+  const current = versionStore.readCurrent(packRoot, pack.mod.id);
+  const versions = versionStore.listVersions(packRoot, pack.mod.id);
   const idx = versions.indexOf(current);
   if (idx <= 0) throw new Error("No previous version to roll back to.");
   const previous = versions[idx - 1];
-  const profile = path.join(packRoot, "profiles", `${pack.mod.id}-${previous}.me3`);
+  const isBg3 = pack.install && pack.install.type === "bg3";
+  const profile = isBg3
+    ? path.join(versionStore.versionDir(packRoot, pack.mod.id, previous), "modsettings.lsx")
+    : versionStore.profileFile(packRoot, pack.mod.id, previous);
   if (!fs.existsSync(profile)) throw new Error(`Profile for ${previous} is missing.`);
-  writeText(path.join(packRoot, "mods", pack.mod.id, "current.txt"), `${previous}\n`);
+  const game = isBg3 ? steam.findGame(pack.game) : null;
+  if (isBg3 && !game) throw new Error(`${pack.game.title} was not found in the Steam libraries.`);
+  if (isBg3) bg3.applyBg3({ pack, root, game, version: previous, log });
+  versionStore.writeCurrent(packRoot, pack.mod.id, previous);
   log(`Rolled back ${pack.name} to ${previous}`);
   return { previous, current };
 }
 
-module.exports = { installPack, rollback, listVersions, compareVersions, packRootFor };
+module.exports = { installPack, rollback };

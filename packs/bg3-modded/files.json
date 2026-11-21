@@ -1,0 +1,651 @@
+{
+  "schema": 1,
+  "pack": "bg3-modded",
+  "version": "2026.11.21",
+  "files": [
+    {
+      "source": "payload/versions/2026.11.21/Mods/aberrantmind_e79f6d0c-d430-fdf-9r6e.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/aberrantmind_e79f6d0c-d430-fdf-9r6e.pak",
+      "size": 15454342,
+      "sha256": "04bdcc037e5b55a602f0e473d1615273d7a59b45c07b0fdfd705e3ce1713473f",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/ActTwoExpansion_41ec643a-e2ad-e69d-52c2-920a6f4a98ad.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/ActTwoExpansion_41ec643a-e2ad-e69d-52c2-920a6f4a98ad.pak",
+      "size": 795690643,
+      "sha256": "afbf2e4809c29785f188da99a7fa7b4630ab850376b7f0291d1980597203dafe",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/barbariansubclasses5ecombined_-a1gz.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/barbariansubclasses5ecombined_-a1gz.pak",
+      "size": 17438466,
+      "sha256": "ed540c40aec9d7f0ad6eede7e84d2c02a16fe7f0841fde3b73aadbdb814b6528",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/betterbladesinger_6d56f0eb-67a-6puc.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/betterbladesinger_6d56f0eb-67a-6puc.pak",
+      "size": 106825,
+      "sha256": "6b21e9fbad3771799772a72ab5fd7de9b0f460cb56c8fd58b82fe9b96d6b8770",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/bloodhunter_860e44bd-5c0a-ad19-g06x.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/bloodhunter_860e44bd-5c0a-ad19-g06x.pak",
+      "size": 19041112,
+      "sha256": "3ad1fc60833d4f5daf7069129d10df1a9507acf48b22f832c4398a81e171a14d",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/bloodmagicspell_5b702441-7a33-4dfn.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/bloodmagicspell_5b702441-7a33-4dfn.pak",
+      "size": 6470400,
+      "sha256": "289b4c858c7d3fcd6ea48b536478b9f2f13dbe486d69b845aa82d7fca589ca47",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/bloodofwitches_f9fdd8af-7637-a-iac3.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/bloodofwitches_f9fdd8af-7637-a-iac3.pak",
+      "size": 23488828,
+      "sha256": "7caa06141789f3ebb687ecf075670946547f8fd8b78fe88098151cb29b4cad2a",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/bookofdruids_36134629-de40-94c-0fzy.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/bookofdruids_36134629-de40-94c-0fzy.pak",
+      "size": 30681294,
+      "sha256": "e38205752329a9180cad2976c13e6cb8b817616e038e31c95def7e13a36c67cd",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/bookofrogues_237f5681-5e16-907-0g6e.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/bookofrogues_237f5681-5e16-907-0g6e.pak",
+      "size": 26450297,
+      "sha256": "d5d2a17f8b8e97359eb8cbc531ec11753b190b0ae2a2c5e7b71ebb5014797137",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/bookofsorcerers_dd4845b6-a1fa-lzxd.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/bookofsorcerers_dd4845b6-a1fa-lzxd.pak",
+      "size": 8464582,
+      "sha256": "f79fd013b9112d204742ede9fce74929ddc09984be49fa29f7a745dddc89d469",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/bookofwizards_4f905004-5213-ed-gb5q.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/bookofwizards_4f905004-5213-ed-gb5q.pak",
+      "size": 26410416,
+      "sha256": "3d75113bfe2621d284fdfdb2f1153a33624542d666548d475e7917c66351a17b",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/camp-scene-overhaul_d756bfd1-e-71f7.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/camp-scene-overhaul_d756bfd1-e-71f7.pak",
+      "size": 1215494,
+      "sha256": "4e7d2a808defe8c689de3f8afd7167e229ff18dec9f7380afc6fdef8bd8b194d",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/campapproval_6698ea1d-19bc-a98-4zxv.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/campapproval_6698ea1d-19bc-a98-4zxv.pak",
+      "size": 1867209,
+      "sha256": "2051a498eba8456543ba66bffb6d0bc2ab2baebbe9ccc095cb1c4d5d5e86d8d7",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/circleofblood_037df947-34fd-cb-73eu.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/circleofblood_037df947-34fd-cb-73eu.pak",
+      "size": 13388848,
+      "sha256": "203d19d15c8031227981878107afbc755bd31fdee09ac7dcc0e3918cfc15e2e3",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/circleofwinter_b8c4eb4c-4b51-4-11kt.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/circleofwinter_b8c4eb4c-4b51-4-11kt.pak",
+      "size": 7839637,
+      "sha256": "55dc630147707b126856978bb9984d388a9b88fd5157f7d60a0eb76e55fc9c23",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/clericsubclasses5ecombined_a64-b6qy.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/clericsubclasses5ecombined_a64-b6qy.pak",
+      "size": 9052503,
+      "sha256": "9ffe16c69f7624bdc8224b2fc35f2f3fd1e83923ce6482f588d934e6d5e9667e",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/CombatMod.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/CombatMod.pak",
+      "size": 313281,
+      "sha256": "6c7946edb78510f869940b5aaf6aed2c63c8223c27df03a974cb60f61e36009b",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/configurablepartylimit_33c1de8-bwds.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/configurablepartylimit_33c1de8-bwds.pak",
+      "size": 22230886,
+      "sha256": "37bc2f5612d6f7be058f13d72d07362221bdceac6f8fd7b8978bf18973c14565",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/cuddlesleep_2856e13e-78ea-04ce-ft68.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/cuddlesleep_2856e13e-78ea-04ce-ft68.pak",
+      "size": 4329042,
+      "sha256": "75c62fee88202c21d723da2b0a5312c236be79af855a70b0b7f704f5e0681637",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/daelenstestament_c714f127-6475-ijw2.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/daelenstestament_c714f127-6475-ijw2.pak",
+      "size": 26825683,
+      "sha256": "25e4b975a4fdfcfd18e85d57fe9c58b50faf59d1ef6823c27a0dcca4f20e984d",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/dawnstarsarcanespells_20c00910-8bue.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/dawnstarsarcanespells_20c00910-8bue.pak",
+      "size": 23953729,
+      "sha256": "2b85e3aff65335130246eb9301a58201d905483d22c27b0b6d3dcbbc7b0ab124",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/dawnstarsblackmagicspells_6ab0-0l3y.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/dawnstarsblackmagicspells_6ab0-0l3y.pak",
+      "size": 23261692,
+      "sha256": "cc4246db40f67509a60d46f0ddb25b1953175a88190b9f8429ffc0d3671157f2",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/dawnstarspsychicweapons_288d01-be5f.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/dawnstarspsychicweapons_288d01-be5f.pak",
+      "size": 17070629,
+      "sha256": "e40c1424756a1a667f25ff0c53efc12a7eb1c940af6e2d515e7d10b65fa67ec5",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/dnd2024_897914ef-5c96-053c-44a-admq.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/dnd2024_897914ef-5c96-053c-44a-admq.pak",
+      "size": 105951695,
+      "sha256": "36434e757983880e0fd2ddb8d1c135aff72bc33e08d4a1e3ce97bb2455160060",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/dnd_expanded_93dc5505-2038-baa-0vlf.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/dnd_expanded_93dc5505-2038-baa-0vlf.pak",
+      "size": 325317272,
+      "sha256": "9886a83963569fed38ff496fcba076698dbf776ba5417ddf06fa77dda866a580",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/dreadoverlordconsole_177b3e55-akgw.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/dreadoverlordconsole_177b3e55-akgw.pak",
+      "size": 20747907,
+      "sha256": "1a07c852816f544c34aa4f23a69ccbe6589201795e5a67719e40d85332037ddc",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/duskblade_0b9fe8cc-f707-9980-c-92bc.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/duskblade_0b9fe8cc-f707-9980-c-92bc.pak",
+      "size": 12138289,
+      "sha256": "5993f58c75976083f48fb94ef4a0f5551f737861774c21bc7a88a38bd1266137",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/dynamicdifficultyscaling_51c67-1r8t.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/dynamicdifficultyscaling_51c67-1r8t.pak",
+      "size": 29706771,
+      "sha256": "23f57a5e4cb2eb5a681b8a6bf13594caa02786d3856c6f98f6d1aee7fd3dfd72",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/EveryoneInDialogue2_0dd6e094-ba27-98cb-1e67-785e41ea29d0.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/EveryoneInDialogue2_0dd6e094-ba27-98cb-1e67-785e41ea29d0.pak",
+      "size": 1051884,
+      "sha256": "8738307b2e8517797e3c04f808e59b9264ff8ddc9d7e3bfac87e452ca258b44c",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/extra_encounters_plus_6324f71c-7nct.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/extra_encounters_plus_6324f71c-7nct.pak",
+      "size": 21188591,
+      "sha256": "34c75aed6ab8c5bc2c6bb04e0251c99be87e27c3dab24317352887fa2971c2a3",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/extra_enemies_honour_a33f6ead-cyki.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/extra_enemies_honour_a33f6ead-cyki.pak",
+      "size": 258140,
+      "sha256": "3e0792f3f78048a7e8079bbac28c7091c5533d36c97e0144d4da77a30e1ab905",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/fightersubclasses5ecombined_88-eq9q.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/fightersubclasses5ecombined_88-eq9q.pak",
+      "size": 16027586,
+      "sha256": "78e5201ba5af645064d4ba447e7fc21bfd7f2aa36e7788c29211763ba9f867f6",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/graveyardsceneextended_3554b86-0ucx.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/graveyardsceneextended_3554b86-0ucx.pak",
+      "size": 1683365,
+      "sha256": "34bea1fe866b7cc066aeb2ad0ca44dd21761a328503dcfb22f8ad70f04db6b22",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/graviturgymagic_f0a59ad2-fb94-62xd.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/graviturgymagic_f0a59ad2-fb94-62xd.pak",
+      "size": 5528633,
+      "sha256": "a120fd55a71325f66146c2d4633ca0425fa0e854723791466ed176589993b434",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/hairunlocked_e4aaf48d-06ef-f53-5ohm.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/hairunlocked_e4aaf48d-06ef-f53-5ohm.pak",
+      "size": 26892914,
+      "sha256": "45695c424f0583d2644bfe6d22a09f4bec6578a63d546dbd523372acfe1afd3a",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/hbbladecantrips_33eec47a-b349-jd34.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/hbbladecantrips_33eec47a-b349-jd34.pak",
+      "size": 25772179,
+      "sha256": "65a747b80867e6e90b753f9cc9a07909e64c44ac566baa0b494edf747b8a6153",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/heroicinspiration2024_b3a46da7-7ecd.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/heroicinspiration2024_b3a46da7-7ecd.pak",
+      "size": 4762849,
+      "sha256": "108c0f42f9389ac85f9cb844f09b35da7e06ae3d7fbb7086b4e9c3a32be25f11",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/hoffeats_3391d66b-a155-03ef-f5-0n7j.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/hoffeats_3391d66b-a155-03ef-f5-0n7j.pak",
+      "size": 2881790,
+      "sha256": "c3bf372c967e5301971102066da882d11e83ea3451a8825d225b7a7141da491e",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/ht_followastarion_ba4a2341-854-1iha.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/ht_followastarion_ba4a2341-854-1iha.pak",
+      "size": 790881,
+      "sha256": "8c80edf1cee86e46d479d7372f425dd6e809c2a8f6914158b7ce9d626edcc5f3",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/impui_26922ba9-6018-5252-075d-eqgb.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/impui_26922ba9-6018-5252-075d-eqgb.pak",
+      "size": 384294,
+      "sha256": "e8e810f2d2b7941237e0b9d69645eab1e4687d951ddb6191fb1ed6ee98e67b40",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/invocationsexpanded_606530e7-6-1c16.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/invocationsexpanded_606530e7-6-1c16.pak",
+      "size": 1043214,
+      "sha256": "e5199200755bd0698383a2075365f2f9c168830d7854d420e38a6f2a41a66ef8",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/largerpeniswithfloppingphysics-bpeb.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/largerpeniswithfloppingphysics-bpeb.pak",
+      "size": 109762997,
+      "sha256": "c2a6ed9d4a0217fc4d71965b290c8632bf3d2f35e5e3e27832f76556beb4f9ba",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/Lich Feats.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/Lich Feats.pak",
+      "size": 213666,
+      "sha256": "e67582d70c139fd7dc7a2c510ecd152c3168014a42f2e286f12c4102d41c0d20",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/lix_origindialogtags_4d98334b-hxyn.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/lix_origindialogtags_4d98334b-hxyn.pak",
+      "size": 196466,
+      "sha256": "d30b81faa6b0eb59e2e51671dd6489bbb3ee100ce1f0c48199e4c143073bc883",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/maleficus_unlockedpaladinclass-8yis.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/maleficus_unlockedpaladinclass-8yis.pak",
+      "size": 2655245,
+      "sha256": "fd3c2a70cbc1f6121516f8f96525b145bee16594bcc5d209c04d64601f29b00a",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/mindweaver_63d2a82d-84e1-05be-fify.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/mindweaver_63d2a82d-84e1-05be-fify.pak",
+      "size": 170270464,
+      "sha256": "ca5dff74654c1c7015a8f447abe42f2b53061fd1098db918d3a82e777114d86b",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/monksubclasses5ecombined_1f9ea-2cmo.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/monksubclasses5ecombined_1f9ea-2cmo.pak",
+      "size": 16843996,
+      "sha256": "68812b393cdfbf2d5bed06edcde74f523cf5e87a242d1311d1d1914bf329d9cf",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/mysticclass_93c6116d-631a-cdc4-iext.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/mysticclass_93c6116d-631a-cdc4-iext.pak",
+      "size": 141378550,
+      "sha256": "3a74cf82c3d3374098ad47e81c4628c6cfe2a9d9d7c889dd753d79b9741995ef",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/naturewitch_777d21b5-c6ad-80d6-2okr.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/naturewitch_777d21b5-c6ad-80d6-2okr.pak",
+      "size": 12165319,
+      "sha256": "a76b260bc2ec963bcbaf38ab01eebdf58d5b92e77bfaaed15a2fdcca09555b05",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/nightmare_difficulty_926179dc-grcn.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/nightmare_difficulty_926179dc-grcn.pak",
+      "size": 3806775,
+      "sha256": "f492ffe414ea42aa40e4952e9f67066dc2e5a40962c94fe6a305e0bd6b93c592",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/NMCM_ca8bfe06-88ec-a4e7-b49e-44eb5658f434.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/NMCM_ca8bfe06-88ec-a4e7-b49e-44eb5658f434.pak",
+      "size": 23343516,
+      "sha256": "9816c0173efa2ba1d48c830534671547f90f2c9d7a5f519b74a91f1e3a018e5f",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/noira_gale_beard_fix_ee18caf2-eiwa.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/noira_gale_beard_fix_ee18caf2-eiwa.pak",
+      "size": 1269443,
+      "sha256": "4bd62c03d34656c4855460c7dcddf8747ef4a85729aa02e50b35f54656879258",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/oathofconquest_7066e995-e7fc-3-kyma.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/oathofconquest_7066e995-e7fc-3-kyma.pak",
+      "size": 8962707,
+      "sha256": "bfbad574a35744ad2384a1d3ed684e8e7f7bfdab0034e7ce86684aeccb980cae",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/oathofpestilence_55436d3d-6b2d-a2kx.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/oathofpestilence_55436d3d-6b2d-a2kx.pak",
+      "size": 5556470,
+      "sha256": "c8eb88e09455986264e5f8bfb3edffd55c1f30e9cbf5694c7f2863053d12c50f",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/onetimerespecbutton_7b25dc8f-1-0gua.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/onetimerespecbutton_7b25dc8f-1-0gua.pak",
+      "size": 125589,
+      "sha256": "1457d820bea8c609c18faa5bc7a97ac612f5780f8d90cc9e5b20e9653fba572c",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/originclassunlocker_2df6194d-7-jz9r.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/originclassunlocker_2df6194d-7-jz9r.pak",
+      "size": 3061861,
+      "sha256": "a290f34c3d79776587360528a698b7a807359921ada2aa2508b350c1d30c1e23",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/Path of Undeath.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/Path of Undeath.pak",
+      "size": 27269661,
+      "sha256": "30c520e150bcd74717733ff729a2f01ede0e538eb55c7946e9cb7c8a25e10a4c",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/rangersubclasses5ecombined_49b-6i4g.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/rangersubclasses5ecombined_49b-6i4g.pak",
+      "size": 138263971,
+      "sha256": "4f1eb6367e97d8a3e6392acb68a3db97634192ab5ff4068d6c84382fc082a9f0",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/ravenloftsubclasses2024_a153a4-91gk.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/ravenloftsubclasses2024_a153a4-91gk.pak",
+      "size": 8712051,
+      "sha256": "1a40b1b78daf8be14b259e725cfe9b837b090a430a44e748adbf3d164a259ea1",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/requiem_for_the_absolute_f1f6f-5xez.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/requiem_for_the_absolute_f1f6f-5xez.pak",
+      "size": 25715621,
+      "sha256": "841ddd96d10eb55df263f42207381395b5e28f5f8d21b18311c431b37ddffeba",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/showcampnightnotification_6357-8uk7.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/showcampnightnotification_6357-8uk7.pak",
+      "size": 21211477,
+      "sha256": "25eefcd6b60ed3d68ab01488ade032aa1f4b01baad25133e1ed5e5e327d7a903",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/startingarmorenhanced_f7c69733-4jh3.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/startingarmorenhanced_f7c69733-4jh3.pak",
+      "size": 5770780,
+      "sha256": "4fc01dfd2d732512ceb29ed5d69c936c8eb46d2720eaf0bdc80e47358f5c6150",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/tacticianenhanced_7d6712c3-3b6-a0le.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/tacticianenhanced_7d6712c3-3b6-a0le.pak",
+      "size": 22943719,
+      "sha256": "26b1c413503d05588d3a1f1ea7e8562c3c8f5609049b07b8c3072ca4fb2f565c",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/tashafeats_e285bbbb-f352-f08e-hnys.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/tashafeats_e285bbbb-f352-f08e-hnys.pak",
+      "size": 2263255,
+      "sha256": "0fa09b270abc0f6656365a971d54d464426e0b765fe46255bc66e892f0d96f51",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/telekinesisspells_19caa3a3-25c-6nop.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/telekinesisspells_19caa3a3-25c-6nop.pak",
+      "size": 15402147,
+      "sha256": "1cd8a7c12acfe2dad9e954df92d35fd3008ab583b36f4eae56659cf3f582d94e",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/test_27f18a86-94f8-1f5c-760c-1-gxcc.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/test_27f18a86-94f8-1f5c-760c-1-gxcc.pak",
+      "size": 3758,
+      "sha256": "44aa5208885d02a468d57b04401921ab8b26c83a38ae84503d73de95ca2703b6",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/test_4b516620-9c56-aa18-96ae-a-dk21.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/test_4b516620-9c56-aa18-96ae-a-dk21.pak",
+      "size": 81215323,
+      "sha256": "7d82256e4364263da0d4fe906d30e789aa95ceed303476c6c0e12f0bd3b65ef9",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/traderdropallloot_887688c7-6db-9aff.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/traderdropallloot_887688c7-6db-9aff.pak",
+      "size": 20545453,
+      "sha256": "df5174671db51063978c4ce96ea9d16b8de6574a606545870ec29a4f9e3a8cb6",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/tutorialmod2_d4600b7e-f7c6-6ca-2hds.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/tutorialmod2_d4600b7e-f7c6-6ca-2hds.pak",
+      "size": 187375,
+      "sha256": "94816ed663599b6a8ba4a50027f0ac8c81b0b4c3f96dfcd398e282dfc3406d30",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/unlocklevelcurve_a2ffd0e4-c407-4p40.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/unlocklevelcurve_a2ffd0e4-c407-4p40.pak",
+      "size": 929427,
+      "sha256": "dd2391e6c0853907d9ac3c3b075f7fd53a3007141e9b6411bdb96f0271be8d85",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/Valkrana's Skeleton Crew.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/Valkrana's Skeleton Crew.pak",
+      "size": 2773308,
+      "sha256": "2ac4317220cd179b120e236aba65dbc4e76618598f1664d2bc97e53662d0f711",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/Valkrana's Spellbook.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/Valkrana's Spellbook.pak",
+      "size": 8385384,
+      "sha256": "43be022407b7a44c6d1105d6ed143923bd6c680ad7322a172265766cdd75bc79",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/Valkrana's Undead Encounters.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/Valkrana's Undead Encounters.pak",
+      "size": 2750071,
+      "sha256": "ab9efe5926dcca784cd6a7fb5cc0b1d865d910a7d0ffcbf67a3c5b751c4e1cc6",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/vampiric_tree_75d2d721-1e37-d9-2t4c.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/vampiric_tree_75d2d721-1e37-d9-2t4c.pak",
+      "size": 31630683,
+      "sha256": "502081d2a304407f71a27113b5eb269b7a34bb7cd902d349eb33ad4e90d726f5",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/Warlock Spell List Fixer.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/Warlock Spell List Fixer.pak",
+      "size": 13018,
+      "sha256": "76175ce74ecbf109e6f401bf5e96046d1ff04580cb6c856193a1e65abadcc9c8",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/wizardly_updo_default_623966ce-b2a0.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/wizardly_updo_default_623966ce-b2a0.pak",
+      "size": 13773250,
+      "sha256": "5319d7ad4616eff3075e22d0754242292a3ed48fbe7d8eb5d1bbcd23f278105b",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/WotD-Aasimar.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/WotD-Aasimar.pak",
+      "size": 620412060,
+      "sha256": "3fac11e8fa6b3da4944894be8a577a6b99a9fdc638a2c90bccfa71d6774c4c29",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Mods/xfed_aio_af330e86-7335-b20c-ce-kd2n.pak",
+      "target": "mods/bg3/versions/2026.11.21/Mods/xfed_aio_af330e86-7335-b20c-ce-kd2n.pak",
+      "size": 79190035,
+      "sha256": "13c21a8a10f6902e7d47add0b1ab0f22b67b716fcadd614047e2aec659136fc8",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/modsettings.lsx",
+      "target": "mods/bg3/versions/2026.11.21/modsettings.lsx",
+      "size": 52755,
+      "sha256": "a2cc91c8c21669c6ccb39d7330cb7332ceb4f126409fb033781596c4a86d600d",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/Config.json",
+      "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/Config.json",
+      "size": 330,
+      "sha256": "ddd3f0def348290376d9791b3d5ab7930b4a885e9b8d4827b3d4f63df7c94f4b",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/ItemFilters.json",
+      "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/ItemFilters.json",
+      "size": 31,
+      "sha256": "68c62243afefa1b4c98d74e8685a7c6adabd76c92c7ae582aa0335301f07d107",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/Localization/ToT.json",
+      "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/Localization/ToT.json",
+      "size": 24161,
+      "sha256": "2504f033d7661679cc50dd1c42eacd9b572368ba4b37f9b764067f1ef47ec09b",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Enemies.json",
+      "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Enemies.json",
+      "size": 53356,
+      "sha256": "6338356bdcdf03eb8568b27c654437d9af91d347b6a534ee795955803f883667",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/LootRates.json",
+      "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/LootRates.json",
+      "size": 326,
+      "sha256": "4f4c0dc456a9816a13f8b0bbbc04f14d4dddcedad6b89597e58e60b739b89e96",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Maps.json",
+      "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Maps.json",
+      "size": 103943,
+      "sha256": "97f8110857b245c9e3f0c02460c5fff0b5566607cf4d4d896d98c38abd90d062",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Scenarios.json",
+      "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Scenarios.json",
+      "size": 2692,
+      "sha256": "bcec22e8ed835fe8f7234998381fb98b28d64b8046814a5889c7ff4ab06b5cc0",
+      "mode": "644"
+    },
+    {
+      "source": "art/bg3/grid.png",
+      "target": "art/bg3/grid.png",
+      "size": 37275,
+      "sha256": "da337cab5c83b0e0e86af078f3c71e710404d7308e2816d392273e0022d65542",
+      "mode": "644"
+    },
+    {
+      "source": "art/bg3/header.png",
+      "target": "art/bg3/header.png",
+      "size": 15035,
+      "sha256": "d7e5903e917b5af39cf4e60882abe50c5d5bc4dbf6527e481a0394d1f934931c",
+      "mode": "644"
+    },
+    {
+      "source": "art/bg3/hero.png",
+      "target": "art/bg3/hero.png",
+      "size": 56772,
+      "sha256": "c6e9872fdf64118c2a9c1855884a74186a205ce2e945a7ba610320a913224991",
+      "mode": "644"
+    },
+    {
+      "source": "art/bg3/icon.png",
+      "target": "art/bg3/icon.png",
+      "size": 12159,
+      "sha256": "4b62fcdc957dbddfbd79018eccf25c90193823a9692d6dff32f3735e8aa0ac1f",
+      "mode": "644"
+    },
+    {
+      "source": "art/bg3/logo.png",
+      "target": "art/bg3/logo.png",
+      "size": 14938,
+      "sha256": "e7533061dd1bbee12cfd1717518874a5cb6d4d595466c87b381581832cb8940c",
+      "mode": "644"
+    },
+    {
+      "source": "art/bg3/portrait.png",
+      "target": "art/bg3/portrait.png",
+      "size": 37275,
+      "sha256": "da337cab5c83b0e0e86af078f3c71e710404d7308e2816d392273e0022d65542",
+      "mode": "644"
+    }
+  ]
+}

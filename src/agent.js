@@ -10,6 +10,7 @@ const steam = require("./steam");
 const installer = require("./installer");
 const preconditions = require("./preconditions");
 const storage = require("./storage");
+const versionStore = require("./version-store");
 
 function contentType(p) {
   switch (path.extname(p).toLowerCase()) {
@@ -65,16 +66,16 @@ function createAgent(config) {
   const artCache = new Map();
   const confirmFile = path.join(root, "state", "preconditions.json");
 
-  const packRoot = (id) => path.join(root, "packs", id);
+  const packRoot = (id) => versionStore.packRoot(root, id);
 
   function localPack(id) {
-    const file = path.join(packRoot(id), "pack.json");
+    const file = versionStore.packFile(packRoot(id));
     if (!fs.existsSync(file)) return null;
     try { return util.readJson(file); } catch { return null; }
   }
 
   function localPacks() {
-    const dir = path.join(root, "packs");
+    const dir = versionStore.packsDir(root);
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir, { withFileTypes: true })
       .filter((e) => e.isDirectory())
@@ -86,7 +87,7 @@ function createAgent(config) {
     let files = 0;
     let totalBytes = 0;
     try {
-      const doc = util.readJson(path.join(packRoot(pack.id), pack.files || "files.json"));
+      const doc = util.readJson(versionStore.filesDocFile(packRoot(pack.id), pack));
       if (Array.isArray(doc.files)) {
         files = doc.files.length;
         totalBytes = doc.files.reduce((n, f) => n + (f.size || 0), 0);
@@ -123,24 +124,17 @@ function createAgent(config) {
 
   function localInfo(pack) {
     const pr = packRoot(pack.id);
-    const versionsDir = path.join(pr, "mods", pack.mod.id, "versions");
-    const current = util.readText(path.join(pr, "mods", pack.mod.id, "current.txt")).trim();
-    const versions = fs.existsSync(versionsDir)
-      ? fs.readdirSync(versionsDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory())
-        .map((e) => e.name)
-        .filter((n) => !n.startsWith(".") && !n.includes(".bak-"))
-        .sort(installer.compareVersions)
-      : [];
-    const launcher = path.join(pr, "launchers", `launch-${pack.mod.id}.sh`);
+    const current = versionStore.readCurrent(pr, pack.mod.id);
+    const versions = versionStore.listVersions(pr, pack.mod.id);
+    const launcher = versionStore.launcherFile(pr, pack.mod.id);
     const desktop = path.join(os.homedir(), ".local", "share", "applications", `${pack.mod.id}.desktop`);
     return {
       installed: !!current,
       installedVersion: current || null,
       versions,
-      canRollback: !!current && versions.indexOf(current) > 0,
+      canRollback: versionStore.canRollback(pr, pack.mod.id),
       status: !current ? "not-installed" : (current === pack.mod.version ? "up-to-date" : "update-available"),
-      staging: fs.existsSync(path.join(versionsDir, `.staging-${pack.mod.version}`)),
+      staging: fs.existsSync(versionStore.stagingDir(pr, pack.mod.id, pack.mod.version)),
       packRoot: pr,
       launcher: fs.existsSync(launcher) ? launcher : null,
       desktopFile: fs.existsSync(desktop) ? desktop : null,
@@ -291,10 +285,10 @@ function createAgent(config) {
     const cacheKey = `${packId}:${key}`;
     if (artCache.has(cacheKey)) return artCache.get(cacheKey);
     const pr = packRoot(packId);
-    const localPack = path.join(pr, "pack.json");
-    if (fs.existsSync(localPack)) {
+    const localPackFile = versionStore.packFile(pr);
+    if (fs.existsSync(localPackFile)) {
       try {
-        const pack = util.readJson(localPack);
+        const pack = util.readJson(localPackFile);
         if (pack.art && pack.art[key]) {
           const file = path.join(pr, pack.art[key]);
           if (fs.existsSync(file)) {
@@ -361,7 +355,7 @@ function createAgent(config) {
         const body = await readBody(req);
         if (body.scope !== "logs" && body.packId) {
           try {
-            const pack = util.readJson(path.join(root, "packs", body.packId, "pack.json"));
+            const pack = util.readJson(versionStore.packFile(versionStore.packRoot(root, body.packId)));
             if (util.isGameRunning(pack.launch && pack.launch.gameProcess)) {
               res.writeHead(409, { "content-type": "application/json" });
               return res.end(JSON.stringify({ error: "Close the game before removing installed files." }));

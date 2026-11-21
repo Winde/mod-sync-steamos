@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "id": "bg3-modded",
+  "name": "BG3 Modded",
+  "description": "Baldur's Gate 3 mod snapshot with modsettings and Script Extender",
+  "game": {
+    "id": "bg3",
+    "title": "Baldur's Gate 3",
+    "store": "steam",
+    "appId": 1086940,
+    "installDir": "Baldurs Gate 3",
+    "build": "25605617",
+    "version": "Patch 8",
+    "prefix": true
+  },
+  "mod": {
+    "id": "bg3",
+    "version": "2026.11.21"
+  },
+  "loader": {
+    "type": "bg3se",
+    "profile": "mods/bg3/versions/2026.11.21/modsettings.lsx"
+  },
+  "launch": {
+    "type": "steam",
+    "exe": "bin/bg3.exe",
+    "gameProcess": "bg3.exe",
+    "steamAppId": 1086940,
+    "profile": "mods/bg3/versions/2026.11.21/modsettings.lsx",
+    "saveFile": "PlayerProfiles/Public",
+    "dataDir": "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3"
+  },
+  "install": {
+    "type": "bg3",
+    "dataDir": "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
+    "bg3se": true
+  },
+  "art": {
+    "grid": "art/bg3/grid.png",
+    "hero": "art/bg3/hero.png",
+    "logo": "art/bg3/logo.png",
+    "icon": "art/bg3/icon.png",
+    "header": "art/bg3/header.png",
+    "portrait": "art/bg3/portrait.png"
+  },
+  "notes": [
+    {
+      "title": "Close Baldur's Gate 3 before installing",
+      "body": "The pack writes mods and modsettings into the game's Proton prefix. Close the game and its launcher first.",
+      "tone": "warning"
+    },
+    {
+      "title": "Script Extender",
+      "body": "BG3 Script Extender is included and applied with the pack.",
+      "tone": "info"
+    },
+    {
+      "title": "Saves",
+      "body": "Saves are not part of the pack and are not synced. Adding or removing mods can affect existing saves.",
+      "tone": "warning"
+    }
+  ],
+  "preconditions": [
+    {
+      "id": "game-installed",
+      "type": "game-installed",
+      "required": true,
+      "title": "Baldur's Gate 3 is installed"
+    },
+    {
+      "id": "game-build",
+      "type": "game-build",
+      "required": true,
+      "build": "25605617",
+      "title": "Game is build 25605617 (Patch 8)"
+    },
+    {
+      "id": "proton-prefix",
+      "type": "proton-prefix",
+      "required": true,
+      "title": "Proton prefix exists",
+      "hint": "Launch the vanilla game once from Steam."
+    },
+    {
+      "id": "game-closed",
+      "type": "game-not-running",
+      "required": true,
+      "title": "Game is closed"
+    },
+    {
+      "id": "disk-free",
+      "type": "disk-free",
+      "required": true,
+      "reserveBytes": 1073741824,
+      "title": "Enough free space"
+    }
+  ],
+  "files": "files.json",
+  "save": {
+    "transfer": "out-of-scope"
+  }
+}

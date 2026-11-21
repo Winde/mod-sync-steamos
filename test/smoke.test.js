@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { validatePack, validateFiles } = require("../src/manifest");
 const { safeJoin, formatBytes, readJson } = require("../src/util");
-const { compareVersions } = require("../src/installer");
+const { compareVersions } = require("../src/version-store");
 const { shortcutId } = require("../src/steam");
 const { parseRange } = require("../src/server");
 

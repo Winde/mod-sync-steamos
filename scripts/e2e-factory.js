@@ -16,6 +16,7 @@ const { parseArgs } = require("node:util");
 const { createServer } = require("../src/server");
 const { createAgent } = require("../src/agent");
 const { loadPack } = require("../src/manifest");
+const versionStore = require("../src/version-store");
 const { sha256File, mapLimit, safeJoin, walkFiles, formatBytes } = require("../src/util");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -42,13 +43,13 @@ function progressLine(job, startedAt) {
 }
 
 async function verifyRoot(pack, files, root, verifyHashes) {
-  const installedRoot = path.join(root, "packs", pack.id);
-  const currentPath = path.join(installedRoot, "mods", pack.mod.id, "current.txt");
+  const installedRoot = versionStore.packRoot(root, pack.id);
+  const currentPath = versionStore.currentFile(installedRoot, pack.mod.id);
   if (!fs.existsSync(currentPath)) throw new Error(`not installed: missing ${currentPath}`);
-  const current = fs.readFileSync(currentPath, "utf8").trim();
+  const current = versionStore.readCurrent(installedRoot, pack.mod.id);
   if (current !== pack.mod.version) throw new Error(`current.txt is ${current}, expected ${pack.mod.version}`);
 
-  const versionDir = path.join(installedRoot, "mods", pack.mod.id, "versions", pack.mod.version);
+  const versionDir = versionStore.versionDir(installedRoot, pack.mod.id, pack.mod.version);
   if (!fs.existsSync(versionDir)) throw new Error(`missing version dir ${versionDir}`);
 
   const problems = [];
@@ -73,7 +74,7 @@ async function verifyRoot(pack, files, root, verifyHashes) {
     throw new Error(`verification failed:\n  ${problems.slice(0, 20).join("\n  ")}${problems.length > 20 ? `\n  ...and ${problems.length - 20} more` : ""}`);
   }
 
-  const launcher = path.join(installedRoot, "launchers", `launch-${pack.mod.id}.sh`);
+  const launcher = versionStore.launcherFile(installedRoot, pack.mod.id);
   if (!fs.existsSync(launcher)) throw new Error(`missing launcher ${launcher}`);
   const launcherText = fs.readFileSync(launcher, "utf8");
   if (!launcherText.includes(pack.launch.saveFile) || !launcherText.includes("--online false")) {

@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { rollback, listVersions } = require("../src/installer");
+const { rollback } = require("../src/installer");
+const { listVersions } = require("../src/version-store");
 
 test("rollback switches current.txt to the previous installed version", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-rollback-"));
@@ -16,7 +17,7 @@ test("rollback switches current.txt to the previous installed version", () => {
   fs.writeFileSync(path.join(packRoot, "profiles", "graceborne-0.2.7.me3"), "");
   fs.writeFileSync(path.join(packRoot, "mods", "graceborne", "current.txt"), "0.2.7\n");
 
-  assert.deepEqual(listVersions(packRoot, pack), ["0.2.5", "0.2.7"]);
+  assert.deepEqual(listVersions(packRoot, pack.mod.id), ["0.2.5", "0.2.7"]);
   const result = rollback({ pack, root, log: () => {} });
   assert.equal(result.previous, "0.2.5");
   assert.equal(fs.readFileSync(path.join(packRoot, "mods", "graceborne", "current.txt"), "utf8").trim(), "0.2.5");
