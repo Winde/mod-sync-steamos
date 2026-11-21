@@ -58,6 +58,8 @@ function createAgent(config) {
   const port = Number(config.port || 8788);
   const pcUrl = String(config.pcUrl || "").replace(/\/+$/, "");
   const token = config.token || "";
+  if (config.steamRoot) process.env.STEAM_ROOT = String(config.steamRoot);
+  if (Array.isArray(config.steamLibraries)) steam.setExtraLibraries(config.steamLibraries);
   const webDir = path.join(__dirname, "..", "web");
   const jobs = new Map();
   let activeJob = null;

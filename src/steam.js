@@ -2,17 +2,53 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const zlib = require("node:zlib");
+const { execFileSync } = require("node:child_process");
+
+let registryRoots = null;
+let extraLibraries = [];
+
+function setExtraLibraries(list) {
+  extraLibraries = Array.isArray(list) ? list.filter((p) => typeof p === "string" && p) : [];
+}
+
+function addRoot(roots, value) {
+  if (value) roots.push(value);
+}
+
+function windowsRegistryRoots() {
+  if (registryRoots) return registryRoots;
+  const found = [];
+  const queries = [
+    ["HKCU\\Software\\Valve\\Steam", "SteamPath"],
+    ["HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam", "InstallPath"],
+    ["HKLM\\SOFTWARE\\Valve\\Steam", "InstallPath"],
+  ];
+  for (const [key, value] of queries) {
+    try {
+      const out = execFileSync("reg", ["query", key, "/v", value], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      const match = new RegExp(`${value}\\s+REG_SZ\\s+(.+)`, "i").exec(out);
+      if (match) found.push(match[1].trim());
+    } catch { }
+  }
+  registryRoots = found;
+  return found;
+}
 
 function steamRoots() {
   const roots = [];
   if (process.platform === "win32") {
+    addRoot(roots, process.env.STEAM_ROOT);
     const pf = process.env["ProgramFiles(x86)"] || process.env.ProgramFiles;
-    if (pf) roots.push(path.join(pf, "Steam"));
+    if (pf) addRoot(roots, path.join(pf, "Steam"));
+    for (const root of windowsRegistryRoots()) addRoot(roots, root);
   } else {
-    roots.push(path.join(os.homedir(), ".steam", "steam"));
-    roots.push(path.join(os.homedir(), ".local", "share", "Steam"));
-    roots.push(path.join(os.homedir(), ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam"));
-    roots.push(path.join(os.homedir(), ".var", "app", "com.valvesoftware.Steam", ".steam", "steam"));
+    addRoot(roots, process.env.STEAM_ROOT);
+    addRoot(roots, path.join(os.homedir(), ".steam", "steam"));
+    addRoot(roots, path.join(os.homedir(), ".steam", "root"));
+    addRoot(roots, path.join(os.homedir(), ".local", "share", "Steam"));
+    addRoot(roots, path.join(os.homedir(), ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam"));
+    addRoot(roots, path.join(os.homedir(), ".var", "app", "com.valvesoftware.Steam", ".steam", "steam"));
+    addRoot(roots, path.join(os.homedir(), ".snap", "steam", "common", ".local", "share", "Steam"));
   }
   return [...new Set(roots)].filter((p) => fs.existsSync(p));
 }
@@ -30,17 +66,23 @@ function libraries() {
       libs.add(p);
     }
   }
+  for (const lib of extraLibraries) libs.add(lib);
   return [...libs].filter((p) => fs.existsSync(p));
 }
 
+function readManifest(library, appId) {
+  const file = path.join(library, "steamapps", `appmanifest_${appId}.acf`);
+  if (!fs.existsSync(file)) return null;
+  const txt = fs.readFileSync(file, "utf8");
+  const installDir = /"installdir"\s+"([^"]+)"/.exec(txt)?.[1] || "";
+  let build = /"buildid"\s+"(\d+)"/.exec(txt)?.[1] || "";
+  if (!build || build === "0") build = /"TargetBuildID"\s+"(\d+)"/.exec(txt)?.[1] || "";
+  return { file, installDir, build };
+}
+
 function readBuild(library, appId) {
-  const manifest = path.join(library, "steamapps", `appmanifest_${appId}.acf`);
-  if (!fs.existsSync(manifest)) return null;
-  const txt = fs.readFileSync(manifest, "utf8");
-  let m = txt.match(/"buildid"\s+"(\d+)"/);
-  if (m && m[1] !== "0") return m[1];
-  m = txt.match(/"TargetBuildID"\s+"(\d+)"/);
-  return m ? m[1] : null;
+  const manifest = readManifest(library, appId);
+  return manifest ? manifest.build || null : null;
 }
 
 function findAppManifest(appId) {
@@ -63,17 +105,21 @@ function readInstalledDepots(library, appId) {
 function findGame(game) {
   if (!game || !game.appId) return null;
   for (const lib of libraries()) {
-    const gameRoot = path.join(lib, "steamapps", "common", game.installDir);
+    const manifest = readManifest(lib, game.appId);
+    const installDir = (manifest && manifest.installDir) || game.installDir;
+    if (!installDir) continue;
+    const gameRoot = path.join(lib, "steamapps", "common", installDir);
+    if (!fs.existsSync(gameRoot)) continue;
     const exe = game.exe ? path.join(gameRoot, game.exe) : null;
-    if (exe ? !fs.existsSync(exe) : !fs.existsSync(gameRoot)) continue;
     const prefix = process.platform === "win32"
       ? null
       : path.join(lib, "steamapps", "compatdata", String(game.appId), "pfx");
     return {
       library: lib,
       root: gameRoot,
-      exe,
-      build: readBuild(lib, game.appId),
+      installDir,
+      exe: exe && fs.existsSync(exe) ? exe : null,
+      build: manifest ? manifest.build || null : null,
       prefix,
       prefixReady: prefix ? fs.existsSync(prefix) : true,
       platform: process.platform,
@@ -206,6 +252,6 @@ async function registerShortcut({ exePath, name, icon, art }) {
 }
 
 module.exports = {
-  steamRoots, libraries, findGame, findUserData, findAppManifest,
-  readInstalledDepots, registerShortcut, shortcutId, mergeShortcut,
+  steamRoots, libraries, findGame, findUserData, findAppManifest, readManifest,
+  readInstalledDepots, registerShortcut, shortcutId, mergeShortcut, setExtraLibraries,
 };

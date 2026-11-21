@@ -96,3 +96,29 @@ test("registerShortcut writes one Steam entry and updates it on a second run", a
     fs.rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("findGame reads the install directory from the app manifest", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-manifest-"));
+  const oldRoot = process.env.STEAM_ROOT;
+  try {
+    process.env.STEAM_ROOT = root;
+    fs.mkdirSync(path.join(root, "steamapps", "common", "Actual Folder", "bin"), { recursive: true });
+    fs.writeFileSync(path.join(root, "steamapps", "appmanifest_999999.acf"), `"AppState"
+{
+  "appid" "999999"
+  "installdir" "Actual Folder"
+  "buildid" "12345"
+}
+`);
+    fs.writeFileSync(path.join(root, "steamapps", "common", "Actual Folder", "bin", "game.exe"), "");
+    const game = steam.findGame({ appId: 999999, installDir: "Wrong Folder", exe: "bin/game.exe" });
+    assert.ok(game);
+    assert.equal(game.installDir, "Actual Folder");
+    assert.equal(game.root, path.join(root, "steamapps", "common", "Actual Folder"));
+    assert.equal(game.build, "12345");
+    assert.ok(game.exe.endsWith(path.join("bin", "game.exe")));
+  } finally {
+    if (oldRoot === undefined) delete process.env.STEAM_ROOT; else process.env.STEAM_ROOT = oldRoot;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

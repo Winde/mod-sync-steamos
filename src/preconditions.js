@@ -126,7 +126,9 @@ function checkDlc(check, { pack, game }) {
 function checkOne(check, { pack, game, root, totalBytes }) {
   switch (check.type) {
     case "game-installed":
-      return game ? pass(`${pack.game.title} at ${game.root}`) : fail(`${pack.game.title} was not found in the Steam libraries.`);
+      return game
+        ? pass(`${pack.game.title} at ${game.root}`)
+        : fail(`${pack.game.title} was not found in Steam libraries (${steam.libraries().join(", ") || "none"}).`);
     case "game-build": {
       const expected = String(check.build || pack.game.build || "");
       if (!game) return unknown("Game not found.");
