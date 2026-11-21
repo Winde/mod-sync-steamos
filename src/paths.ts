@@ -8,8 +8,10 @@
  * installer resolves the profile that matches the game install at runtime.
  */
 
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { projectRoot } from "./root";
 import { errorMessage } from "./util";
 import type {
   LaunchInfo,
@@ -57,6 +59,44 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+/** Launcher templates selected by `launch.type` when a profile has none. */
+const DEFAULT_LAUNCHER_TEMPLATES: Readonly<Record<string, string>> = {
+  steam: "launch-steam.sh",
+};
+
+export interface LauncherTemplate {
+  /** Template path relative to templates/linux. */
+  name: string;
+  /** Absolute template path. */
+  file: string;
+}
+
+/**
+ * Resolve a launcher template once for the pack audit, manifest validation,
+ * and launcher writer. `requireExists` stays off during schema validation so
+ * a Server that does not ship templates can still inspect packs.
+ */
+export function resolveLauncherTemplate(
+  template: string | null | undefined,
+  launchType: string | null | undefined,
+  options: { templatesDir?: string; requireExists?: boolean } = {},
+): LauncherTemplate {
+  const name = template || (launchType ? DEFAULT_LAUNCHER_TEMPLATES[launchType] : "") || "";
+  if (!name) throw new Error(`no launcher template for launch type ${launchType || "unknown"}`);
+  if (path.isAbsolute(name) || name.split(/[\\/]/).includes("..")) {
+    throw new Error(`launcher template escapes templates/linux: ${name}`);
+  }
+  const dir = path.resolve(options.templatesDir || path.join(projectRoot, "templates", "linux"));
+  const file = path.resolve(dir, name);
+  if (!file.startsWith(dir + path.sep)) {
+    throw new Error(`launcher template escapes templates/linux: ${name}`);
+  }
+  if (options.requireExists !== false && (!fs.existsSync(file) || !fs.statSync(file).isFile())) {
+    throw new Error(`launcher template missing: ${name}`);
+  }
+  return { name, file };
+}
+
 export function validatePlatforms(platforms: unknown, where = "platforms"): Platforms {
   if (platforms == null) return {};
   if (!isPlainObject(platforms)) throw new Error(`${where}: must be an object`);
@@ -68,8 +108,12 @@ export function validatePlatforms(platforms: unknown, where = "platforms"): Plat
     for (const [key, value] of Object.entries(profile)) {
       if (!(PROFILE_KEYS as readonly string[]).includes(key)) throw new Error(`${where}.${variant}: unknown key ${key}`);
       if (typeof value !== "string" || !value) throw new Error(`${where}.${variant}.${key}: must be a non-empty string`);
-      if (key === "template" && (path.isAbsolute(value) || value.split(/[\\/]/).includes(".."))) {
-        throw new Error(`${where}.${variant}.template: must stay under templates/linux`);
+      if (key === "template") {
+        try {
+          resolveLauncherTemplate(value, null, { requireExists: false });
+        } catch (err) {
+          throw new Error(`${where}.${variant}.template: ${errorMessage(err)}`);
+        }
       }
     }
   }

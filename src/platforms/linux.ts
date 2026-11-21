@@ -6,7 +6,6 @@ import { writeText, errorMessage, isGameRunning } from "../util";
 import * as paths from "../paths";
 import * as steam from "../steam";
 import * as versionStore from "../version-store";
-import { projectRoot } from "../root";
 import type { Pack, SteamGame } from "../types";
 
 /**
@@ -37,15 +36,8 @@ export function writeLauncher({
   const packRoot = versionStore.packRoot(root, pack.id);
   const target = paths.resolve(pack, game);
   const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
-  const templates = path.join(projectRoot, "templates", "linux");
-  const defaultTemplates: Record<string, string> = { steam: "launch-steam.sh" };
-  const templateName = target.template || defaultTemplates[pack.launch.type];
-  if (!templateName) throw new Error(`No launcher template for launch type ${pack.launch.type}.`);
-  const templateFile = path.resolve(templates, templateName);
-  if (!templateFile.startsWith(path.resolve(templates) + path.sep)) {
-    throw new Error(`Launcher template escapes the template directory: ${templateName}`);
-  }
-  const launcherText = renderTemplate(templateFile, {
+  const template = paths.resolveLauncherTemplate(target.template, pack.launch.type);
+  const launcherText = renderTemplate(template.file, {
     ROOT: packRoot,
     MOD: pack.mod.id,
     GAME: game ? game.root : "",

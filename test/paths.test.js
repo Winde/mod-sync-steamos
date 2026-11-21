@@ -45,6 +45,24 @@ test("an unsupported native build is reported instead of silently using Proton p
   assert.equal(resolved.supported, false);
 });
 
+test("launcher templates share the default, containment, and existence rules", () => {
+  const fallback = paths.resolveLauncherTemplate(null, "steam");
+  assert.equal(fallback.name, "launch-steam.sh");
+  assert.ok(fallback.file.endsWith(path.join("templates", "linux", "launch-steam.sh")));
+
+  assert.equal(paths.resolveLauncherTemplate("loaders/me3.sh", "steam").name, "loaders/me3.sh");
+  assert.equal(paths.resolveLauncherTemplate("missing.sh", "steam", { requireExists: false }).name, "missing.sh");
+
+  assert.throws(() => paths.resolveLauncherTemplate(null, "me3"), /no launcher template/);
+  assert.throws(() => paths.resolveLauncherTemplate("../launch-steam.sh", "steam"), /escapes/);
+  assert.throws(() => paths.resolveLauncherTemplate(path.join(path.sep, "tmp", "launch.sh"), "steam"), /escapes/);
+  assert.throws(() => paths.resolveLauncherTemplate("missing.sh", "steam"), /missing/);
+  assert.throws(
+    () => paths.validatePlatforms({ windows: { template: "../launch-steam.sh" } }, "test.platforms"),
+    /escapes/,
+  );
+});
+
 test("files are selected by platform and totals follow the selection", () => {
   const files = [
     { target: "mods/a.pak", size: 10 },

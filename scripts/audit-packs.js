@@ -50,17 +50,10 @@ function auditPackRoot(packRoot) {
       }
     }
 
-    const templateName = profile.template || (pack.launch.type === "steam" ? "launch-steam.sh" : "");
-    if (!templateName) {
-      errors.push(`${variant}: no launcher template for launch type ${pack.launch.type}`);
-    } else {
-      const templatesDir = path.join(repoRoot, "templates", "linux");
-      const template = path.resolve(templatesDir, templateName);
-      if (!template.startsWith(templatesDir + path.sep)) {
-        errors.push(`${variant}: launcher template escapes templates/linux: ${templateName}`);
-      } else if (!fs.existsSync(template)) {
-        errors.push(`${variant}: launcher template missing: ${templateName}`);
-      }
+    try {
+      paths.resolveLauncherTemplate(profile.template, pack.launch.type);
+    } catch (err) {
+      errors.push(`${variant}: ${err.message}`);
     }
 
     for (const file of selected) {

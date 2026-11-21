@@ -135,7 +135,7 @@ function installedDepots(game: SteamGame | null | undefined): number[] | null {
 
 function checkDlc(
   check: PreconditionConfig,
-  { pack, game }: { pack: Pack; game: SteamGame | null | undefined },
+  { game }: { game: SteamGame | null | undefined },
 ): CheckOutcome {
   const found: string[] = [];
   const tried: string[] = [];
@@ -239,7 +239,7 @@ function checkOne(check: PreconditionConfig, { pack, game, root, totalBytes, tar
       return fail(`Missing ${candidates.join(" or ")}.`);
     }
     case "dlc-installed":
-      return checkDlc(check, { pack, game });
+      return checkDlc(check, { game });
     case "manual":
       return unknown("Needs confirmation.");
     default:

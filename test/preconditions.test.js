@@ -45,7 +45,6 @@ test("validatePack accepts notes and preconditions", () => {
 test("launch modes are explicit and validated", () => {
   const pack = basePack([], []);
   pack.launch.mode = "default";
-  pack.launch.defaultExe = "bin/game.exe";
   assert.equal(validatePack(pack).launch.mode, "default");
   pack.launch.mode = "alternate-exe";
   assert.equal(validatePack(pack).launch.mode, "alternate-exe");
