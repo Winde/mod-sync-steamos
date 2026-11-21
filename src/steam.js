@@ -112,11 +112,17 @@ function findGame(game) {
     const gameRoot = path.join(lib, "steamapps", "common", installDir);
     if (!fs.existsSync(gameRoot)) continue;
     const exe = game.exe ? path.join(gameRoot, game.exe) : null;
+    const nativeExe = game.linuxExe ? path.join(gameRoot, game.linuxExe) : null;
+    const exeReady = !!exe && fs.existsSync(exe);
+    const nativeExeReady = !!nativeExe && fs.existsSync(nativeExe);
+    const mode = process.platform === "win32"
+      ? "windows"
+      : (nativeExeReady && !exeReady ? "native" : "proton");
     const expectedPrefix = process.platform === "win32"
       ? null
       : path.join(lib, "steamapps", "compatdata", String(game.appId), "pfx");
     let prefix = null;
-    if (process.platform !== "win32") {
+    if (process.platform !== "win32" && mode !== "native") {
       for (const candidate of libs) {
         const p = path.join(candidate, "steamapps", "compatdata", String(game.appId), "pfx");
         if (fs.existsSync(p)) { prefix = p; break; }
@@ -127,10 +133,12 @@ function findGame(game) {
       library: lib,
       root: gameRoot,
       installDir,
-      exe: exe && fs.existsSync(exe) ? exe : null,
+      exe: exeReady ? exe : (nativeExeReady ? nativeExe : null),
       build: manifest ? manifest.build || null : null,
+      mode,
+      native: mode === "native",
       prefix,
-      prefixReady: prefix ? fs.existsSync(prefix) : true,
+      prefixReady: mode === "native" ? false : (prefix ? fs.existsSync(prefix) : true),
       platform: process.platform,
     };
   }

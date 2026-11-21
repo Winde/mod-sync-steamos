@@ -14,6 +14,19 @@
     "version": "1.17",
     "prefix": true
   },
+  "platforms": {
+    "windows": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-win/bin/me3.exe"
+    },
+    "linux-proton": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-linux/bin/me3",
+      "windowsBinaries": "tools/me3-win/bin"
+    }
+  },
   "mod": {
     "id": "graceborne",
     "version": "0.2.7"
@@ -24,15 +37,15 @@
   },
   "launch": {
     "type": "me3",
+    "mode": "loader",
+    "defaultExe": "Game/eldenring.exe",
     "exe": "Game/eldenring.exe",
     "gameProcess": "eldenring.exe",
     "steamAppId": 1245620,
     "profile": "profiles/graceborne-0.2.7.me3",
     "saveFile": "ER0000.graceborne.sl2",
     "me3": "tools/me3-linux/bin/me3",
-    "windowsBinaries": "tools/me3-linux/win64",
-    "mode": "loader",
-    "defaultExe": "Game/eldenring.exe"
+    "windowsBinaries": "tools/me3-win/bin"
   },
   "art": {
     "grid": "art/graceborne/grid.png",
@@ -100,7 +113,7 @@
   "contents": {
     "kind": "packages",
     "source": "me3 profile",
-    "generatedAt": "2026-11-21T10:30:21.028Z",
+    "generatedAt": "2026-11-21T11:45:13.610Z",
     "count": 1,
     "packages": [
       {

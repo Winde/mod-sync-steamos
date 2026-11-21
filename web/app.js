@@ -646,6 +646,7 @@
       <div class="row"><span>${labels.availableRow}</span><b>${esc(p.mod.version)}</b></div>
       <div class="row"><span>${labels.versionsKept}</span><b>${esc(versions)}</b></div>
       <div class="row"><span>${labels.gameRow}</span><b>${esc(p.game.title)} ${esc(p.game.version || "")} · ${labels.buildLabel} ${esc(p.game.build || "")}</b></div>
+      ${p.platform ? `<div class="row"><span>${labels.platformRow}</span><b>${labels.platformName(p.platform.variant)}${p.platform.supported ? "" : ` · ${labels.platformUnsupported}`}</b></div>` : ""}
       <div class="row"><span>${labels.launchRow}</span><b>${esc(launchLabel(p))}</b></div>
       <div class="row"><span>${labels.packRow}</span><b>${labels.stats(gb(p.totalBytes), p.files)}</b></div>
       ${p.contents ? `<div class="row"><span>${labels.contentsRow}</span><b>${contentsCount(p.contents)} ${labels.contentsSource(p.contents.source)}</b></div>` : ""}

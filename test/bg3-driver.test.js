@@ -60,9 +60,17 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.equal(result.pack.contents.mods[0].file, "Mods/ModA_uuid.pak");
     assert.equal(result.pack.contents.mods[1].builtin, true);
 
+    assert.equal(result.pack.platforms["linux-native"], undefined);
+    assert.equal(result.pack.platforms["linux-proton"].gameProcess, "bg3.exe");
+    assert.match(result.pack.platforms["linux-proton"].dataDir, /^%PREFIX%/);
+
     const loaded = loadPack(out);
     assert.equal(loaded.pack.contents.count, 1);
     assert.equal(loaded.files.files.filter((f) => f.target.startsWith("mods/bg3/")).length > 0, true);
+    const dll = loaded.files.files.find((f) => f.target.endsWith("/bg3se/DWrite.dll"));
+    assert.deepEqual(dll.platforms, ["windows", "linux-proton"]);
+    const pak = loaded.files.files.find((f) => f.target.endsWith("/Mods/ModA_uuid.pak"));
+    assert.equal(pak.platforms, undefined);
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }

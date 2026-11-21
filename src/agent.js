@@ -9,6 +9,7 @@ const util = require("./util");
 const steam = require("./steam");
 const installer = require("./installer");
 const preconditions = require("./preconditions");
+const paths = require("./paths");
 const storage = require("./storage");
 const versionStore = require("./version-store");
 
@@ -88,14 +89,19 @@ function createAgent(config) {
   function localSummary(pack) {
     let files = 0;
     let totalBytes = 0;
+    let platformFiles = null;
+    let platformBytes = null;
     try {
       const doc = util.readJson(versionStore.filesDocFile(packRoot(pack.id), pack));
       if (Array.isArray(doc.files)) {
         files = doc.files.length;
         totalBytes = doc.files.reduce((n, f) => n + (f.size || 0), 0);
+        const stats = paths.platformStats(doc.files);
+        platformFiles = Object.fromEntries(paths.VARIANTS.map((variant) => [variant, stats[variant].files]));
+        platformBytes = Object.fromEntries(paths.VARIANTS.map((variant) => [variant, stats[variant].totalBytes]));
       }
     } catch { }
-    return { ...pack, files, totalBytes };
+    return { ...pack, files, totalBytes, platformFiles, platformBytes };
   }
 
   function readConfirmations() {
@@ -147,16 +153,21 @@ function createAgent(config) {
   async function gameState(pack) {
     if (!pack) return null;
     const g = steam.findGame(pack.game);
+    const target = paths.resolve(pack, g);
     return {
       title: pack.game.title,
       expectedBuild: pack.game.build || null,
       path: g ? g.root : null,
       build: g ? g.build : null,
+      mode: g ? g.mode : null,
+      variant: target.variant,
+      supported: target.supported,
       prefixReady: g ? g.prefixReady : null,
-      running: util.isGameRunning(pack.launch && pack.launch.gameProcess),
+      running: util.isGameRunning(target.gameProcess),
       ok: !!g
         && (!pack.game.build || g.build === String(pack.game.build))
-        && (process.platform === "win32" || !pack.game.prefix || g.prefixReady),
+        && target.supported
+        && (target.variant !== "linux-proton" || !pack.game.prefix || g.prefixReady),
     };
   }
 
@@ -172,14 +183,28 @@ function createAgent(config) {
     const packs = [...merged.values()].map((p) => {
       const li = localInfo(p);
       const game = steam.findGame(p.game);
+      const target = paths.resolve(p, game);
+      const variant = target.variant;
+      const selected = {
+        ...p,
+        files: p.platformFiles?.[variant] ?? p.files,
+        totalBytes: p.platformBytes?.[variant] ?? p.totalBytes,
+      };
       const pre = preconditions.evaluatePreconditions({
         pack: p,
         game,
         root,
-        totalBytes: p.totalBytes,
+        totalBytes: selected.totalBytes,
         confirmed: confirmed[p.id] || {},
       });
-      return { ...p, ...li, preconditions: pre, blocked: pre.blocked, local: local.has(p.id) };
+      return {
+        ...selected,
+        ...li,
+        platform: { variant, supported: target.supported, error: target.error || null },
+        preconditions: pre,
+        blocked: pre.blocked,
+        local: local.has(p.id),
+      };
     }).sort((a, b) => {
       const game = String(a.game?.title || "").localeCompare(String(b.game?.title || ""));
       return game || String(a.name || "").localeCompare(String(b.name || ""));
@@ -277,7 +302,8 @@ function createAgent(config) {
     const info = localInfo(pack);
     if (!info.installed) throw new Error("Pack is not installed.");
     if (!info.launcher) throw new Error("Launcher is missing. Reinstall the pack.");
-    if (util.isGameRunning(pack.launch.gameProcess)) throw new Error("The game is already running.");
+    const target = paths.resolve(pack, steam.findGame(pack.game));
+    if (util.isGameRunning(target.gameProcess)) throw new Error("The game is already running.");
     const child = spawn("bash", [info.launcher], { detached: true, stdio: "ignore" });
     child.unref();
     return { ok: true, launcher: info.launcher };
@@ -358,7 +384,8 @@ function createAgent(config) {
         if (body.scope !== "logs" && body.packId) {
           try {
             const pack = util.readJson(versionStore.packFile(versionStore.packRoot(root, body.packId)));
-            if (util.isGameRunning(pack.launch && pack.launch.gameProcess)) {
+            const target = paths.resolve(pack, steam.findGame(pack.game));
+            if (util.isGameRunning(target.gameProcess)) {
               res.writeHead(409, { "content-type": "application/json" });
               return res.end(JSON.stringify({ error: "Close the game before removing installed files." }));
             }

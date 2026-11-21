@@ -127,6 +127,35 @@ test("findGame checks every Steam library for the Proton prefix", { skip: proces
   assert.equal(game.prefixReady, true);
 });
 
+test("findGame detects a native Linux build instead of looking for a prefix", { skip: process.platform === "win32" }, (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-native-"));
+  const oldRoot = process.env.STEAM_ROOT;
+  t.after(() => {
+    if (oldRoot === undefined) delete process.env.STEAM_ROOT; else process.env.STEAM_ROOT = oldRoot;
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  });
+
+  process.env.STEAM_ROOT = root;
+  fs.mkdirSync(path.join(root, "steamapps", "common", "Baldurs Gate 3", "bin"), { recursive: true });
+  fs.writeFileSync(path.join(root, "steamapps", "appmanifest_1086940.acf"), `"AppState"
+{
+  "appid" "1086940"
+  "installdir" "Baldurs Gate 3"
+  "buildid" "25605617"
+}
+`);
+  fs.writeFileSync(path.join(root, "steamapps", "common", "Baldurs Gate 3", "bin", "bg3"), "");
+  fs.mkdirSync(path.join(root, "steamapps", "compatdata", "1086940", "pfx"), { recursive: true });
+
+  const game = steam.findGame({ appId: 1086940, installDir: "Baldurs Gate 3", exe: "bin/bg3.exe", linuxExe: "bin/bg3" });
+  assert.ok(game);
+  assert.equal(game.mode, "native");
+  assert.equal(game.native, true);
+  assert.equal(game.prefix, null);
+  assert.equal(game.prefixReady, false);
+  assert.ok(game.exe.endsWith(path.join("bin", "bg3")));
+});
+
 test("findGame reads the install directory from the app manifest", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-manifest-"));
   const oldRoot = process.env.STEAM_ROOT;

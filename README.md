@@ -38,8 +38,9 @@ kiosk, or SSH; the PC only serves the installer and pack files over HTTP.
 
 ## Quick start (Steam Machine)
 
-1. Install the pack's game via Steam and launch it once so its Proton prefix
-   exists. ModSync shows the pack's own notes and preconditions before install.
+1. Install the pack's game via Steam. On Linux, launch it once so its Proton
+   prefix exists. ModSync shows the pack's own notes and preconditions before
+   install.
 2. In Desktop Mode, run the install one-liner printed by `serve`:
    ```bash
    curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \

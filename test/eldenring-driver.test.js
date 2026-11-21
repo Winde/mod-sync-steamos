@@ -37,8 +37,10 @@ load_before = []
     }
   }
   write(path.join(src, "tools", "me3-linux", "bin", "me3"), "#!/bin/sh\n");
-  write(path.join(src, "tools", "me3-linux", "win64", "me3.exe"), "win");
-  write(path.join(src, "tools", "me3-win", "bin", "me3.exe"), "win");
+  for (const name of ["me3.exe", "me3-launcher.exe", "me3_mod_host.dll"]) {
+    write(path.join(src, "tools", "me3-linux", "bin", "win64", name), `win-${name}`);
+    write(path.join(src, "tools", "me3-win", "bin", name), `win-${name}`);
+  }
   return src;
 }
 
@@ -64,8 +66,18 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     assert.equal(grace.pack.contents.kind, "packages");
     assert.equal(grace.pack.contents.count, 1);
     assert.match(grace.pack.contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
+    assert.equal(grace.pack.platforms.windows.loader, "tools/me3-win/bin/me3.exe");
+    assert.equal(grace.pack.platforms["linux-proton"].windowsBinaries, "tools/me3-win/bin");
     const graceDoc = loadPack(path.join(outRoot, "grace")).files;
     assert.ok(graceDoc.files.some((f) => f.target.startsWith("mods/graceborne/")));
+    assert.deepEqual(
+      graceDoc.files.find((f) => f.target === "tools/me3-linux/bin/me3").platforms,
+      ["linux-proton"],
+    );
+    assert.deepEqual(
+      graceDoc.files.find((f) => f.target === "tools/me3-win/bin/me3.exe").platforms,
+      ["windows"],
+    );
 
     assert.equal(convergence.pack.id, "eldenring-convergence");
     assert.equal(convergence.pack.name, "The Convergence");

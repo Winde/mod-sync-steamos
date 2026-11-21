@@ -4,6 +4,7 @@ const {
   ensureDir, writeJson, writeText, walkFiles, materialize,
   sha256File, modeFor, formatBytes,
 } = require("../util");
+const paths = require("../paths");
 
 const GAME = {
   id: "eldenring",
@@ -16,6 +17,33 @@ const GAME = {
   version: "1.17",
   prefix: true,
 };
+
+const DEFAULT_PLATFORMS = {
+  windows: {
+    exe: "Game/eldenring.exe",
+    gameProcess: "eldenring.exe",
+    loader: "tools/me3-win/bin/me3.exe",
+  },
+  "linux-proton": {
+    exe: "Game/eldenring.exe",
+    gameProcess: "eldenring.exe",
+    loader: "tools/me3-linux/bin/me3",
+  },
+};
+
+const TOOL_PLATFORMS = {
+  "me3-linux/": ["linux-proton"],
+  "me3-win/": ["windows"],
+};
+
+function platformsForTool(rel, windowsBinaries) {
+  if (rel.startsWith("me3-win/") && windowsBinaries === "tools/me3-win/bin") {
+    // Linux me3 needs the launcher and host DLL, not the Windows CLI.
+    return rel.endsWith("/me3.exe") ? ["windows"] : ["windows", "linux-proton"];
+  }
+  const prefix = Object.keys(TOOL_PLATFORMS).find((candidate) => rel.startsWith(candidate));
+  return prefix ? TOOL_PLATFORMS[prefix] : null;
+}
 
 function defaultSource() {
   return "D:\\EldenRingMods";
@@ -83,6 +111,54 @@ function requirePath(p, label) {
   if (!fs.existsSync(p)) throw new Error(`${label} not found: ${p}`);
 }
 
+function sameFile(a, b) {
+  if (!fs.existsSync(a) || !fs.existsSync(b)) return false;
+  if (fs.statSync(a).size !== fs.statSync(b).size) return false;
+  return fs.readFileSync(a).equals(fs.readFileSync(b));
+}
+
+/**
+ * Keep one copy of the Windows host binaries. The Linux me3 launcher can use
+ * the Windows distribution's bin directory, so the duplicate win64 tree is
+ * only kept when the two downloads are not byte-identical.
+ */
+function copyMe3Runtime(me3Linux, me3Win, toolsDst) {
+  const linuxLoader = path.join(me3Linux, "bin", "me3");
+  requirePath(linuxLoader, "me3 Linux loader");
+  for (const name of ["me3.exe", "me3-launcher.exe", "me3_mod_host.dll"]) {
+    requirePath(path.join(me3Win, "bin", name), `me3 Windows ${name}`);
+  }
+
+  const linuxBinDst = path.join(toolsDst, "me3-linux", "bin");
+  ensureDir(linuxBinDst);
+  fs.copyFileSync(linuxLoader, path.join(linuxBinDst, "me3"));
+
+  const winBinSrc = path.join(me3Win, "bin");
+  const winBinDst = path.join(toolsDst, "me3-win", "bin");
+  ensureDir(winBinDst);
+  for (const name of ["me3.exe", "me3-launcher.exe", "me3_mod_host.dll"]) {
+    fs.copyFileSync(path.join(winBinSrc, name), path.join(winBinDst, name));
+  }
+
+  const linuxHost = path.join(me3Linux, "bin", "win64");
+  const sameHost = ["me3-launcher.exe", "me3_mod_host.dll"].every(
+    (name) => sameFile(path.join(linuxHost, name), path.join(winBinSrc, name)),
+  );
+  let windowsBinaries = "tools/me3-win/bin";
+  if (!sameHost && fs.existsSync(linuxHost)) {
+    fs.cpSync(linuxHost, path.join(toolsDst, "me3-linux", "bin", "win64"), { recursive: true });
+    windowsBinaries = "tools/me3-linux/bin/win64";
+  }
+
+  const licenseDst = path.join(toolsDst, "me3");
+  ensureDir(licenseDst);
+  for (const name of ["LICENSE-MIT", "LICENSE-APACHE"]) {
+    const file = path.join(me3Win, name);
+    if (fs.existsSync(file)) fs.copyFileSync(file, path.join(licenseDst, name));
+  }
+  return windowsBinaries;
+}
+
 async function buildPack({ recipe, source, out, link = true, version: requestedVersion, log = () => {} }) {
   if (!recipe) throw new Error("ELDEN RING driver needs a pack recipe");
   if (recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for ELDEN RING`);
@@ -107,6 +183,9 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   requirePath(me3Win, "me3 Windows runtime");
   requirePath(artSrc, "art");
 
+  const platforms = paths.mergePlatforms(DEFAULT_PLATFORMS, recipe.platforms);
+  paths.validatePlatforms(platforms, "pack.platforms");
+
   log(`Packing ${recipe.name} ${version} from ${src}`);
   fs.rmSync(dst, { recursive: true, force: true });
   ensureDir(path.join(dst, "payload", "versions"));
@@ -127,8 +206,8 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
 
   log("Copying profile, tools, and art...");
   fs.cpSync(profileSrc, path.join(dst, "profiles", path.basename(profileSrc)), { recursive: true });
-  fs.cpSync(me3Linux, path.join(dst, "tools", "me3-linux"), { recursive: true });
-  fs.cpSync(me3Win, path.join(dst, "tools", "me3-win"), { recursive: true });
+  const windowsBinaries = copyMe3Runtime(me3Linux, me3Win, path.join(dst, "tools"));
+  platforms["linux-proton"].windowsBinaries = windowsBinaries;
   fs.cpSync(artSrc, path.join(dst, "art", artId), { recursive: true });
 
   const toolFiles = walkFiles(path.join(dst, "tools"));
@@ -136,11 +215,22 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   const totalEntries = payloadFiles.length + 1 + toolFiles.length + artFiles.length;
   let processed = 0;
   const files = [];
-  const add = async (sourceRel, targetRel) => {
+  const byHash = new Map();
+  const add = async (sourceRel, targetRel, platformList) => {
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
-    files.push({ source: sourceRel, target: targetRel, size, sha256, mode: modeFor(targetRel) });
+    const entry = { source: sourceRel, target: targetRel, size, sha256, mode: modeFor(targetRel) };
+    if (platformList) entry.platforms = [...platformList];
+    const shared = byHash.get(sha256);
+    if (shared) {
+      // Keep one copy on the PC; the installer still writes every target.
+      entry.source = shared.source;
+      fs.rmSync(abs, { force: true });
+    } else {
+      byHash.set(sha256, entry);
+    }
+    files.push(entry);
     processed++;
     const step = Math.max(1, Math.ceil(totalEntries / 10));
     if (processed === totalEntries || processed % step === 0) {
@@ -153,7 +243,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   }
   await add(`profiles/${path.basename(profileSrc)}`, `profiles/${path.basename(profileSrc)}`);
   for (const tool of toolFiles) {
-    await add(`tools/${tool.rel}`, `tools/${tool.rel}`);
+    await add(`tools/${tool.rel}`, `tools/${tool.rel}`, platformsForTool(tool.rel, windowsBinaries));
   }
   for (const art of artFiles) {
     await add(`art/${artId}/${art.rel}`, `art/${artId}/${art.rel}`);
@@ -167,6 +257,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     name: recipe.name,
     description: recipe.description || "",
     game: { ...GAME },
+    platforms,
     mod: { id: modId, version },
     loader: { type: "me3", profile: `profiles/${modId}-${version}.me3` },
     launch: {
@@ -179,7 +270,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
       profile: `profiles/${modId}-${version}.me3`,
       saveFile,
       me3: "tools/me3-linux/bin/me3",
-      windowsBinaries: "tools/me3-linux/win64",
+      windowsBinaries,
     },
     art: {
       grid: `art/${artId}/grid.png`,

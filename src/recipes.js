@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { readJson } = require("./util");
 const { validateNotes, validatePreconditions } = require("./preconditions");
+const { validatePlatforms } = require("./paths");
 
 const recipesDir = path.resolve(__dirname, "..", "recipes");
 
@@ -16,6 +17,7 @@ function validateRecipe(recipe) {
   }
   validateNotes(recipe.notes);
   validatePreconditions(recipe.preconditions);
+  validatePlatforms(recipe.platforms, "recipe.platforms");
   return recipe;
 }
 

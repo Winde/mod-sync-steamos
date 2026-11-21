@@ -10,6 +10,7 @@ const {
 const steam = require("./steam");
 const preconditions = require("./preconditions");
 const versionStore = require("./version-store");
+const paths = require("./paths");
 const bg3 = require("./installers/bg3");
 
 function renderTemplate(file, values) {
@@ -44,18 +45,24 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   const payloadPrefix = versionStore.payloadPrefix(pack.mod.id, version);
   const staging = versionStore.stagingDir(packRoot, pack.mod.id, version);
   const versionDir = versionStore.versionDir(packRoot, pack.mod.id, version);
-  const files = filesDoc.files;
+  const target = paths.resolve(pack, game);
+  const files = paths.filesFor(filesDoc.files, target.variant);
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
 
-  if (isGameRunning(pack.launch.gameProcess)) {
+  if (!files.length) throw new Error(`This pack has no files for ${target.variant}.`);
+  if (game && !target.supported) {
+    throw new Error(`${pack.game.title} is the ${target.variant} build, but this pack does not support it.`);
+  }
+  if (isGameRunning(target.gameProcess)) {
     throw new Error(`${pack.game.title} is running. Close it before installing.`);
   }
   if (game && pack.game.build && game.build && game.build !== String(pack.game.build)) {
     throw new Error(`Expected ${pack.game.title} build ${pack.game.build}; found ${game.build}.`);
   }
-  if (game && pack.game.prefix && process.platform !== "win32" && !game.prefixReady) {
-    throw new Error("Launch ELDEN RING once via Steam first so the Proton prefix exists.");
+  if (game && target.variant === "linux-proton" && !game.prefixReady) {
+    throw new Error(`Launch ${pack.game.title} once via Steam first so its Proton prefix exists.`);
   }
+  if (target.error) throw new Error(target.error);
 
   const pre = preconditions.evaluatePreconditions({ pack, game, root, totalBytes, confirmed });
   if (pre.blocked) {
@@ -80,10 +87,11 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   let lastReport = 0;
   const counted = new Map();
   const setCounted = (file, n) => {
-    const prev = counted.get(file.source) || 0;
+    const key = file.target;
+    const prev = counted.get(key) || 0;
     const next = Math.max(0, Math.min(file.size, n));
     if (next === prev) return;
-    counted.set(file.source, next);
+    counted.set(key, next);
     bytesDone += next - prev;
   };
   const pathFor = (file) => {
@@ -130,7 +138,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
     }
   };
 
-  log(`Installing ${pack.name} ${version}: ${files.length} files, ${formatBytes(totalBytes)}`);
+  log(`Installing ${pack.name} ${version} for ${target.variant}: ${files.length} of ${filesDoc.files.length} files, ${formatBytes(totalBytes)}`);
   log(free != null ? `Free space: ${formatBytes(free)}` : "Free space: unknown");
 
   await mapLimit(files, 6, async (file) => {
@@ -200,26 +208,27 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   const templates = path.join(__dirname, "..", "templates", "linux");
   const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
   const isSteam = pack.launch.type === "steam";
+  if (!isSteam && !target.loader) throw new Error(`This pack has no loader for ${target.variant}.`);
   const launcherText = isSteam
     ? renderTemplate(path.join(templates, "launch-bg3.sh"), {
       ROOT: packRoot,
       MOD: pack.mod.id,
       GAME: game ? game.root : "",
       PREFIX: game && game.prefix ? game.prefix : "",
-      DATA_DIR: game && game.prefix ? path.join(game.prefix, pack.launch.dataDir) : "",
+      DATA_DIR: target.dataDir || "",
       STEAM_APP_ID: pack.launch.steamAppId,
-      GAME_PROCESS: pack.launch.gameProcess,
+      GAME_PROCESS: target.gameProcess,
     })
     : renderTemplate(path.join(templates, "launch-mod.sh"), {
       ROOT: packRoot,
       MOD: pack.mod.id,
       GAME: game ? game.root : "",
-      EXE: pack.launch.exe,
-      GAME_PROCESS: pack.launch.gameProcess,
+      EXE: target.exe,
+      GAME_PROCESS: target.gameProcess,
       STEAM_APP_ID: pack.launch.steamAppId,
       SAVE_FILE: pack.launch.saveFile,
-      ME3: path.join(packRoot, pack.launch.me3),
-      WIN64: path.join(packRoot, pack.launch.windowsBinaries),
+      ME3: path.join(packRoot, target.loader),
+      WIN64: target.windowsBinaries ? path.join(packRoot, target.windowsBinaries) : "",
     });
   writeText(launcher, launcherText, 0o755);
 

@@ -18,6 +18,7 @@ const { createAgent } = require("../src/agent");
 const { loadPack } = require("../src/manifest");
 const versionStore = require("../src/version-store");
 const { sha256File, mapLimit, safeJoin, walkFiles, formatBytes } = require("../src/util");
+const paths = require("../src/paths");
 
 const repoRoot = path.resolve(__dirname, "..");
 const stateDir = path.join(repoRoot, "state");
@@ -52,10 +53,11 @@ async function verifyRoot(pack, files, root, verifyHashes) {
   const versionDir = versionStore.versionDir(installedRoot, pack.mod.id, pack.mod.version);
   if (!fs.existsSync(versionDir)) throw new Error(`missing version dir ${versionDir}`);
 
+  const wanted = paths.filesFor(files.files, paths.variantFor(null));
   const problems = [];
   let verified = 0;
   let bytes = 0;
-  await mapLimit(files.files, 6, async (f) => {
+  await mapLimit(wanted, 6, async (f) => {
     const target = safeJoin(installedRoot, f.target);
     if (!fs.existsSync(target)) {
       problems.push(`missing ${f.target}`);
@@ -83,7 +85,7 @@ async function verifyRoot(pack, files, root, verifyHashes) {
   const parts = walkFiles(installedRoot).filter((f) => f.rel.endsWith(".part"));
   if (parts.length) throw new Error(`${parts.length} .part files left behind`);
 
-  console.log(`Verified: ${verified}/${files.files.length} files, ${formatBytes(bytes)}`);
+  console.log(`Verified: ${verified}/${wanted.length} files, ${formatBytes(bytes)}`);
   console.log(`Version:  ${current}`);
   console.log(`Launcher: ${launcher}`);
   console.log("Partials: none");
@@ -109,8 +111,9 @@ async function main() {
   }
 
   const { pack, files } = loadPack(packRoot);
-  const totalBytes = files.files.reduce((n, f) => n + f.size, 0);
-  console.log(`Pack:     ${pack.name} ${pack.mod.version} (${files.files.length} files, ${formatBytes(totalBytes)})`);
+  const wanted = paths.filesFor(files.files, paths.variantFor(null));
+  const totalBytes = wanted.reduce((n, f) => n + f.size, 0);
+  console.log(`Pack:     ${pack.name} ${pack.mod.version} (${wanted.length} files, ${formatBytes(totalBytes)})`);
   console.log(`Pack dir: ${packRoot}`);
   console.log(`TV root:  ${root}`);
 

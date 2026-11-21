@@ -6,8 +6,8 @@ A driver describes one game family for the pack builder and the agent.
 
 A driver knows the **game**: Steam metadata, install layout, loader, launch
 mechanics. A recipe in `recipes/<id>.json` knows the **pack**: name, mod id,
-save file, notes, and preconditions. Adding a total conversion is a new recipe,
-not a driver change.
+save file, platform profiles, notes, and preconditions. Adding a total
+conversion is a new recipe, not a driver change.
 
 ```json
 {
@@ -18,10 +18,29 @@ not a driver change.
   "modId": "graceborne",
   "artId": "graceborne",
   "saveFile": "ER0000.graceborne.sl2",
+  "platforms": {
+    "windows": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-win/bin/me3.exe"
+    },
+    "linux-proton": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-linux/bin/me3",
+      "windowsBinaries": "tools/me3-win/bin"
+    }
+  },
   "notes": [],
   "preconditions": []
 }
 ```
+
+Drivers provide default profiles for their game; a recipe overrides only the
+entries that differ. The builder merges both into `pack.json.platforms`, and the
+agent selects a profile from the target OS and the detected game build. A
+recipe that does not list `linux-native` makes the agent report that native
+Linux needs Proton rather than guessing at a prefix path.
 
 `modsync init` lists recipes; `modsync pack --recipe <id>` builds one. The
 generated `pack.json` remains the definition the agent serves.
@@ -35,9 +54,10 @@ generated `pack.json` remains the definition the agent serves.
   driver code.
 - The agent does not execute driver code; it uses the generic `pack.json` fields:
   - `game` — Steam app id, install dir, build, prefix requirement.
-  - `loader` / `launch` — loader type, exe, process name, profile, save file.
+  - `platforms` — per-OS exe, process, loader, and data paths.
+  - `loader` / `launch` — loader type, profile, save file, and legacy defaults.
   - `install` — for drivers that apply files outside the pack root (BG3).
-  - `files` — the file manifest.
+  - `files` — the file manifest, optionally tagged per platform.
 
 This keeps the agent game-agnostic. A driver can add code later if a game needs
 custom install steps (e.g. WeiDU).
@@ -48,15 +68,16 @@ custom install steps (e.g. WeiDU).
 |---|---|---|---|---|
 | ELDEN RING | Overlay | `eldenring` | me3 | v1; build 25827938 / 1.17; recipes for Graceborne and Convergence |
 | Skyrim SE | Overlay/profile | `skyrim-se` | SKSE + MO2/Vortex | save paths/MO2 profile later |
-| Baldur's Gate 3 | Profile | `bg3` | BG3SE + modsettings | implemented; default exe + Proton prefix apply |
+| Baldur's Gate 3 | Profile | `bg3` | BG3SE + modsettings | implemented for Windows and Linux/Proton; native Linux needs Proton |
 | Baldur's Gate 2 EE | In-place recipe | `bg2-weidu` | WeiDU + InfinityLoader | alternate exe, clean game backup, install order |
 
 ## Adding a game
 
 1. Add a driver that maps its working install to the pack format.
-2. Add one or more recipes in `recipes/`.
-3. Extend the installer/launch template if the loader or apply step differs.
-4. Add tests with a fake source and fake game root.
+2. Define the driver's default `platforms` whenever game paths or loaders differ by OS.
+3. Add one or more recipes in `recipes/`; override platform entries only when needed.
+4. Extend the installer/launch template if the loader or apply step differs.
+5. Add tests with a fake source and fake game root, and run `npm run packs:check`.
 
 The restrictions are in `docs/DESIGN.md`. If a game cannot meet them, it needs a
 custom driver, not a change to the core.

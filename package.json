@@ -18,6 +18,7 @@
     "build:dir": "electron-builder --dir",
     "test": "node --test",
     "contents": "node scripts/refresh-contents.js",
+    "packs:check": "node scripts/audit-packs.js",
     "notes": "node scripts/release-notes.mjs",
     "e2e": "node scripts/e2e-factory.js",
     "verify-install": "node scripts/e2e-factory.js --verify-only"

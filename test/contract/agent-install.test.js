@@ -30,6 +30,11 @@ const PACK_ID = "eldenring-graceborne";
 const MOD_ID = "graceborne";
 const VERSION = "0.2.7";
 const GAME_PROCESS = "modsync-test-not-running.exe";
+const PLATFORM = process.platform === "win32" ? "windows" : "linux-proton";
+
+function selectedFiles() {
+  return filesDoc.files.filter((file) => !file.platforms || file.platforms.includes(PLATFORM));
+}
 
 let fixture;
 let built;
@@ -120,13 +125,13 @@ test("install writes the complete TV contract", { timeout: 60000 }, async (t) =>
   const job = await install(agent);
   assert.equal(job.type, "install");
   assert.equal(job.packId, PACK_ID);
-  assert.equal(job.done, filesDoc.files.length);
-  assert.equal(job.total, filesDoc.files.length);
+  assert.equal(job.done, selectedFiles().length);
+  assert.equal(job.total, selectedFiles().length);
   assert.ok(job.bytesDone > 0);
   assert.ok(job.bytesTotal > 0);
 
   const packRoot = path.join(root, "packs", PACK_ID);
-  for (const file of filesDoc.files) {
+  for (const file of selectedFiles()) {
     const target = path.join(packRoot, file.target);
     assert.ok(fs.existsSync(target), `installed: ${file.target}`);
     assert.equal(fs.statSync(target).size, file.size, `size: ${file.target}`);
@@ -176,7 +181,7 @@ test("install writes the complete TV contract", { timeout: 60000 }, async (t) =>
 test("install resumes a partially downloaded staging file", { timeout: 60000 }, async (t) => {
   const { root, agent } = await startTv(t, "modsync-tv-resume-");
 
-  const sample = filesDoc.files.find(
+  const sample = selectedFiles().find(
     (file) => file.target.startsWith(`mods/${MOD_ID}/versions/${VERSION}/`) && file.size > 8,
   );
   assert.ok(sample, "fixture has a payload file to resume");
@@ -199,7 +204,7 @@ test("install resumes a partially downloaded staging file", { timeout: 60000 }, 
 
   // A second payload file is already complete; it should be verified and
   // counted, not downloaded again.
-  const complete = filesDoc.files.find(
+  const complete = selectedFiles().find(
     (file) => file.target.startsWith(payloadPrefix) && file.source !== sample.source && file.size > 0,
   );
   assert.ok(complete, "fixture has a second payload file");
@@ -208,7 +213,7 @@ test("install resumes a partially downloaded staging file", { timeout: 60000 }, 
   fs.copyFileSync(path.join(built.packRoot, complete.source), completeTarget);
 
   const job = await install(agent);
-  const totalBytes = filesDoc.files.reduce((n, file) => n + file.size, 0);
+  const totalBytes = selectedFiles().reduce((n, file) => n + file.size, 0);
   assert.equal(job.bytesTotal, totalBytes);
   assert.equal(job.bytesDone, totalBytes);
   assert.match((job.log || []).join("\n"), /Resume: .*already on disk/);

@@ -115,8 +115,10 @@ function workingInstall({ versions = ["0.2.7"], payloadBytes = 0 } = {}) {
   }
   write(root, "mods/graceborne/current.txt", `${versions[versions.length - 1]}\n`);
   write(root, "tools/me3-linux/bin/me3", "#!/bin/sh\nexit 0\n", 0o755);
-  write(root, "tools/me3-linux/win64/me3.exe", "fake me3 windows\n");
-  write(root, "tools/me3-win/bin/me3.exe", "fake me3 windows\n");
+  for (const name of ["me3.exe", "me3-launcher.exe", "me3_mod_host.dll"]) {
+    write(root, `tools/me3-linux/bin/win64/${name}`, `fake me3 windows ${name}\n`);
+    write(root, `tools/me3-win/bin/${name}`, `fake me3 windows ${name}\n`);
+  }
   for (const name of ["grid", "hero", "logo", "icon"]) {
     write(root, `art/graceborne/${name}.png`, PNG);
   }
@@ -377,6 +379,7 @@ function setLaunchGameProcess(packRoot, processName) {
   const file = path.join(packRoot, "pack.json");
   const pack = readJson(file);
   pack.launch.gameProcess = processName;
+  for (const profile of Object.values(pack.platforms || {})) profile.gameProcess = processName;
   fs.writeFileSync(file, JSON.stringify(pack, null, 2) + "\n");
   return pack;
 }

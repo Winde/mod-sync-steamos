@@ -60,6 +60,19 @@ A pack never contains the base game or saves.
     "prefix": true
   },
   "mod": { "id": "graceborne", "version": "0.2.7" },
+  "platforms": {
+    "windows": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-win/bin/me3.exe"
+    },
+    "linux-proton": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-linux/bin/me3",
+      "windowsBinaries": "tools/me3-win/bin"
+    }
+  },
   "loader": { "type": "me3", "profile": "profiles/graceborne-0.2.7.me3" },
   "launch": {
     "type": "me3",
@@ -71,7 +84,7 @@ A pack never contains the base game or saves.
     "profile": "profiles/graceborne-0.2.7.me3",
     "saveFile": "ER0000.graceborne.sl2",
     "me3": "tools/me3-linux/bin/me3",
-    "windowsBinaries": "tools/me3-linux/win64"
+    "windowsBinaries": "tools/me3-win/bin"
   },
   "art": {
     "grid": "art/graceborne/grid.png",
@@ -97,10 +110,51 @@ A pack never contains the base game or saves.
       "size": 2097152,
       "sha256": "…",
       "mode": "644"
+    },
+    {
+      "source": "tools/me3-win/bin/me3_mod_host.dll",
+      "target": "tools/me3-win/bin/me3_mod_host.dll",
+      "size": 6571816,
+      "sha256": "…",
+      "mode": "644",
+      "platforms": ["windows", "linux-proton"]
     }
   ]
 }
 ```
+
+### Platform profiles
+
+A pack is built once and served to Windows and Linux machines. `platforms`
+holds the values that differ per machine:
+
+| Variant | Selected when |
+|---|---|
+| `windows` | the agent runs on Windows |
+| `linux-proton` | Linux and the game has a Proton prefix |
+| `linux-native` | Linux and the game exposes its native executable |
+
+The installer resolves one profile at install time. A pack only supports the
+variants it lists; a game installed in an unsupported mode is blocked with an
+explanation instead of writing to the wrong folder. `exe`, `gameProcess`, and
+`loader` are relative to the game root or pack root; `dataDir` and `saveDir` are
+absolute after token expansion:
+
+| Token | Value |
+|---|---|
+| `%HOME%` | the user's home directory |
+| `%DATA_HOME%` | `XDG_DATA_HOME` on Linux, `%LOCALAPPDATA%` on Windows |
+| `%LOCALAPPDATA%` | the Windows local app data directory |
+| `%APPDATA%` | the Windows roaming app data directory |
+| `%PREFIX%` | the game's Proton prefix |
+| `%GAME%` | the game install root |
+
+`files[].platforms` narrows a download to specific variants. Omitting it means
+all platforms. Shared mod payloads stay untagged and exist once; only loader
+binaries carry platform tags. When two targets have identical content, the pack
+keeps one source file and both targets point at it. Run `npm run packs:check`
+before serving a pack to verify profiles, loader coverage, target portability,
+and duplicate storage.
 
 ### Notes
 

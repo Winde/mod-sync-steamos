@@ -9,6 +9,7 @@ const { loadPack, packSummary } = require("./manifest");
 const { createServer } = require("./server");
 const { createAgent } = require("./agent");
 const labels = require("./labels");
+const paths = require("./paths");
 const steam = require("./steam");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -200,9 +201,11 @@ function cmdDoctor(values) {
     try {
       const { pack } = loadPack(root);
       const game = steam.findGame(pack.game);
+      const target = paths.resolve(pack, game);
       console.log(`Pack: ${pack.name} ${pack.mod.version}`);
       console.log(`  Game: ${pack.game.title} (${pack.game.appId}) required build ${pack.game.build || "-"}`);
-      console.log(`  Found: ${game ? game.root : "NO"} build=${game ? game.build : "-"} prefix=${game ? game.prefixReady : "-"}`);
+      console.log(`  Found: ${game ? game.root : "NO"} build=${game ? game.build : "-"} mode=${game ? game.mode : "-"} prefix=${game ? game.prefixReady : "-"}`);
+      console.log(`  Target: ${target.variant} supported=${target.supported}${target.error ? ` error=${target.error}` : ""}`);
     } catch (err) {
       console.log(`Pack ${ent.name}: INVALID (${err.message})`);
     }

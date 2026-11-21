@@ -61,10 +61,10 @@ Keep that terminal open while the TV downloads. On the Steam Machine:
 
 ## Every play session
 
-Launch the game from its **pack shortcut**, not the Steam Play button. The
+Launch the game from its **pack shortcut**, not the Steam Play button.
 For me3 packs, the launcher starts me3 with the installed profile, waits for the
-game, and exits. For BG3, the installer/rollback applies the pack into the
-Proton prefix and the shortcut starts the game through Steam. For a
+game, and exits. For profile packs, install/rollback writes into the data folder
+for the detected platform and the shortcut starts the game through Steam. For a
 default-exe pack, launch the regular Steam game entry; for an alternate-exe or
 loader pack, use the generated ModSync shortcut.
 The PC server is not needed. Once the local-first change lands, ModSync will not

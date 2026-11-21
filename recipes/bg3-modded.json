@@ -5,24 +5,43 @@
   "name": "BG3 Modded",
   "description": "Baldur's Gate 3 mod snapshot with modsettings and Script Extender",
   "modId": "bg3",
+  "platforms": {
+    "windows": {
+      "dataDir": "%LOCALAPPDATA%/Larian Studios/Baldur's Gate 3",
+      "saveDir": "%LOCALAPPDATA%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
+      "exe": "bin/bg3.exe",
+      "gameProcess": "bg3.exe"
+    },
+    "linux-proton": {
+      "dataDir": "%PREFIX%/drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
+      "saveDir": "%PREFIX%/drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3/PlayerProfiles",
+      "exe": "bin/bg3.exe",
+      "gameProcess": "bg3.exe"
+    }
+  },
   "notes": [
     {
       "title": "Close Baldur's Gate 3 before installing",
-      "body": "The pack writes mods and modsettings into the game's Proton prefix. Close the game and its launcher first.",
+      "body": "The pack writes mods and modsettings into the game's data folder: the Windows app data folder or the Proton prefix. Close the game and its launcher first.",
       "tone": "warning"
     },
     {
       "title": "Saves",
       "body": "Saves are not part of the pack and are not synced. Adding or removing mods can affect existing saves.",
       "tone": "warning"
+    },
+    {
+      "title": "Linux uses Proton",
+      "body": "This pack targets Windows and Linux with Proton. If Steam installed the native Linux build, open the game's Properties, Compatibility, and force a Proton version before installing.",
+      "tone": "warning"
     }
   ],
   "preconditions": [
     { "id": "game-installed", "type": "game-installed", "required": true, "title": "Baldur's Gate 3 is installed" },
     { "id": "game-build", "type": "game-build", "required": true, "build": "25605617", "title": "Game is build 25605617 (Patch 8)" },
-    { "id": "proton-prefix", "type": "proton-prefix", "required": true, "title": "Proton prefix exists", "hint": "Launch the vanilla game once from Steam." },
+    { "id": "proton-prefix", "type": "proton-prefix", "required": true, "title": "Game data location is ready", "hint": "Launch the vanilla game once from Steam." },
     { "id": "game-closed", "type": "game-not-running", "required": true, "title": "Game is closed" },
     { "id": "disk-free", "type": "disk-free", "required": true, "reserveBytes": 1073741824, "title": "Enough space for the pack" },
-    { "id": "disk-free-game", "type": "disk-free", "scope": "game", "required": true, "reserveBytes": 1073741824, "title": "Enough space to apply the pack" }
+    { "id": "disk-free-game", "type": "disk-free", "scope": "target", "required": true, "reserveBytes": 1073741824, "title": "Enough space in the game data folder" }
   ]
 }

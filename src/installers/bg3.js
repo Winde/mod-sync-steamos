@@ -1,17 +1,16 @@
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const {
   ensureDir, materialize, readJson, writeJson, safeJoin, walkFiles,
 } = require("../util");
+const paths = require("../paths");
 
-function dataDirFor(pack, game) {
-  if (process.platform === "win32") {
-    return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
-      "Larian Studios", "Baldur's Gate 3");
+function dataDirFor(pack, game, platform = process.platform) {
+  const target = paths.resolve(pack, game, platform);
+  if (!target.dataDir) {
+    throw new Error(target.error || `Baldur's Gate 3 data directory is not configured for ${target.variant}.`);
   }
-  if (!game || !game.prefix) throw new Error("Baldur's Gate 3 Proton prefix was not found. Launch the vanilla game once from Steam.");
-  return path.join(game.prefix, pack.launch.dataDir || pack.install.dataDir);
+  return target.dataDir;
 }
 
 function appliedFile(packRoot) {
@@ -62,13 +61,15 @@ function removeApplied(packRoot, applied) {
   }
 }
 
-function applyBg3({ pack, root, game, version, log = () => {} }) {
+function applyBg3({ pack, root, game, version, platform = process.platform, log = () => {} }) {
   const packRoot = path.join(root, "packs", pack.id);
   const src = path.join(packRoot, "mods", pack.mod.id, "versions", version);
   if (!fs.existsSync(src)) throw new Error(`BG3 version payload is missing: ${src}`);
-  const dataDir = dataDirFor(pack, game);
+  const target = paths.resolve(pack, game, platform);
+  const dataDir = dataDirFor(pack, game, platform);
   const gameRoot = game && game.root ? game.root : "";
   if (!gameRoot) throw new Error("Baldur's Gate 3 game root was not found.");
+  const native = target.variant === "linux-native";
 
   const previous = readApplied(packRoot);
   if (previous) {
@@ -80,11 +81,13 @@ function applyBg3({ pack, root, game, version, log = () => {} }) {
   const applied = {
     packId: pack.id,
     version,
+    platform: target.variant,
     dataDir,
     gameRoot,
     data: [],
     game: [],
     backups: [],
+    skipped: [],
   };
 
   const modsSrc = path.join(src, "Mods");
@@ -114,37 +117,42 @@ function applyBg3({ pack, root, game, version, log = () => {} }) {
     applied.data.push(rel);
   }
 
-  for (const [name, rel] of [
-    ["DWrite.dll", "bin/DWrite.dll"],
-    ["ScriptExtenderSettings.json", "bin/ScriptExtenderSettings.json"],
-  ]) {
-    const source = path.join(src, "bg3se", name);
-    if (!fs.existsSync(source)) continue;
-    if (backupFile(packRoot, "game", gameRoot, rel)) {
-      applied.backups.push({ scope: "game", rel });
-    }
-    const target = safeJoin(gameRoot, rel);
-    ensureDir(path.dirname(target));
-    fs.copyFileSync(source, target);
-    applied.game.push(rel);
-  }
-
-  const extSrc = path.join(src, "Script Extender");
-  if (fs.existsSync(extSrc)) {
-    for (const file of walkFiles(extSrc)) {
-      const rel = `Script Extender/${file.rel}`;
-      if (backupFile(packRoot, "data", dataDir, rel)) {
-        applied.backups.push({ scope: "data", rel });
+  if (native) {
+    applied.skipped.push("bg3se", "Script Extender");
+    log("Native Linux build: skipped the Windows Script Extender files.");
+  } else {
+    for (const [name, rel] of [
+      ["DWrite.dll", "bin/DWrite.dll"],
+      ["ScriptExtenderSettings.json", "bin/ScriptExtenderSettings.json"],
+    ]) {
+      const source = path.join(src, "bg3se", name);
+      if (!fs.existsSync(source)) continue;
+      if (backupFile(packRoot, "game", gameRoot, rel)) {
+        applied.backups.push({ scope: "game", rel });
       }
-      const target = safeJoin(dataDir, rel);
-      ensureDir(path.dirname(target));
-      fs.copyFileSync(file.abs, target);
-      applied.data.push(rel);
+      const file = safeJoin(gameRoot, rel);
+      ensureDir(path.dirname(file));
+      fs.copyFileSync(source, file);
+      applied.game.push(rel);
+    }
+
+    const extSrc = path.join(src, "Script Extender");
+    if (fs.existsSync(extSrc)) {
+      for (const file of walkFiles(extSrc)) {
+        const rel = `Script Extender/${file.rel}`;
+        if (backupFile(packRoot, "data", dataDir, rel)) {
+          applied.backups.push({ scope: "data", rel });
+        }
+        const target = safeJoin(dataDir, rel);
+        ensureDir(path.dirname(target));
+        fs.copyFileSync(file.abs, target);
+        applied.data.push(rel);
+      }
     }
   }
 
   writeJson(appliedFile(packRoot), applied);
-  log(`Applied BG3 ${version}: ${paks.length} mods, ${applied.game.length} loader files.`);
+  log(`Applied BG3 ${version} for ${target.variant}: ${paks.length} mods, ${applied.game.length} loader files.`);
   return applied;
 }
 

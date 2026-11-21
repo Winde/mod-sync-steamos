@@ -197,10 +197,7 @@ test("storage clear refuses while the game is running", { timeout: 60000 }, asyn
   assert.equal(started.status, 202);
   await pollJob(guardAgent.base, started.json.jobId);
 
-  const packFile = path.join(root, "packs", PACK_ID, "pack.json");
-  const pack = readJson(packFile);
-  pack.launch.gameProcess = process.platform === "win32" ? "node.exe" : "node";
-  fs.writeFileSync(packFile, JSON.stringify(pack, null, 2) + "\n");
+  setLaunchGameProcess(path.join(root, "packs", PACK_ID), process.platform === "win32" ? "node.exe" : "node");
 
   const out = await request(guardAgent.base, "/api/storage/clear", {
     method: "POST",

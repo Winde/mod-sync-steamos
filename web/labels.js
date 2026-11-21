@@ -115,6 +115,13 @@
     availableRow: "Available",
     versionsKept: "Versions kept",
     gameRow: "Game",
+    platformRow: "Install target",
+    platformName: (variant) => ({
+      windows: "Windows",
+      "linux-proton": "Linux · Proton",
+      "linux-native": "Linux · native",
+    }[variant] || variant || "Unknown"),
+    platformUnsupported: "unsupported by this pack",
     packRow: "Pack",
     launcherRow: "Launcher",
     launchRow: "Launch",

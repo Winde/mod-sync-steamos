@@ -25,35 +25,35 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/action/script/c1271.hks",
+      "source": "payload/versions/0.2.7/mod/action/script/c1270.hks",
       "target": "mods/graceborne/versions/0.2.7/mod/action/script/c1271.hks",
       "size": 35104,
       "sha256": "6b5e0e97203b54eb2f148bcff98c90c768ff9b86d443f6e1699a09160efd7b39",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/action/script/c1360.hks",
+      "source": "payload/versions/0.2.7/mod/action/script/c1270.hks",
       "target": "mods/graceborne/versions/0.2.7/mod/action/script/c1360.hks",
       "size": 35104,
       "sha256": "6b5e0e97203b54eb2f148bcff98c90c768ff9b86d443f6e1699a09160efd7b39",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/action/script/c2210.hks",
+      "source": "payload/versions/0.2.7/mod/action/script/c1270.hks",
       "target": "mods/graceborne/versions/0.2.7/mod/action/script/c2210.hks",
       "size": 35104,
       "sha256": "6b5e0e97203b54eb2f148bcff98c90c768ff9b86d443f6e1699a09160efd7b39",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/action/script/c3115.hks",
+      "source": "payload/versions/0.2.7/mod/action/script/c1270.hks",
       "target": "mods/graceborne/versions/0.2.7/mod/action/script/c3115.hks",
       "size": 35104,
       "sha256": "6b5e0e97203b54eb2f148bcff98c90c768ff9b86d443f6e1699a09160efd7b39",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/action/script/c6075.hks",
+      "source": "payload/versions/0.2.7/mod/action/script/c1270.hks",
       "target": "mods/graceborne/versions/0.2.7/mod/action/script/c6075.hks",
       "size": 35104,
       "sha256": "6b5e0e97203b54eb2f148bcff98c90c768ff9b86d443f6e1699a09160efd7b39",
@@ -3035,7 +3035,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/chr/c5132_h.texbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/action/script/crossbowParryForTheModernManAndHisHKS/hksModule-CrossbowParry/debugthing.lua",
       "target": "mods/graceborne/versions/0.2.7/mod/chr/c5132_h.texbnd.dcx",
       "size": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -3161,21 +3161,21 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/chr/c8002.chrbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/chr/c8000.chrbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/chr/c8002.chrbnd.dcx",
       "size": 1619653,
       "sha256": "979c57bfe91128492affd878590017274c4af28bbe8f7536035a39628a847d10",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/chr/c8002_h.texbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/chr/c8000_h.texbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/chr/c8002_h.texbnd.dcx",
       "size": 5444807,
       "sha256": "f0fe0692fef0c0c0f51c318d8129754ad141cc679e7832a532d3e51ce1de9827",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/chr/c8002_l.texbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/chr/c8000_l.texbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/chr/c8002_l.texbnd.dcx",
       "size": 267182,
       "sha256": "1c8810daba5c36ec824897db27c37b4f318bd0c622bbb828c84ebaaff9d341dd",
@@ -3231,28 +3231,28 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/cutscene/s21_01_0000_00.tpfbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/asset/aeg/aeg468/aeg468_055.geombnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/cutscene/s21_01_0000_00.tpfbnd.dcx",
       "size": 176,
       "sha256": "07f28b43855c14b89df6d15bf5100bcf46231fe4edbc3514de2daa62298de7dc",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/cutscene/s21_01_0010_00.tpfbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/asset/aeg/aeg468/aeg468_055.geombnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/cutscene/s21_01_0010_00.tpfbnd.dcx",
       "size": 176,
       "sha256": "07f28b43855c14b89df6d15bf5100bcf46231fe4edbc3514de2daa62298de7dc",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/cutscene/s21_01_0010_01.tpfbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/asset/aeg/aeg468/aeg468_055.geombnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/cutscene/s21_01_0010_01.tpfbnd.dcx",
       "size": 176,
       "sha256": "07f28b43855c14b89df6d15bf5100bcf46231fe4edbc3514de2daa62298de7dc",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/cutscene/s21_01_0010_02.tpfbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/asset/aeg/aeg468/aeg468_055.geombnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/cutscene/s21_01_0010_02.tpfbnd.dcx",
       "size": 176,
       "sha256": "07f28b43855c14b89df6d15bf5100bcf46231fe4edbc3514de2daa62298de7dc",
@@ -3973,7 +3973,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/deude/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/deude/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4001,7 +4001,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/engus/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/engus/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4029,7 +4029,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/frafr/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/frafr/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4043,7 +4043,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/itait/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/itait/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4057,7 +4057,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/jpnjp/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/jpnjp/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4071,7 +4071,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/korkr/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/korkr/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4085,7 +4085,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/polpl/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/polpl/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4099,7 +4099,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/porbr/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/porbr/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4113,7 +4113,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/rusru/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/rusru/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4127,7 +4127,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/spaar/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/spaar/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4141,7 +4141,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/spaes/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/spaes/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4155,7 +4155,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/thath/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/thath/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4169,7 +4169,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/zhocn/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/zhocn/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -4183,7 +4183,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/msg/zhotw/item_dlc02.msgbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/msg/araae/item_dlc02.msgbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/msg/zhotw/item_dlc02.msgbnd.dcx",
       "size": 352416,
       "sha256": "b016b2402ab8247af82340551a8095d303ed54e6d4c63e2cd1b9a019a6ca3a56",
@@ -5051,14 +5051,14 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/bd_m_5091.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/bd_m_5090.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/bd_m_5091.partsbnd.dcx",
       "size": 18655040,
       "sha256": "1d02a627d1323302ec82f46aa346a626e7ea89025587a631224a626a65ba9312",
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/bd_m_5091_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/bd_m_5090_l.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/bd_m_5091_l.partsbnd.dcx",
       "size": 3061040,
       "sha256": "5745b052ec09664e5863f1d9d8c59578b2c723f7e84fc3fc6a862663c3a7b3ba",
@@ -6094,7 +6094,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/hd_m_9150_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/hd_m_9150.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/hd_m_9150_l.partsbnd.dcx",
       "size": 15857360,
       "sha256": "015209698cd8e09c33dc207d11367789d4c3a284ce4aa6adc1e04e3831c1c4b2",
@@ -7305,7 +7305,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/lg_m_9801.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/am_m_9801.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/lg_m_9801.partsbnd.dcx",
       "size": 1235776,
       "sha256": "d121b8129133f83f0d017863b24b8d9f33b71b41c469ad281f4950629cccf903",
@@ -7319,7 +7319,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/lg_m_9811.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/am_m_9811.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/lg_m_9811.partsbnd.dcx",
       "size": 4450539,
       "sha256": "45d23406d79366294193718714e962d62af918f07b357ee1177ba4fd23474687",
@@ -8110,7 +8110,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1956_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1956.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1956_l.partsbnd.dcx",
       "size": 464895,
       "sha256": "f5fdf35f4a3629648f8954d4599e0d7e8058470b887ae329c74c78e76efe0bf5",
@@ -8124,7 +8124,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1957_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1957.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1957_l.partsbnd.dcx",
       "size": 441223,
       "sha256": "b58a49733043e845e8513b01344f8990547f42fa429469c4c9f4bd8f7a41fa08",
@@ -8138,7 +8138,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1958_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1958.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1958_l.partsbnd.dcx",
       "size": 1677922,
       "sha256": "cc02aacac12d4a6869330454d2a97d9c18b518a572594a0ebfe4acb06996af0a",
@@ -8152,7 +8152,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1959_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1959.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1959_l.partsbnd.dcx",
       "size": 708453,
       "sha256": "f37128b4757dba933fadf8cf3b18ac15e10eb3536efd59eaef70de2bf55d7351",
@@ -8166,7 +8166,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1960_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1960.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1960_l.partsbnd.dcx",
       "size": 1638941,
       "sha256": "d9a451b28da5f613223a35d9b945d7e09bab313ccf840575827fc764ef1e87f8",
@@ -8180,7 +8180,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1961_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1961.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1961_l.partsbnd.dcx",
       "size": 1591181,
       "sha256": "3d85e51123ee061417b5d98badf7d2c1d695ecaa5e2486fc178433ec326e22fb",
@@ -8194,7 +8194,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1962_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1962.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1962_l.partsbnd.dcx",
       "size": 745100,
       "sha256": "d728cb3933b8e2a350ca9a4b206ac426514fd1e2837d7bdda6b4852dd13518bf",
@@ -8208,7 +8208,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1963_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1963.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1963_l.partsbnd.dcx",
       "size": 5448910,
       "sha256": "24097ac1fbd3e77f62482c60fa91255deab50e542aaa54b7ee42972240746b6a",
@@ -8222,7 +8222,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1964_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1964.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1964_l.partsbnd.dcx",
       "size": 1059466,
       "sha256": "b1ea9f14a5d3245449486f78601ac05e0d66b1f97dfa05634733261eb21e24f4",
@@ -8236,7 +8236,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1965_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1965.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1965_l.partsbnd.dcx",
       "size": 845249,
       "sha256": "275f6e31771c092bb6a762d814e7b72f397cd7142be330a062cb10b65b61c56c",
@@ -8250,7 +8250,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1966_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1966.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1966_l.partsbnd.dcx",
       "size": 3102157,
       "sha256": "d674bfd361702a7cd51904a8b25303ed094c3a5206dcedd915847c431357fb4f",
@@ -8264,7 +8264,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1967_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1967.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1967_l.partsbnd.dcx",
       "size": 2837550,
       "sha256": "ea3212801c9ac89302117f89d92d8936665ddd3b727004155459ce147b2eebca",
@@ -8292,7 +8292,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1969_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1969.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1969_l.partsbnd.dcx",
       "size": 731519,
       "sha256": "aa96c56adea794249449094ddb530ebd4919da50044510d6bc94964a27008262",
@@ -8306,7 +8306,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1970_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1970.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1970_l.partsbnd.dcx",
       "size": 1618271,
       "sha256": "40ae08c3a90fa2281d5d7c5cda187bf440869ef0902f390d1162aaed57a062a0",
@@ -8327,7 +8327,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1972_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1972.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1972_l.partsbnd.dcx",
       "size": 1480220,
       "sha256": "a0e8d017eac13d7c9b5b3077681c0d484ba4d3476eaa7b20b4fa4254ed39922e",
@@ -8341,7 +8341,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1974_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1974.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1974_l.partsbnd.dcx",
       "size": 1770531,
       "sha256": "073fd8af3f963ef862741f15ef81a40ecb46c32264e1bdec08527443a88314eb",
@@ -8355,7 +8355,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1975_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1975.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1975_l.partsbnd.dcx",
       "size": 703916,
       "sha256": "69d215ceeb59e31c2d477d7b64d580f4d161d8ba925bd547d996264cf0cab7d5",
@@ -8369,7 +8369,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1976_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1976.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1976_l.partsbnd.dcx",
       "size": 1244988,
       "sha256": "9ff7d19fd283f98c25e4cc390e92c1274397ff09727221a24306c27cbaf4d182",
@@ -8383,7 +8383,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1977_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1977.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1977_l.partsbnd.dcx",
       "size": 518321,
       "sha256": "c9cb4add022d7dc3335c665249c3fd284f9f09fca74231fcfe9865dae99f0abd",
@@ -8397,7 +8397,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1978_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1978.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1978_l.partsbnd.dcx",
       "size": 670546,
       "sha256": "03efdd911e33543831209b88400f73f8c025c4c2fc589f84746634e05dad39f6",
@@ -8411,7 +8411,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1979_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1979.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1979_l.partsbnd.dcx",
       "size": 918060,
       "sha256": "1cd39dda03d314d69c019745be995c2f58ef52914fcebede38ec20041b0702f8",
@@ -8425,7 +8425,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1980_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1980.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1980_l.partsbnd.dcx",
       "size": 1562919,
       "sha256": "0c485e9e8048c1910892fbdbb24e1a86866cddca728f58831147df0c8ade1c30",
@@ -8439,7 +8439,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1981_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1981.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1981_l.partsbnd.dcx",
       "size": 732250,
       "sha256": "7ae82288c4ed2ae2318fa98c5a283970b77aca9eecf92c5884ad1fa418d907a8",
@@ -8453,7 +8453,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1985_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1985.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1985_l.partsbnd.dcx",
       "size": 732716,
       "sha256": "33e09c904bec6b64f2f4a65d4c2bef78ebab7995e2644ea2c8ff3ea0e1e9ceb4",
@@ -8467,7 +8467,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1986_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1986.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1986_l.partsbnd.dcx",
       "size": 1265172,
       "sha256": "0a3d668017bb9e792fbefbbf38e6950e84ebffcf659c7be179db8bf8c8012c83",
@@ -8481,7 +8481,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1987_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1987.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1987_l.partsbnd.dcx",
       "size": 1390064,
       "sha256": "c8609daabf1f134250951bd052e7abfe28fdc82cd7e8c29d8d481021279d3ae1",
@@ -8495,7 +8495,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1988_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1988.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1988_l.partsbnd.dcx",
       "size": 774577,
       "sha256": "59d291f94d8cefdceb590e28b6ed1518e7e11f1d11efd878629de4feaf5dc411",
@@ -8509,7 +8509,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1991_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1991.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1991_l.partsbnd.dcx",
       "size": 445568,
       "sha256": "46ee353d5be99415ce062ea2dd4ec24a4c645ab61f334bb58f92cf9ef0ae604b",
@@ -8523,7 +8523,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/parts/wp_a_1992_l.partsbnd.dcx",
+      "source": "payload/versions/0.2.7/mod/parts/wp_a_1992.partsbnd.dcx",
       "target": "mods/graceborne/versions/0.2.7/mod/parts/wp_a_1992_l.partsbnd.dcx",
       "size": 1219154,
       "sha256": "fea5080257bc3c82567a4365d798782443c2c0a0d83ed6e11ff8d8f2920dfb19",
@@ -9867,7 +9867,7 @@
       "mode": "644"
     },
     {
-      "source": "payload/versions/0.2.7/mod/Scripts-Data-Exposer-FS.dll",
+      "source": "payload/versions/0.2.7/mod/action/script/crossbowParryForTheModernManAndHisHKS/dll mods/Scripts-Data-Exposer-FS.dll",
       "target": "mods/graceborne/versions/0.2.7/mod/Scripts-Data-Exposer-FS.dll",
       "size": 43520,
       "sha256": "5ad7212b1675310b9d3f99870af33eeca6300295f373abed3a8276574ee3133c",
@@ -10021,214 +10021,60 @@
       "mode": "644"
     },
     {
-      "source": "tools/me3-linux/bin/me3",
-      "target": "tools/me3-linux/bin/me3",
-      "size": 6438352,
-      "sha256": "33813a5642cd2a1ad0e88484b71e153747227cc00f8ca073bc7a7439fc64d185",
-      "mode": "755"
-    },
-    {
-      "source": "tools/me3-linux/bin/win64/me3-launcher.exe",
-      "target": "tools/me3-linux/bin/win64/me3-launcher.exe",
-      "size": 4649256,
-      "sha256": "4195535ac8448d20e620bc911772a18fc75462e4c36668968164842d787d0011",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/bin/win64/me3.exe",
-      "target": "tools/me3-linux/bin/win64/me3.exe",
-      "size": 6167824,
-      "sha256": "203a726ab40ecac6ee9deaba1aa96f741d87e12def549cdeb48f99e5fe16d52d",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/bin/win64/me3_mod_host.dll",
-      "target": "tools/me3-linux/bin/win64/me3_mod_host.dll",
-      "size": 6571816,
-      "sha256": "e08af3dd9d7be2655e2f245fa2bfc316aa8c6af74a3f2dc7cb0598f96c769317",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/CHANGELOG.pdf",
-      "target": "tools/me3-linux/CHANGELOG.pdf",
-      "size": 434706,
-      "sha256": "7813b8af3f96433f66eca36d745ef969e319228aeea44f900042e09560cbc802",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/dist/me3-launch.desktop",
-      "target": "tools/me3-linux/dist/me3-launch.desktop",
-      "size": 206,
-      "sha256": "1631e03bbb4863d5ae699fc9490f1f3ee9ebc03664a991d22969d2b33a506cc5",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/dist/me3.ico",
-      "target": "tools/me3-linux/dist/me3.ico",
-      "size": 220746,
-      "sha256": "b6b136a3771eaa886e28616d987f38caab0aa22d7b270e8cdd54acc3bfd994a8",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/dist/me3.png",
-      "target": "tools/me3-linux/dist/me3.png",
-      "size": 34202,
-      "sha256": "6a32fccce96f39a16508fb12d0616bd247bac914eda9c174561eae5f8cdb30e9",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/dist/me3.xml",
-      "target": "tools/me3-linux/dist/me3.xml",
-      "size": 324,
-      "sha256": "cd78cc36dd42b296b3ccd74cffb65eb173760fee6f084fcb84a5b9e55e2a7728",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/eldenring-default.me3",
-      "target": "tools/me3-linux/eldenring-default.me3",
-      "size": 112,
-      "sha256": "5814d1dfae8b9e6dc252e7db0a863bc49560529da0b9c4a289895cc86ca9e352",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/install-user.sh",
-      "target": "tools/me3-linux/install-user.sh",
-      "size": 848,
-      "sha256": "f70b2a1d59e8c5aa09dc895a6806c29f8ee9287ea18f028bf5e296b41ab5d8f3",
-      "mode": "755"
-    },
-    {
-      "source": "tools/me3-linux/launch-eldenring-mods.sh",
-      "target": "tools/me3-linux/launch-eldenring-mods.sh",
-      "size": 181,
-      "sha256": "762e271ad2e9af5e9fa83baa5fa42fe120b3c85dc99d8fad84bac409c777e99e",
-      "mode": "755"
-    },
-    {
-      "source": "tools/me3-linux/launch-nightreign-mods.sh",
-      "target": "tools/me3-linux/launch-nightreign-mods.sh",
-      "size": 182,
-      "sha256": "194ea4ade5caf1a22ae9c92e4acacd65038b0cb7a9453cdc48ddb4a88e6d8d88",
-      "mode": "755"
-    },
-    {
-      "source": "tools/me3-linux/launch-sekiro-mods.sh",
-      "target": "tools/me3-linux/launch-sekiro-mods.sh",
-      "size": 178,
-      "sha256": "86132383fe668dbc2253e820bbc181316e0d817643b41739972796ba80aa78ef",
-      "mode": "755"
-    },
-    {
-      "source": "tools/me3-linux/LICENSE-APACHE",
-      "target": "tools/me3-linux/LICENSE-APACHE",
+      "source": "tools/me3/LICENSE-APACHE",
+      "target": "tools/me3/LICENSE-APACHE",
       "size": 9723,
       "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
       "mode": "644"
     },
     {
-      "source": "tools/me3-linux/LICENSE-MIT",
-      "target": "tools/me3-linux/LICENSE-MIT",
+      "source": "tools/me3/LICENSE-MIT",
+      "target": "tools/me3/LICENSE-MIT",
       "size": 1023,
       "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
       "mode": "644"
     },
     {
-      "source": "tools/me3-linux/nightreign-default.me3",
-      "target": "tools/me3-linux/nightreign-default.me3",
-      "size": 114,
-      "sha256": "17b6776dc392057ca7b08f99fe2e241ae6bacbddbf0057a238924e13da8001c7",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-linux/sekiro-default.me3",
-      "target": "tools/me3-linux/sekiro-default.me3",
-      "size": 106,
-      "sha256": "f944f7f386bc81ec306170d46a9af5a87af996b0843427d5d8397054408bcbf9",
-      "mode": "644"
+      "source": "tools/me3-linux/bin/me3",
+      "target": "tools/me3-linux/bin/me3",
+      "size": 6438352,
+      "sha256": "33813a5642cd2a1ad0e88484b71e153747227cc00f8ca073bc7a7439fc64d185",
+      "mode": "755",
+      "platforms": [
+        "linux-proton"
+      ]
     },
     {
       "source": "tools/me3-win/bin/me3-launcher.exe",
       "target": "tools/me3-win/bin/me3-launcher.exe",
       "size": 4649256,
       "sha256": "4195535ac8448d20e620bc911772a18fc75462e4c36668968164842d787d0011",
-      "mode": "644"
+      "mode": "644",
+      "platforms": [
+        "windows",
+        "linux-proton"
+      ]
     },
     {
       "source": "tools/me3-win/bin/me3.exe",
       "target": "tools/me3-win/bin/me3.exe",
       "size": 6167824,
       "sha256": "203a726ab40ecac6ee9deaba1aa96f741d87e12def549cdeb48f99e5fe16d52d",
-      "mode": "644"
+      "mode": "644",
+      "platforms": [
+        "windows"
+      ]
     },
     {
       "source": "tools/me3-win/bin/me3_mod_host.dll",
       "target": "tools/me3-win/bin/me3_mod_host.dll",
       "size": 6571816,
       "sha256": "e08af3dd9d7be2655e2f245fa2bfc316aa8c6af74a3f2dc7cb0598f96c769317",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/CHANGELOG.pdf",
-      "target": "tools/me3-win/CHANGELOG.pdf",
-      "size": 434706,
-      "sha256": "7813b8af3f96433f66eca36d745ef969e319228aeea44f900042e09560cbc802",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/eldenring-default.me3",
-      "target": "tools/me3-win/eldenring-default.me3",
-      "size": 112,
-      "sha256": "5814d1dfae8b9e6dc252e7db0a863bc49560529da0b9c4a289895cc86ca9e352",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/launch-eldenring-mods.bat",
-      "target": "tools/me3-win/launch-eldenring-mods.bat",
-      "size": 57,
-      "sha256": "707536e70af90f5cc80de3ffa8a510fcbc575ac614285f445792084babe97444",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/launch-nightreign-mods.bat",
-      "target": "tools/me3-win/launch-nightreign-mods.bat",
-      "size": 58,
-      "sha256": "8cdd1619a45bf712a95007faae0e8fd67cbdff77058e43963b7f889667d9d365",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/launch-sekiro-mods.bat",
-      "target": "tools/me3-win/launch-sekiro-mods.bat",
-      "size": 54,
-      "sha256": "d028ef898699d4d2186d22660c431355a1a2f0d1b1828828b634f2e44d8dd4ab",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/LICENSE-APACHE",
-      "target": "tools/me3-win/LICENSE-APACHE",
-      "size": 9723,
-      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/LICENSE-MIT",
-      "target": "tools/me3-win/LICENSE-MIT",
-      "size": 1023,
-      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/nightreign-default.me3",
-      "target": "tools/me3-win/nightreign-default.me3",
-      "size": 114,
-      "sha256": "17b6776dc392057ca7b08f99fe2e241ae6bacbddbf0057a238924e13da8001c7",
-      "mode": "644"
-    },
-    {
-      "source": "tools/me3-win/sekiro-default.me3",
-      "target": "tools/me3-win/sekiro-default.me3",
-      "size": 106,
-      "sha256": "f944f7f386bc81ec306170d46a9af5a87af996b0843427d5d8397054408bcbf9",
-      "mode": "644"
+      "mode": "644",
+      "platforms": [
+        "windows",
+        "linux-proton"
+      ]
     },
     {
       "source": "art/graceborne/grid.png",

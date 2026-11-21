@@ -7,6 +7,18 @@
   "modId": "graceborne",
   "artId": "graceborne",
   "saveFile": "ER0000.graceborne.sl2",
+  "platforms": {
+    "windows": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-win/bin/me3.exe"
+    },
+    "linux-proton": {
+      "exe": "Game/eldenring.exe",
+      "gameProcess": "eldenring.exe",
+      "loader": "tools/me3-linux/bin/me3"
+    }
+  },
   "notes": [
     {
       "title": "Install 1.17 and launch vanilla once",

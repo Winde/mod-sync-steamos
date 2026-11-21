@@ -6,9 +6,11 @@ const {
   sha256File, modeFor, formatBytes,
 } = require("../util");
 const steam = require("../steam");
+const paths = require("../paths");
 
 const PACK_ID = "bg3-modded";
 const MOD_ID = "bg3";
+const WINDOWS_EXTENDER_PLATFORMS = ["windows", "linux-proton"];
 const GAME = {
   id: "bg3",
   title: "Baldur's Gate 3",
@@ -16,9 +18,25 @@ const GAME = {
   appId: 1086940,
   installDir: "Baldurs Gate 3",
   exe: "bin/bg3.exe",
+  linuxExe: "bin/bg3",
   build: "25605617",
   version: "Patch 8",
   prefix: true,
+};
+
+const DEFAULT_PLATFORMS = {
+  windows: {
+    dataDir: "%LOCALAPPDATA%/Larian Studios/Baldur's Gate 3",
+    saveDir: "%LOCALAPPDATA%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
+    exe: "bin/bg3.exe",
+    gameProcess: "bg3.exe",
+  },
+  "linux-proton": {
+    dataDir: "%PREFIX%/drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
+    saveDir: "%PREFIX%/drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3/PlayerProfiles",
+    exe: "bin/bg3.exe",
+    gameProcess: "bg3.exe",
+  },
 };
 
 function defaultSource() {
@@ -27,9 +45,11 @@ function defaultSource() {
       "Larian Studios", "Baldur's Gate 3");
   }
   const game = steam.findGame(GAME);
-  return game
-    ? path.join(game.prefix, "drive_c", "users", "steamuser", "AppData", "Local", "Larian Studios", "Baldur's Gate 3")
-    : path.join(os.homedir(), ".local", "share", "Larian Studios", "Baldur's Gate 3");
+  if (game) {
+    const resolved = paths.resolve({ platforms: DEFAULT_PLATFORMS }, game);
+    if (resolved.dataDir) return resolved.dataDir;
+  }
+  return paths.expand("%DATA_HOME%/Larian Studios/Baldur's Gate 3", paths.contextFor(null));
 }
 
 function defaultVersion() {
@@ -140,6 +160,9 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     .sort((a, b) => a.localeCompare(b));
   if (!paks.length) throw new Error(`No .pak files in ${modsDir}`);
 
+  const platforms = paths.mergePlatforms(DEFAULT_PLATFORMS, recipe && recipe.platforms);
+  paths.validatePlatforms(platforms, "pack.platforms");
+
   log(`Packing BG3 mods ${version} from ${src}`);
   fs.rmSync(dst, { recursive: true, force: true });
   const payload = path.join(dst, "payload", "versions", version);
@@ -200,11 +223,22 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   const payloadFiles = walkFiles(payload);
   const artFiles = walkFiles(artDst);
   const total = payloadFiles.length + artFiles.length;
-  const add = async (sourceRel, targetRel) => {
+  const byHash = new Map();
+  const add = async (sourceRel, targetRel, platformList) => {
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
-    files.push({ source: sourceRel, target: targetRel, size, sha256, mode: modeFor(targetRel) });
+    const entry = { source: sourceRel, target: targetRel, size, sha256, mode: modeFor(targetRel) };
+    if (platformList) entry.platforms = [...platformList];
+    const shared = byHash.get(sha256);
+    if (shared) {
+      // Keep one copy on the PC; the installer still writes every target.
+      entry.source = shared.source;
+      fs.rmSync(abs, { force: true });
+    } else {
+      byHash.set(sha256, entry);
+    }
+    files.push(entry);
     processed++;
     const step = Math.max(1, Math.ceil(total / 10));
     if (processed === total || processed % step === 0) {
@@ -212,8 +246,16 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     }
   };
 
+  const extenderFile = (rel) => rel === "bg3se"
+    || rel.startsWith("bg3se/")
+    || rel === "Script Extender"
+    || rel.startsWith("Script Extender/");
   for (const file of payloadFiles) {
-    await add(`payload/versions/${version}/${file.rel}`, `mods/${modId}/versions/${version}/${file.rel}`);
+    await add(
+      `payload/versions/${version}/${file.rel}`,
+      `mods/${modId}/versions/${version}/${file.rel}`,
+      extenderFile(file.rel) ? WINDOWS_EXTENDER_PLATFORMS : null,
+    );
   }
   for (const art of artFiles) {
     await add(`art/${modId}/${art.rel}`, `art/${modId}/${art.rel}`);
@@ -224,7 +266,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   notes.push({
     title: "Script Extender",
     body: bg3seFiles
-      ? "BG3 Script Extender is included and applied with the pack."
+      ? "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. The native Linux build is not supported by this pack."
       : "This pack has no BG3 Script Extender files. Install BG3SE in the game before using Script Extender mods.",
     tone: bg3seFiles ? "info" : "warning",
   });
@@ -234,7 +276,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     : [
       { id: "game-installed", type: "game-installed", required: true, title: "Baldur's Gate 3 is installed" },
       { id: "game-build", type: "game-build", required: true, build: GAME.build, title: `Game is build ${GAME.build} (${GAME.version})` },
-      { id: "proton-prefix", type: "proton-prefix", required: true, title: "Proton prefix exists", hint: "Launch the vanilla game once from Steam." },
+      { id: "proton-prefix", type: "proton-prefix", required: true, title: "Game data location is ready", hint: "Launch the vanilla game once from Steam." },
       { id: "game-closed", type: "game-not-running", required: true, title: "Game is closed" },
       { id: "disk-free", type: "disk-free", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough space for the pack" },
       { id: "disk-free-game", type: "disk-free", scope: "game", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough space to apply the pack" },
@@ -246,6 +288,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     name: packName,
     description: packDescription,
     game: { ...GAME },
+    platforms,
     mod: { id: modId, version },
     loader: { type: "bg3se", profile: `mods/${modId}/versions/${version}/modsettings.lsx` },
     launch: {

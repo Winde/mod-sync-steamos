@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const util = require("./util");
 const steam = require("./steam");
+const paths = require("./paths");
 
 const CHECK_TYPES = new Set([
   "game-installed",
@@ -51,8 +52,8 @@ function validatePreconditions(list) {
     if (check.type === "disk-free" && check.bytes != null && !Number.isFinite(check.bytes)) {
       throw new Error(`pack.json.preconditions: ${check.id} bytes must be a number`);
     }
-    if (check.type === "disk-free" && check.scope != null && !["tv", "game"].includes(check.scope)) {
-      throw new Error(`pack.json.preconditions: ${check.id} scope must be tv or game`);
+    if (check.type === "disk-free" && check.scope != null && !["tv", "game", "target"].includes(check.scope)) {
+      throw new Error(`pack.json.preconditions: ${check.id} scope must be tv, game, or target`);
     }
     if (check.type === "path-exists") {
       const paths = check.paths || (check.path ? [check.path] : []);
@@ -123,11 +124,11 @@ function checkDlc(check, { pack, game }) {
   return fail(`Not detected (${tried.join("; ")}).`);
 }
 
-function checkOne(check, { pack, game, root, totalBytes }) {
+function checkOne(check, { pack, game, root, totalBytes, target }) {
   switch (check.type) {
     case "game-installed":
       return game
-        ? pass(`${pack.game.title} at ${game.root}`)
+        ? pass(`${pack.game.title} at ${game.root} (${game.mode || "unknown"}).`)
         : fail(`${pack.game.title} was not found in Steam libraries (${steam.libraries().join(", ") || "none"}).`);
     case "game-build": {
       const expected = String(check.build || pack.game.build || "");
@@ -138,12 +139,17 @@ function checkOne(check, { pack, game, root, totalBytes }) {
         : fail(`Build ${game.build}; this pack needs ${expected}.`);
     }
     case "game-not-running":
-      return util.isGameRunning(pack.launch && pack.launch.gameProcess)
+      return util.isGameRunning(target.gameProcess)
         ? fail(`${pack.game.title} is running.`)
         : pass(`${pack.game.title} is closed.`);
     case "proton-prefix":
       if (process.platform === "win32") return pass("Not needed on Windows.");
       if (!game) return unknown("Game not found.");
+      if (game.native) {
+        return target.supported
+          ? pass("Native Linux build; no Proton prefix needed.")
+          : fail(`${pack.game.title} is the native Linux build, but this pack needs Proton. In Steam, open Properties, Compatibility, and force a Proton version.`);
+      }
       if (game.prefixReady) return pass("Proton prefix exists.");
       {
         const checked = steam.libraries().map((lib) => path.join(lib, "steamapps", "compatdata", String(pack.game.appId), "pfx"));
@@ -152,8 +158,10 @@ function checkOne(check, { pack, game, root, totalBytes }) {
     case "disk-free": {
       const reserve = Number.isFinite(check.reserveBytes) ? check.reserveBytes : 1024 * 1024 * 1024;
       const need = Number.isFinite(check.bytes) ? check.bytes : (totalBytes || 0) + reserve;
-      const base = check.scope === "game" ? (game && game.root) : root;
-      if (!base) return unknown("Game not found.");
+      const base = check.scope === "game"
+        ? (game && game.root)
+        : check.scope === "target" ? target.dataDir : root;
+      if (!base) return unknown("Install target not found.");
       const free = util.freeBytes(base);
       if (free == null) return unknown("Free space could not be read.");
       return free >= need
@@ -182,8 +190,9 @@ function checkOne(check, { pack, game, root, totalBytes }) {
 
 function evaluatePreconditions({ pack, game, root, totalBytes, confirmed = {} }) {
   const checks = Array.isArray(pack.preconditions) ? pack.preconditions : [];
+  const target = paths.resolve(pack, game);
   const results = checks.map((check) => {
-    let result = checkOne(check, { pack, game, root, totalBytes });
+    let result = checkOne(check, { pack, game, root, totalBytes, target });
     const confirmable = check.type === "manual" || check.confirmable === true;
     if (result.status !== "pass" && confirmable && confirmed[check.id]) {
       result = pass("Confirmed on this TV.");
@@ -215,8 +224,11 @@ function defaultTitle(check, pack) {
     case "game-installed": return `${pack.game.title} is installed`;
     case "game-build": return `${pack.game.title} build ${check.build || pack.game.build}`;
     case "game-not-running": return "Game is closed";
-    case "proton-prefix": return "Proton prefix exists";
-    case "disk-free": return check.scope === "game" ? "Enough space in the game library" : "Enough free space";
+    case "proton-prefix": return "Game data location is ready";
+    case "disk-free":
+      if (check.scope === "game") return "Enough space in the game library";
+      if (check.scope === "target") return "Enough space in the game data folder";
+      return "Enough free space";
     case "path-exists": return "Required files exist";
     case "dlc-installed": return "DLC is installed";
     case "manual": return "Manual check";
