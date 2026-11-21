@@ -109,6 +109,22 @@ v1 supports overlay packs on SteamOS. Profile/in-place drivers come later.
   identity checks, conflict handling, Steam Cloud interaction, atomic writes
   and validation. It is not a generic file copy.
 
+## Rollback
+
+Installs are versioned:
+
+- `mods/<mod>/versions/<version>/`
+- `profiles/<mod>-<version>.me3`
+- `mods/<mod>/current.txt`
+
+The launcher reads `current.txt` at launch. Installing a new version keeps the
+previous version and profile. Rollback switches the pointer; the previous
+version and profile are not rebuilt or downloaded again.
+
+The installer keeps the version folder; a reinstall of the **same** version
+moves the old copy to `<version>.bak-<timestamp>` and leaves it out of the
+rollback list. Saves are not versioned in v1.
+
 ## Console/terminal
 
 The Linux launcher starts me3, waits for the game process, waits for exit, then

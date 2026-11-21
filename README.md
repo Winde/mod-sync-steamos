@@ -68,6 +68,26 @@ active. The TV pulls from port 8787:
 
 No SSH. No port forwarding. LAN only.
 
+## Rollback
+
+Every installed version and its me3 profile stay on disk. The launcher reads
+`mods/<mod>/current.txt`, so rollback is a pointer switch:
+
+1. Build 0.2.5 and install it on the TV:
+   ```powershell
+   node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.5
+   ```
+2. Build 0.2.7 and install/update:
+   ```powershell
+   node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.7
+   ```
+3. The dashboard now shows **Roll back** (home and Details). It switches
+   `current.txt` to 0.2.5; 0.2.7 stays installed.
+
+Rollback does **not** roll back saves. Saves are out of v1; the TV save stays
+where it is. If you need the save from before an update, copy it manually while
+the game is closed.
+
 ## What the agent does
 
 - Reads the pack manifest from the PC.
