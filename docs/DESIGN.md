@@ -178,7 +178,8 @@ A note is either a string or `{ title?, body, tone? }`, where `tone` is
 ### Preconditions
 
 `preconditions` is optional, structured and machine-checked. Each entry has an
-`id`, a `type`, and `required` (default `false`).
+`id`, a `type`, and `required` (default `false`). A check may list `platforms`;
+on other variants it is skipped with a pass and a “Not needed” detail.
 
 ```json
 "preconditions": [
@@ -197,9 +198,9 @@ Supported types:
 | `game-installed` | Game root exists in a Steam library | — |
 | `game-build` | Steam `buildid` matches | `build` (defaults to `game.build`) |
 | `game-not-running` | Game process is not running | — |
-| `proton-prefix` | `compatdata/<appId>/pfx` exists on Linux | — |
-| `disk-free` | Free space at the TV root is enough | `bytes` or `reserveBytes` |
-| `path-exists` | A file/dir exists under the game or TV root | `path` or `paths`, `scope: "game" \| "tv"` |
+| `proton-prefix` | Proton prefix exists, or the native build needs no prefix | — |
+| `disk-free` | Free space at the TV root, game library, or install target | `bytes` or `reserveBytes`, `scope: "tv" \| "game" \| "target"` |
+| `path-exists` | A file/dir exists under home, game, TV root, or target | `path` or `paths`, `scope: "home" \| "game" \| "tv" \| "target"` |
 | `dlc-installed` | Steam manifest, installed depot, or DLC paths | `dlcAppId`, `depotIds`, `paths` |
 | `manual` | User confirms in the app | `hint` |
 
@@ -293,6 +294,6 @@ rollback list. Saves are not versioned in v1.
 ## Console/terminal
 
 For me3 packs, the Linux launcher starts me3, waits for the game process, waits
-for exit, then stops me3 and exits. BG3 packs are applied to the Proton prefix
-at install/rollback time, then the launcher starts the game through Steam. The
-`.desktop` uses `Terminal=false`.
+for exit, then stops me3 and exits. BG3 packs are applied to the per-platform
+data folder at install/rollback time, then the launcher starts the game through
+Steam. The `.desktop` uses `Terminal=false`.

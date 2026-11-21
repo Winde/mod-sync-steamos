@@ -96,13 +96,14 @@ test("BG3 apply on a native Linux build skips the Windows script extender", (t) 
   const applied = applyBg3({ pack, root, game, version: "1.0.0", platform: "linux", log: () => { } });
 
   assert.equal(applied.platform, "linux-native");
-  assert.deepEqual(applied.skipped, ["bg3se", "Script Extender"]);
+  assert.deepEqual(applied.skipped, ["bg3se"]);
   assert.equal(fs.readFileSync(path.join(dataDir, "Mods", "a.pak"), "utf8"), "native-a");
   assert.equal(fs.readFileSync(path.join(dataDir, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8"), "native-settings");
   assert.equal(fs.existsSync(path.join(gameRoot, "bin", "DWrite.dll")), false);
-  assert.equal(fs.existsSync(path.join(dataDir, "Script Extender", "Test", "Config.json")), false);
+  assert.equal(fs.readFileSync(path.join(dataDir, "Script Extender", "Test", "Config.json"), "utf8"), "windows-config");
 
   revertBg3({ pack, root, log: () => { } });
   assert.equal(fs.existsSync(path.join(dataDir, "Mods", "a.pak")), false);
+  assert.equal(fs.existsSync(path.join(dataDir, "Script Extender", "Test", "Config.json")), false);
   assert.equal(fs.readFileSync(path.join(dataDir, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8"), "vanilla-settings");
 });

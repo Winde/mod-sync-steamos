@@ -37,6 +37,12 @@ const DEFAULT_PLATFORMS = {
     exe: "bin/bg3.exe",
     gameProcess: "bg3.exe",
   },
+  "linux-native": {
+    dataDir: "%DATA_HOME%/Larian Studios/Baldur's Gate 3",
+    saveDir: "%DATA_HOME%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
+    exe: "bin/bg3",
+    gameProcess: "bg3",
+  },
 };
 
 function defaultSource() {
@@ -246,10 +252,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     }
   };
 
-  const extenderFile = (rel) => rel === "bg3se"
-    || rel.startsWith("bg3se/")
-    || rel === "Script Extender"
-    || rel.startsWith("Script Extender/");
+  const extenderFile = (rel) => rel === "bg3se" || rel.startsWith("bg3se/");
   for (const file of payloadFiles) {
     await add(
       `payload/versions/${version}/${file.rel}`,
@@ -266,8 +269,8 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   notes.push({
     title: "Script Extender",
     body: bg3seFiles
-      ? "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. The native Linux build is not supported by this pack."
-      : "This pack has no BG3 Script Extender files. Install BG3SE in the game before using Script Extender mods.",
+      ? "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. The native Linux build uses BG3LE instead; install it before launching the pack."
+      : "This pack has no BG3 Script Extender files. Install BG3SE (Windows/Proton) or BG3LE (native Linux) before using Script Extender mods.",
     tone: bg3seFiles ? "info" : "warning",
   });
   const contents = contentsFor(src, paks);

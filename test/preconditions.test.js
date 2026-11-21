@@ -53,6 +53,32 @@ test("launch modes are explicit and validated", () => {
   assert.throws(() => validatePack(pack), /mode/);
 });
 
+test("platform-scoped checks only apply to their target", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-pre-platform-"));
+  const pack = basePack([{ id: "native-only", type: "manual", required: true, platforms: ["linux-native"] }]);
+  pack.platforms = {
+    windows: { exe: "Game/test.exe", gameProcess: "test-game-not-running.exe" },
+    "linux-proton": { exe: "Game/test.exe", gameProcess: "test-game-not-running.exe" },
+  };
+  const game = { root, build: "42", prefixReady: true, library: root };
+  const out = evaluatePreconditions({ pack, game, root, totalBytes: 1 });
+  assert.equal(out.blocked, false);
+  assert.equal(out.checks[0].status, "pass");
+  assert.match(out.checks[0].detail, /Not needed/);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("path-exists scopes are validated", () => {
+  assert.throws(
+    () => validatePreconditions([{ id: "p", type: "path-exists", scope: "moon", path: "x" }]),
+    /scope/,
+  );
+  assert.throws(
+    () => validatePreconditions([{ id: "p", type: "manual", platforms: ["dos"] }]),
+    /unknown platform/,
+  );
+});
+
 test("required failures block, optional failures do not", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-pre-"));
   const game = { root, build: "41", prefixReady: true, library: root };

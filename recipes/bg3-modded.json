@@ -17,6 +17,12 @@
       "saveDir": "%PREFIX%/drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3/PlayerProfiles",
       "exe": "bin/bg3.exe",
       "gameProcess": "bg3.exe"
+    },
+    "linux-native": {
+      "dataDir": "%DATA_HOME%/Larian Studios/Baldur's Gate 3",
+      "saveDir": "%DATA_HOME%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
+      "exe": "bin/bg3",
+      "gameProcess": "bg3"
     }
   },
   "notes": [
@@ -31,8 +37,8 @@
       "tone": "warning"
     },
     {
-      "title": "Linux uses Proton",
-      "body": "This pack targets Windows and Linux with Proton. If Steam installed the native Linux build, open the game's Properties, Compatibility, and force a Proton version before installing.",
+      "title": "Native Linux needs BG3LE",
+      "body": "On the native Linux build, install BG3LE (https://www.nexusmods.com/baldursgate3/mods/25431) with its install.py before this pack. BG3LE provides the Script Extender API natively; the pack installs the same mods and modsettings. Launch the game from Steam so BG3LE's launch wrapper runs.",
       "tone": "warning"
     }
   ],
@@ -40,6 +46,7 @@
     { "id": "game-installed", "type": "game-installed", "required": true, "title": "Baldur's Gate 3 is installed" },
     { "id": "game-build", "type": "game-build", "required": true, "build": "25605617", "title": "Game is build 25605617 (Patch 8)" },
     { "id": "proton-prefix", "type": "proton-prefix", "required": true, "title": "Game data location is ready", "hint": "Launch the vanilla game once from Steam." },
+    { "id": "bg3le", "type": "path-exists", "scope": "home", "paths": [".local/share/bg3le"], "platforms": ["linux-native"], "required": true, "title": "BG3LE is installed", "hint": "Install BG3LE (Nexus mod 25431) with its install.py before installing this pack. https://www.nexusmods.com/baldursgate3/mods/25431" },
     { "id": "game-closed", "type": "game-not-running", "required": true, "title": "Game is closed" },
     { "id": "disk-free", "type": "disk-free", "required": true, "reserveBytes": 1073741824, "title": "Enough space for the pack" },
     { "id": "disk-free-game", "type": "disk-free", "scope": "target", "required": true, "reserveBytes": 1073741824, "title": "Enough space in the game data folder" }

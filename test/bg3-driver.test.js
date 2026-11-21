@@ -60,9 +60,11 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.equal(result.pack.contents.mods[0].file, "Mods/ModA_uuid.pak");
     assert.equal(result.pack.contents.mods[1].builtin, true);
 
-    assert.equal(result.pack.platforms["linux-native"], undefined);
+    assert.equal(result.pack.platforms["linux-native"].exe, "bin/bg3");
+    assert.equal(result.pack.platforms["linux-native"].gameProcess, "bg3");
     assert.equal(result.pack.platforms["linux-proton"].gameProcess, "bg3.exe");
     assert.match(result.pack.platforms["linux-proton"].dataDir, /^%PREFIX%/);
+    assert.ok(result.pack.preconditions.some((check) => check.id === "bg3le" && check.platforms.includes("linux-native")));
 
     const loaded = loadPack(out);
     assert.equal(loaded.pack.contents.count, 1);
@@ -71,6 +73,11 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.deepEqual(dll.platforms, ["windows", "linux-proton"]);
     const pak = loaded.files.files.find((f) => f.target.endsWith("/Mods/ModA_uuid.pak"));
     assert.equal(pak.platforms, undefined);
+    const extConfig = loaded.files.files.find((f) => f.target.endsWith("/Script Extender/Test/Config.json"));
+    assert.equal(extConfig.platforms, undefined);
+    const nativeFiles = loaded.files.files.filter((f) => !f.platforms || f.platforms.includes("linux-native"));
+    assert.ok(nativeFiles.some((f) => f.target.endsWith("/Script Extender/Test/Config.json")));
+    assert.ok(!nativeFiles.some((f) => f.target.endsWith("/bg3se/DWrite.dll")));
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }

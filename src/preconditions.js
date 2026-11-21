@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const util = require("./util");
 const steam = require("./steam");
@@ -45,6 +46,19 @@ function validatePreconditions(list) {
     }
     if (check.hint != null && typeof check.hint !== "string") {
       throw new Error(`pack.json.preconditions: ${check.id} hint must be a string`);
+    }
+    if (check.platforms != null) {
+      if (!Array.isArray(check.platforms) || !check.platforms.length) {
+        throw new Error(`pack.json.preconditions: ${check.id} platforms must be a non-empty array`);
+      }
+      for (const variant of check.platforms) {
+        if (!paths.VARIANTS.includes(variant)) {
+          throw new Error(`pack.json.preconditions: ${check.id} unknown platform ${variant}`);
+        }
+      }
+    }
+    if (check.type === "path-exists" && check.scope != null && !["home", "game", "tv", "target"].includes(check.scope)) {
+      throw new Error(`pack.json.preconditions: ${check.id} scope must be home, game, tv, or target`);
     }
     if (check.type === "game-build" && check.build != null && typeof check.build !== "string") {
       throw new Error(`pack.json.preconditions: ${check.id} build must be a string`);
@@ -169,15 +183,19 @@ function checkOne(check, { pack, game, root, totalBytes, target }) {
         : fail(`${util.formatBytes(free)} free at ${base}; need ${util.formatBytes(need)}.`);
     }
     case "path-exists": {
-      const paths = check.paths || [check.path];
-      const base = check.scope === "tv" ? root : (game && game.root);
-      if (!base) return unknown("Game not found.");
-      for (const rel of paths) {
+      const candidates = check.paths || [check.path];
+      const base = check.scope === "tv"
+        ? root
+        : check.scope === "home" ? os.homedir()
+        : check.scope === "target" ? target.dataDir
+        : (game && game.root);
+      if (!base) return unknown("Install target not found.");
+      for (const rel of candidates) {
         try {
           if (fs.existsSync(util.safeJoin(base, rel))) return pass(`Found ${rel}.`);
         } catch { /* invalid path counts as missing */ }
       }
-      return fail(`Missing ${paths.join(" or ")}.`);
+      return fail(`Missing ${candidates.join(" or ")}.`);
     }
     case "dlc-installed":
       return checkDlc(check, { pack, game });
@@ -192,7 +210,9 @@ function evaluatePreconditions({ pack, game, root, totalBytes, confirmed = {} })
   const checks = Array.isArray(pack.preconditions) ? pack.preconditions : [];
   const target = paths.resolve(pack, game);
   const results = checks.map((check) => {
-    let result = checkOne(check, { pack, game, root, totalBytes, target });
+    let result = Array.isArray(check.platforms) && !check.platforms.includes(target.variant)
+      ? pass(`Not needed for ${target.variant}.`)
+      : checkOne(check, { pack, game, root, totalBytes, target });
     const confirmable = check.type === "manual" || check.confirmable === true;
     if (result.status !== "pass" && confirmable && confirmed[check.id]) {
       result = pass("Confirmed on this TV.");

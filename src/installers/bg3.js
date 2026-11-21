@@ -118,8 +118,8 @@ function applyBg3({ pack, root, game, version, platform = process.platform, log 
   }
 
   if (native) {
-    applied.skipped.push("bg3se", "Script Extender");
-    log("Native Linux build: skipped the Windows Script Extender files.");
+    applied.skipped.push("bg3se");
+    log("Native Linux build: skipped the Windows Script Extender binaries.");
   } else {
     for (const [name, rel] of [
       ["DWrite.dll", "bin/DWrite.dll"],
@@ -135,19 +135,19 @@ function applyBg3({ pack, root, game, version, platform = process.platform, log 
       fs.copyFileSync(source, file);
       applied.game.push(rel);
     }
+  }
 
-    const extSrc = path.join(src, "Script Extender");
-    if (fs.existsSync(extSrc)) {
-      for (const file of walkFiles(extSrc)) {
-        const rel = `Script Extender/${file.rel}`;
-        if (backupFile(packRoot, "data", dataDir, rel)) {
-          applied.backups.push({ scope: "data", rel });
-        }
-        const target = safeJoin(dataDir, rel);
-        ensureDir(path.dirname(target));
-        fs.copyFileSync(file.abs, target);
-        applied.data.push(rel);
+  const extSrc = path.join(src, "Script Extender");
+  if (fs.existsSync(extSrc)) {
+    for (const file of walkFiles(extSrc)) {
+      const rel = `Script Extender/${file.rel}`;
+      if (backupFile(packRoot, "data", dataDir, rel)) {
+        applied.backups.push({ scope: "data", rel });
       }
+      const target = safeJoin(dataDir, rel);
+      ensureDir(path.dirname(target));
+      fs.copyFileSync(file.abs, target);
+      applied.data.push(rel);
     }
   }
 

@@ -583,77 +583,49 @@
       "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/Config.json",
       "size": 330,
       "sha256": "ddd3f0def348290376d9791b3d5ab7930b4a885e9b8d4827b3d4f63df7c94f4b",
-      "mode": "644",
-      "platforms": [
-        "windows",
-        "linux-proton"
-      ]
+      "mode": "644"
     },
     {
       "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/ItemFilters.json",
       "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/ItemFilters.json",
       "size": 31,
       "sha256": "68c62243afefa1b4c98d74e8685a7c6adabd76c92c7ae582aa0335301f07d107",
-      "mode": "644",
-      "platforms": [
-        "windows",
-        "linux-proton"
-      ]
+      "mode": "644"
     },
     {
       "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/Localization/ToT.json",
       "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/Localization/ToT.json",
       "size": 24161,
       "sha256": "2504f033d7661679cc50dd1c42eacd9b572368ba4b37f9b764067f1ef47ec09b",
-      "mode": "644",
-      "platforms": [
-        "windows",
-        "linux-proton"
-      ]
+      "mode": "644"
     },
     {
       "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Enemies.json",
       "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Enemies.json",
       "size": 53356,
       "sha256": "6338356bdcdf03eb8568b27c654437d9af91d347b6a534ee795955803f883667",
-      "mode": "644",
-      "platforms": [
-        "windows",
-        "linux-proton"
-      ]
+      "mode": "644"
     },
     {
       "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/LootRates.json",
       "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/LootRates.json",
       "size": 326,
       "sha256": "4f4c0dc456a9816a13f8b0bbbc04f14d4dddcedad6b89597e58e60b739b89e96",
-      "mode": "644",
-      "platforms": [
-        "windows",
-        "linux-proton"
-      ]
+      "mode": "644"
     },
     {
       "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Maps.json",
       "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Maps.json",
       "size": 103943,
       "sha256": "97f8110857b245c9e3f0c02460c5fff0b5566607cf4d4d896d98c38abd90d062",
-      "mode": "644",
-      "platforms": [
-        "windows",
-        "linux-proton"
-      ]
+      "mode": "644"
     },
     {
       "source": "payload/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Scenarios.json",
       "target": "mods/bg3/versions/2026.11.21/Script Extender/Trials of Tav/v1.12/Scenarios.json",
       "size": 2692,
       "sha256": "bcec22e8ed835fe8f7234998381fb98b28d64b8046814a5889c7ff4ab06b5cc0",
-      "mode": "644",
-      "platforms": [
-        "windows",
-        "linux-proton"
-      ]
+      "mode": "644"
     },
     {
       "source": "art/bg3/grid.png",
