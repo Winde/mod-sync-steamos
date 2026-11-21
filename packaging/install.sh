@@ -85,7 +85,7 @@ fi
 VERSION="${VERSION#v}"
 [ -n "$VERSION" ] || die "could not determine the release version"
 TAG="v${VERSION}"
-APPIMAGE_NAME="ModSync-${VERSION}-x86_64.AppImage"
+APPIMAGE_NAME="ModSync-Client-${VERSION}-x86_64.AppImage"
 BASE="https://github.com/${REPO}/releases/download/${TAG}"
 
 say "Installing ModSync ${VERSION}"

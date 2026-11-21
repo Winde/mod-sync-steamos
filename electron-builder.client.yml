@@ -1,7 +1,7 @@
 appId: tv.modsync.client
 productName: ModSync Client
 copyright: ModSync
-artifactName: ModSync-${version}-${arch}.${ext}
+artifactName: ModSync-Client-${version}-${arch}.${ext}
 
 directories:
   buildResources: build
@@ -34,7 +34,6 @@ win:
       arch:
         - x64
   icon: build/icon.png
-  artifactName: ModSync-Client-${version}-${arch}.${ext}
 
 nsis:
   oneClick: false

@@ -89,7 +89,7 @@ npm run dev:client
 npm run build:server:win     # release/ModSync-Server-<version>-x64.exe
 npm run build:server:linux   # release/ModSync-Server-<version>-x86_64.AppImage
 npm run build:client:win     # release/ModSync-Client-<version>-x64.exe
-npm run build:client:linux   # release/ModSync-<version>-x86_64.AppImage
+npm run build:client:linux   # release/ModSync-Client-<version>-x86_64.AppImage
 ```
 
 The first run creates `state/console.json` in a checkout, or

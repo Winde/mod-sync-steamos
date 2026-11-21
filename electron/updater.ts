@@ -54,7 +54,7 @@ export function compareVersions(a: unknown, b: unknown): number {
 }
 
 export function appImageName(version: string): string {
-  return `ModSync-${version}-x86_64.AppImage`;
+  return `ModSync-Client-${version}-x86_64.AppImage`;
 }
 
 export interface ReleaseAsset {
