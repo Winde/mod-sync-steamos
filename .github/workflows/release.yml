@@ -53,10 +53,22 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "Release version: ${tag}"
 
-  build:
-    name: Linux apps
+  server:
+    name: Server (${{ matrix.platform }})
     needs: verify
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: Linux
+            slug: linux
+            builder_args: --linux AppImage
+          - os: windows-latest
+            platform: Windows
+            slug: windows
+            builder_args: --win nsis
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,12 +80,54 @@ jobs:
       - run: npm ci
       - name: Compile TypeScript
         run: npm run build
-      - name: Build the Server AppImage
-        run: npx electron-builder --config electron-builder.server.yml --linux AppImage --publish never
-      - name: Build the Client AppImage
-        run: npx electron-builder --config electron-builder.client.yml --linux AppImage --publish never
+      - name: Build the Server app
+        run: npx electron-builder --config electron-builder.server.yml ${{ matrix.builder_args }} --publish never
 
-      - name: Package the installer and artwork
+      - if: matrix.slug == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-linux
+          path: release/*.AppImage
+          if-no-files-found: error
+      - if: matrix.slug == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-windows
+          path: release/*.exe
+          if-no-files-found: error
+
+  client:
+    name: Client (${{ matrix.platform }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: Linux
+            slug: linux
+            builder_args: --linux AppImage
+          - os: windows-latest
+            platform: Windows
+            slug: windows
+            builder_args: --win nsis
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - name: Compile TypeScript
+        run: npm run build
+      - name: Build the Client app
+        run: npx electron-builder --config electron-builder.client.yml ${{ matrix.builder_args }} --publish never
+
+      - name: Package the Client installer and artwork
+        if: matrix.slug == 'linux'
         run: |
           set -euo pipefail
           cp packaging/install.sh release/install.sh
@@ -82,44 +136,25 @@ jobs:
             && zip -q "$GITHUB_WORKSPACE/release/steam-art.zip" \
                  hero.png portrait.png header.png logo.png icon.png)
 
-      - uses: actions/upload-artifact@v4
+      - if: matrix.slug == 'linux'
+        uses: actions/upload-artifact@v4
         with:
-          name: release
+          name: client-linux
           path: |
             release/*.AppImage
             release/install.sh
             release/steam-art.zip
           if-no-files-found: error
-
-  build-windows:
-    name: Windows apps
-    needs: verify
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - if: matrix.slug == 'windows'
+        uses: actions/upload-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-      - name: Compile TypeScript
-        run: npm run build
-      - name: Build the Server installer
-        run: npx electron-builder --config electron-builder.server.yml --win nsis --publish never
-      - name: Build the Client installer
-        run: npx electron-builder --config electron-builder.client.yml --win nsis --publish never
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-release
+          name: client-windows
           path: release/*.exe
           if-no-files-found: error
 
   publish:
     name: Publish
-    needs: [verify, build, build-windows]
+    needs: [verify, server, client]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     steps:
@@ -129,12 +164,19 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: release
+          name: server-linux
           path: artifacts
-
       - uses: actions/download-artifact@v4
         with:
-          name: windows-release
+          name: server-windows
+          path: artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-linux
+          path: artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-windows
           path: artifacts
 
       - name: Checksums
