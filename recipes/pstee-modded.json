@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "id": "pstee-modded",
+  "game": "pstee",
+  "name": "PSTEE Modded",
+  "description": "Planescape: Torment: Enhanced Edition snapshot pack",
+  "modId": "pstee",
+  "notes": [
+    {
+      "title": "No Windows loader",
+      "body": "EEex/InfinityLoader is not supported for PSTEE. This snapshot is data-only and can run on the native Linux build as well as Proton.",
+      "tone": "info"
+    }
+  ]
+}

@@ -21,6 +21,9 @@ interface CliValues {
   version?: string;
   recipe?: string;
   "game-root"?: string;
+  "include-dirs"?: string;
+  "extra-files"?: string;
+  "include-base-data"?: boolean;
   copy?: boolean;
   packs?: string;
   host?: string;
@@ -66,6 +69,9 @@ pack:
   --out <dir>       Pack output (default: config or packs/<recipe>)
   --version <ver>   Mod version (default: current.txt for ER, date for BG3)
   --game-root <dir> BG3 game install (default: detected Steam library)
+  --include-dirs <list> Comma-separated mod folders that load at runtime
+  --extra-files <list>  Comma-separated game-relative runtime files/folders
+  --include-base-data   Include bulk data/ content (total conversions only)
   --copy            Copy payload instead of hardlinking
 
 init:
@@ -146,13 +152,18 @@ async function cmdPack(values: CliValues): Promise<void> {
   console.log(`Pack: ${recipe.name} (${recipe.id})`);
   console.log(`Source: ${source}`);
   console.log(`Output: ${out}`);
+  const driverOptions: Record<string, unknown> = {};
+  if (values["game-root"]) driverOptions.gameRoot = values["game-root"];
+  if (values["include-dirs"]) driverOptions.includeDirs = values["include-dirs"];
+  if (values["extra-files"]) driverOptions.extraFiles = values["extra-files"];
+  if (values["include-base-data"]) driverOptions.includeBaseData = "yes";
   const result = await driver.buildPack({
     recipe,
     source,
     out,
     link: !values.copy,
     version: values.version || config.version || recipe.version,
-    driverOptions: values["game-root"] ? { gameRoot: values["game-root"] } : {},
+    driverOptions,
     log: (m) => console.log(m),
   });
   console.log(`\nPack: ${result.packRoot}`);
@@ -277,6 +288,8 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     options: {
       source: { type: "string" }, out: { type: "string" }, version: { type: "string" },
       recipe: { type: "string" }, "game-root": { type: "string" },
+      "include-dirs": { type: "string" }, "extra-files": { type: "string" },
+      "include-base-data": { type: "boolean" },
       copy: { type: "boolean" }, packs: { type: "string" }, host: { type: "string" }, lan: { type: "boolean" },
       port: { type: "string" }, token: { type: "string" }, config: { type: "string" },
       exe: { type: "string" }, name: { type: "string" }, icon: { type: "string" },

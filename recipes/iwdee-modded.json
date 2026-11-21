@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "id": "iwdee-modded",
+  "game": "iwdee",
+  "name": "IWDEE Modded",
+  "description": "Icewind Dale: Enhanced Edition snapshot pack",
+  "modId": "iwdee",
+  "notes": [
+    {
+      "title": "Expansions",
+      "body": "Heart of Winter and Trials of the Luremaster are part of the base game; there is no DLC merge step.",
+      "tone": "info"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "id": "bg2ee-modded",
+  "game": "bg2",
+  "name": "BG2EE Modded",
+  "description": "Baldur's Gate II: Enhanced Edition snapshot pack",
+  "modId": "bg2",
+  "notes": [
+    {
+      "title": "EET",
+      "body": "EET installs on top of BG2EE and is not supported by snapshot mode; it needs a replay/base-delta pack.",
+      "tone": "info"
+    }
+  ]
+}

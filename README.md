@@ -3,9 +3,10 @@
 Reusable mod-pack deployment for Windows and SteamOS. **v1 is mods only** — no
 save transfer, no save payload, no save prompts.
 
-The first packs are **ELDEN RING + Graceborne** and **Baldur's Gate 3**. The
-core is game-agnostic: a pack manifest, a game driver, and platform decorators.
-Skyrim and BG2 are added as drivers/packs later.
+The first packs are **ELDEN RING + Graceborne**, **Baldur's Gate 3**, and the
+four Steam **Infinity Engine Enhanced Editions** (BG1EE, BG2EE, IWDEE, PSTEE).
+The core is game-agnostic: a pack manifest, a game driver, and platform
+decorators. Skyrim, Icewind Dale II, and EET are added later.
 
 ## Quick start (PC)
 
@@ -33,8 +34,8 @@ checks without emitting, and `npm test` builds and runs the full suite.
 
 `init` writes `state/config.json`; after that `pack` needs no arguments. The
 full form is still available: `pack --recipe eldenring-graceborne --source <dir> --out <dir> --version <ver>`.
-Pack identity lives in `recipes/<id>.json` (Graceborne, Convergence, BG3);
-the driver only knows the game's layout and loader.
+Pack identity lives in `recipes/<id>.json` (Graceborne, Convergence, BG3, and
+the four EE games); the driver only knows the game's layout and loader.
 The Server console uses the same source/output fields.
 
 `serve` binds loopback by default. `--lan` binds the detected LAN IPv4 and
@@ -181,6 +182,7 @@ the game is closed.
 - [`docs/OPERATIONS.md`](docs/OPERATIONS.md) - Server vs Client, one-time setup and every use
 - [`docs/SERVER-CONSOLE.md`](docs/SERVER-CONSOLE.md) - Server app, pack library, token, tray, and sign-in start
 - [`docs/TRANSPORT.md`](docs/TRANSPORT.md) — HTTP pull, token, firewall/VPN
-- [`docs/DRIVERS.md`](docs/DRIVERS.md) — adding Skyrim/BG3/BG2 drivers
+- [`docs/DRIVERS.md`](docs/DRIVERS.md) — drivers and the Infinity Engine family
+- [`docs/INFINITY-ENGINE.md`](docs/INFINITY-ENGINE.md) — BG1EE/BG2EE/IWDEE/PSTEE snapshot design
 - [`docs/TESTING.md`](docs/TESTING.md) — manual acceptance test (install, resume, rollback)
 - [`docs/CONTRACT-TESTS.md`](docs/CONTRACT-TESTS.md) — automated black-box suite and refactor rules

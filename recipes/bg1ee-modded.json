@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "bg1ee-modded",
+  "game": "bg1",
+  "name": "BG1EE Modded",
+  "description": "Baldur's Gate: Enhanced Edition snapshot pack",
+  "modId": "bg1",
+  "notes": [
+    {
+      "title": "Siege of Dragonspear",
+      "body": "If the source install is DLC-merged, the target must have the same DLC Merger base preparation applied first. The pack records that requirement and refuses to mix with unrelated WeiDU installs.",
+      "tone": "warning"
+    },
+    {
+      "title": "EET",
+      "body": "EET installs on top of BG2EE and is not supported by snapshot mode.",
+      "tone": "info"
+    }
+  ]
+}

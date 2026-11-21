@@ -1,5 +1,9 @@
 import * as eldenring from "./eldenring";
 import * as bg3 from "./bg3";
+import * as bg1 from "./bg1";
+import * as bg2 from "./bg2";
+import * as iwdee from "./iwdee";
+import * as pstee from "./pstee";
 import type {
   BuildOption,
   BuildPackOptions,
@@ -20,6 +24,10 @@ export interface Driver {
 const drivers: Record<string, Driver> = {
   eldenring,
   bg3,
+  bg1,
+  bg2,
+  iwdee,
+  pstee,
 };
 
 export function driverFor(game: string): Driver {
@@ -28,4 +36,4 @@ export function driverFor(game: string): Driver {
   return driver;
 }
 
-export { drivers, eldenring, bg3 };
+export { drivers, eldenring, bg3, bg1, bg2, iwdee, pstee };

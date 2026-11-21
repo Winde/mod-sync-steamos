@@ -9,10 +9,12 @@
  */
 
 import * as bg3 from "./bg3";
+import * as infinity from "./infinity";
 import type { Pack, PackAdapter } from "../types";
 
 const adapters: Record<string, PackAdapter> = {
   bg3,
+  infinity,
 };
 
 export function forPack(pack: Pack | null | undefined): PackAdapter | null {

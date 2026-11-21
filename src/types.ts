@@ -367,3 +367,57 @@ export interface BuildPackResult {
   files: number;
   totalBytes: number;
 }
+
+/** Loader description written into an Infinity Engine snapshot archive. */
+export interface InfinityLoaderManifest {
+  type: string;
+  exe: string;
+  ini: string;
+  gameExe: string;
+  realExe: string;
+  support: string;
+  supportFiles: string[];
+}
+
+/** Contents of `modsync.json` inside an Infinity Engine snapshot archive. */
+export interface InfinityManifest {
+  schema: 1;
+  game: string;
+  build: string;
+  version: string;
+  language: string;
+  source: "snapshot";
+  override: string;
+  root: string;
+  meta: string;
+  dialogs: string[];
+  loader: InfinityLoaderManifest | null;
+  basePrep: string[];
+  weidu: { mods: number; components: number };
+  selection: {
+    included: number;
+    bytes: number;
+    modifiedBase: string[];
+    warnings: string[];
+  };
+}
+
+/** Applied state for the generic Infinity Engine install adapter. */
+export interface InfinityApplied {
+  packId: string;
+  version: string;
+  platform: string;
+  gameRoot: string;
+  overrideExisted: boolean;
+  overrideBackup: string | null;
+  files: string[];
+  backups: string[];
+  loader: {
+    gameExe: string;
+    realExe: string;
+    wasLoader: boolean;
+    createdReal: boolean;
+    gameExeBackup: string | null;
+  } | null;
+  installedAt: string;
+}
