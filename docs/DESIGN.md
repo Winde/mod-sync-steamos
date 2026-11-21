@@ -202,13 +202,14 @@ A game is in scope when:
 
 v1 supports overlay packs on SteamOS. Profile/in-place drivers come later.
 
-## v1 vs v2
+## Scope
 
 - v1: mods only, Steam games, HTTP pull, Electron app, deploy/update/rollback/
   launch/storage.
-- v2: save sync as a separate module. It needs per-game save models, account
-  identity checks, conflict handling, Steam Cloud interaction, atomic writes
-  and validation. It is not a generic file copy.
+- Save transfer is **out of scope**. It is not committed to a version, and it is
+  not a generic file copy if it is ever added. It would need per-game save
+  models, account identity checks, conflict handling, Steam Cloud interaction,
+  atomic writes, and validation.
 
 ## Save boundary
 
@@ -216,7 +217,7 @@ v1 supports overlay packs on SteamOS. Profile/in-place drivers come later.
 - The installer never writes a save directory.
 - Steam Cloud handles the vanilla save where the game supports it.
 - Mod saves stay local to each machine.
-- Save sync is v2, with per-game parsers and semantics.
+- Save transfer is out of scope and is not promised for a future version.
 
 ## Rollback
 
