@@ -39,7 +39,7 @@ kiosk, or SSH; the PC only serves the installer and pack files over HTTP.
 ## Quick start (Steam Machine)
 
 1. Install the pack's game via Steam and launch it once so its Proton prefix
-   exists. Pack-specific prerequisites live in `docs/packs/<pack-id>.md`.
+   exists. ModSync shows the pack's own notes and preconditions before install.
 2. In Desktop Mode, run the install one-liner printed by `serve`:
    ```bash
    curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
@@ -110,6 +110,4 @@ the game is closed.
 - [`docs/TRANSPORT.md`](docs/TRANSPORT.md) — HTTP pull, token, firewall/VPN
 - [`docs/DRIVERS.md`](docs/DRIVERS.md) — adding Skyrim/BG3/BG2 drivers
 - [`docs/TESTING.md`](docs/TESTING.md) — manual acceptance test (install, resume, rollback)
-- [`docs/TESTING-BG3.md`](docs/TESTING-BG3.md) — BG3 prefix/modsettings/BG3SE acceptance test
 - [`docs/CONTRACT-TESTS.md`](docs/CONTRACT-TESTS.md) — automated black-box suite and refactor rules
-- [`docs/packs/eldenring-graceborne.md`](docs/packs/eldenring-graceborne.md) — pack-specific setup
