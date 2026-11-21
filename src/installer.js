@@ -262,9 +262,12 @@ Categories=Game;
           grid: path.join(packRoot, pack.art.grid),
           hero: path.join(packRoot, pack.art.hero),
           logo: path.join(packRoot, pack.art.logo),
+          header: pack.art.header ? path.join(packRoot, pack.art.header) : "",
+          portrait: pack.art.portrait ? path.join(packRoot, pack.art.portrait) : "",
+          icon,
         },
       });
-      log(`Steam shortcut added: app ${shortcut.appId}. Restart Steam if it is not visible.`);
+      log(`Steam shortcut ${shortcut.action}: app ${shortcut.appId}. Restart Steam if it is not visible.`);
     } catch (err) {
       log(`Steam shortcut was not added automatically: ${err.message}`);
     }

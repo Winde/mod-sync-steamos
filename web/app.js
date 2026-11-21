@@ -6,6 +6,8 @@
   const library = $("#library");
   const overlay = $("#overlay");
   const pc = $("#pc");
+  const storageBtn = $("#storage-btn");
+  const content = $(".content");
 
   const S = {
     data: null,
@@ -19,6 +21,7 @@
     confirm: null,
     details: null,
     download: null,
+    storage: null,
     wakeLock: null,
     rate: [],
     polling: false,
@@ -71,6 +74,11 @@
         if (pick) S.selectedGame = pick.game.id;
       }
       if (S.libraryView === "packs" && !list.some((g) => g.id === S.selectedGame)) S.libraryView = "games";
+      if (storageBtn) {
+        storageBtn.textContent = S.data.diskFreeBytes != null
+          ? `Storage · ${gb(S.data.diskFreeBytes)} GB free`
+          : "Storage";
+      }
       if (S.data.job && S.data.job.status === "running") S.job = await api(`/api/jobs/${S.data.job.id}`);
       else if (!S.polling && S.job && S.job.status === "running") S.job = S.data.job || null;
     } catch (err) {
@@ -258,7 +266,7 @@
       : "";
     const detailsHtml = `<button class="btn ghost" data-action="details" data-pack="${esc(p.id)}" data-focusable data-key="details">Details</button>`;
     const refreshHtml = `<button class="btn ghost" data-action="retry" data-focusable data-key="refresh">Refresh</button>`;
-    const rollbackHtml = p.versions && p.versions.length > 1
+    const rollbackHtml = p.canRollback
       ? `<button class="btn ghost" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">Roll back</button>`
       : "";
 
@@ -375,6 +383,130 @@
     </div>`;
   }
 
+  function storagePack(packId) {
+    return (S.storage?.packs || []).find((p) => p.id === packId) || null;
+  }
+
+  function renderStorage() {
+    library.innerHTML = "";
+    const s = S.storage;
+    if (!s || s.loading) {
+      main.innerHTML = `<section class="storagewrap">
+        <div class="kicker">STEAM MACHINE</div>
+        <h1>Storage</h1>
+        <div class="meta">Calculating ModSync usage...</div>
+        <div class="actions"><button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">Back</button></div>
+      </section>`;
+      return;
+    }
+    if (s.error) {
+      main.innerHTML = `<section class="storagewrap">
+        <div class="kicker">STEAM MACHINE</div>
+        <h1>Storage</h1>
+        <div class="callout error">${esc(s.error)}</div>
+        <div class="actions"><button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">Back</button></div>
+      </section>`;
+      return;
+    }
+
+    const packs = s.packs || [];
+    const cards = packs.map((p) => {
+      const rows = p.versions.map((v) => `<div class="srow"><span>${esc(v.version)}${v.current ? " · current" : ""}</span><b>${fmtBytes(v.bytes)}</b></div>`).join("");
+      const staging = p.stagingBytes
+        ? `<div class="srow amber"><span>Partial download</span><b>${fmtBytes(p.stagingBytes)}</b></div>`
+        : "";
+      const other = p.otherBytes
+        ? `<div class="srow muted"><span>Profiles, tools, art</span><b>${fmtBytes(p.otherBytes)}</b></div>`
+        : "";
+      const actions = [
+        p.stagingBytes ? `<button class="btn" data-action="storage-clear" data-scope="staging" data-pack="${esc(p.id)}" data-bytes="${p.stagingBytes}" data-focusable>Clear partial (${fmtBytes(p.stagingBytes)})</button>` : "",
+        p.oldBytes ? `<button class="btn" data-action="storage-clear" data-scope="old-versions" data-pack="${esc(p.id)}" data-bytes="${p.oldBytes}" data-focusable>Remove old versions (${fmtBytes(p.oldBytes)})</button>` : "",
+        `<button class="btn ghost" data-action="storage-clear" data-scope="pack" data-pack="${esc(p.id)}" data-bytes="${p.totalBytes}" data-focusable>Remove pack (${fmtBytes(p.totalBytes)})</button>`,
+      ].filter(Boolean).join("");
+      return `<div class="storagecard">
+        <div class="shead">
+          <div>
+            <div class="sname">${esc(p.name)}</div>
+            <div class="ssub">${p.installed ? `Installed ${esc(p.currentVersion)}` : "No installed version"}</div>
+          </div>
+          <div class="ssize">${fmtBytes(p.totalBytes)}</div>
+        </div>
+        <div class="srows">${rows}${staging}${other}</div>
+        <div class="actions">${actions}</div>
+      </div>`;
+    }).join("");
+
+    main.innerHTML = `<section class="storagewrap">
+      <div class="kicker">STEAM MACHINE</div>
+      <h1>Storage</h1>
+      <div class="meta">${s.freeBytes == null ? "Free space unknown" : `${fmtBytes(s.freeBytes)} free on this TV`} · ModSync uses ${fmtBytes(s.rootBytes)}</div>
+      <div class="storagegrid">
+        <div class="stat"><span>Mod packs</span><b>${fmtBytes(s.packsBytes)}</b></div>
+        <div class="stat"><span>Logs</span><b>${fmtBytes(s.logsBytes)}</b></div>
+        <div class="stat"><span>App data</span><b>${fmtBytes(s.otherBytes)}</b></div>
+      </div>
+      <div class="storagepacks">${cards || `<div class="callout">No packs installed on this TV.</div>`}</div>
+      <div class="actions">
+        <button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">Back</button>
+        ${s.logsBytes ? `<button class="btn ghost" data-action="storage-clear" data-scope="logs" data-bytes="${s.logsBytes}" data-focusable>Clear logs (${fmtBytes(s.logsBytes)})</button>` : ""}
+      </div>
+      <div class="hint">Removing packs or versions never touches the base game or saves.</div>
+    </section>`;
+  }
+
+  function requestStorageClear(packId, scope, bytes) {
+    const p = storagePack(packId);
+    const amount = fmtBytes(Number(bytes) || 0);
+    let title;
+    let message;
+    if (scope === "pack") {
+      title = `Remove ${p ? p.name : "pack"}?`;
+      message = `This frees ${amount} and removes the pack from this TV. The base game and saves are not touched.`;
+    } else if (scope === "old-versions") {
+      title = "Remove old versions?";
+      message = `This frees ${amount} and removes rollback targets. The current version stays installed.`;
+    } else if (scope === "staging") {
+      title = "Clear partial download?";
+      message = `This frees ${amount} of incomplete download data. The installed version stays.`;
+    } else {
+      title = "Clear logs?";
+      message = `This frees ${amount} of install and agent logs.`;
+    }
+    S.confirm = { title, message, storage: { packId, scope } };
+    render();
+  }
+
+  async function clearStorageData({ packId, scope }) {
+    S.confirm = null;
+    try {
+      const out = await api("/api/storage/clear", {
+        method: "POST",
+        body: JSON.stringify({ packId, scope }),
+      });
+      if (out.storage) S.storage = out.storage;
+      await refresh();
+      S.confirm = { title: "Cleared", message: `Freed ${fmtBytes(out.freedBytes)}.`, simple: true };
+      render();
+      setTimeout(() => { S.confirm = null; render(); }, 3000);
+    } catch (err) {
+      S.confirm = { title: "Could not clear", message: err.message, simple: true };
+      render();
+    }
+  }
+
+  async function openStorage() {
+    S.view = "storage";
+    S.storage = { loading: true };
+    S.focusKey = "storage-back";
+    render();
+    try {
+      S.storage = await api("/api/storage");
+    } catch (err) {
+      S.storage = { error: err.message };
+    }
+    render();
+  }
+
   function renderDetails() {
     const p = selectedPack();
     if (!p) return;
@@ -402,7 +534,7 @@
       <pre class="log" style="white-space:pre-wrap;font-size:.9vw;color:#8b96a8;max-height:18vh;overflow:auto">${esc(logs || "No log yet.")}</pre>
       <div class="actions">
         <button class="btn primary" data-action="close-details" data-autofocus data-focusable data-key="back">Back</button>
-        ${p.versions && p.versions.length > 1 ? `<button class="btn" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">Roll back</button>` : ""}
+        ${p.canRollback ? `<button class="btn" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">Roll back</button>` : ""}
         <button class="btn ghost" data-action="open-logs" data-focusable data-key="logs">Refresh log</button>
       </div>
     </div>`;
@@ -424,8 +556,10 @@
     S.focusKey = document.activeElement?.getAttribute("data-key") || S.focusKey;
     pc.classList.toggle("online", !!S.data?.pc?.online);
     pc.querySelector("span:last-child").textContent = S.data?.pc?.online ? "PC online" : "PC offline";
+    content.classList.toggle("wide", S.view === "storage");
     if (S.confirm) return renderConfirm();
     if (S.download) return renderDownloadSheet();
+    if (S.view === "storage") return renderStorage();
     if (S.view === "details") return renderDetails();
     overlay.classList.add("hidden");
     if (S.offline || S.error) return renderOffline();
@@ -589,6 +723,9 @@
     else if (action === "cancel-download") cancelDownload();
     else if (action === "dismiss-job") { S.job = null; S.view = "home"; render(); }
     else if (action === "close-download") { S.download = null; S.view = "home"; render(); }
+    else if (action === "storage") openStorage();
+    else if (action === "close-storage") { S.view = "home"; render(); }
+    else if (action === "storage-clear") requestStorageClear(packId, el.getAttribute("data-scope"), Number(el.getAttribute("data-bytes") || 0));
     else if (action === "launch") launch(packId);
     else if (action === "details") openDetails(packId);
     else if (action === "retry" || action === "refresh") refresh();
@@ -601,7 +738,13 @@
       render();
     }
     else if (action === "confirm-check") confirmCheck(packId, el.getAttribute("data-check"));
-    else if (action === "confirm-yes") { const c = S.confirm; S.confirm = null; if (c.packId) rollback(c.packId); else render(); }
+    else if (action === "confirm-yes") {
+      const c = S.confirm;
+      S.confirm = null;
+      if (c.storage) clearStorageData(c.storage);
+      else if (c.packId) rollback(c.packId);
+      else render();
+    }
     else if (action === "confirm-no") { S.confirm = null; render(); }
   });
 
@@ -628,6 +771,7 @@
   function back() {
     if (S.confirm) { S.confirm = null; render(); return; }
     if (S.download) { S.download = null; render(); return; }
+    if (S.view === "storage") { S.view = "home"; render(); return; }
     if (S.view === "details") { S.view = "home"; render(); return; }
     if (S.libraryView === "packs") { S.libraryView = "games"; render(); return; }
   }
@@ -676,7 +820,7 @@
     if (document.visibilityState === "visible" && S.job?.status === "running") acquireWakeLock();
   });
   setInterval(() => {
-    if (!S.confirm && !S.download && !S.polling && S.view !== "details") refresh();
+    if (!S.confirm && !S.download && !S.polling && S.view !== "details" && S.view !== "storage") refresh();
   }, 3000);
   refresh();
 })();

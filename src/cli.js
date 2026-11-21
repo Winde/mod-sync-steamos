@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { parseArgs } = require("node:util");
+const readline = require("node:readline/promises");
 const util = require("./util");
 const { buildPack } = require("./drivers/eldenring");
 const { loadPack, packSummary } = require("./manifest");
@@ -10,10 +11,12 @@ const { buildBootstrap } = require("./bootstrap");
 const steam = require("./steam");
 
 const repoRoot = path.resolve(__dirname, "..");
+const configPath = path.join(repoRoot, "state", "config.json");
 
 const help = `modsync — mod pack deployment for Windows and SteamOS (mods only)
 
 Commands:
+  init      Remember the working install and pack output
   pack      Build a pack from a working install
   serve     Serve packs + bootstrap over HTTP
   agent     Run the TV agent/dashboard
@@ -23,10 +26,14 @@ Commands:
   help      This help
 
 pack:
-  --source <dir>    Working install (default: D:\\EldenRingMods)
-  --out <dir>       Pack output (default: packs/eldenring-graceborne)
+  --source <dir>    Working install (default: state/config.json or D:\\EldenRingMods)
+  --out <dir>       Pack output (default: config or packs/eldenring-graceborne)
   --version <ver>   Mod version (default: current.txt)
   --copy            Copy payload instead of hardlinking
+
+init:
+  Asks once for the working install and pack output, then writes state/config.json.
+  After that, \`modsync pack\` needs no arguments.
 
 serve:
   --packs <dir>     Packs directory (default: packs)
@@ -43,6 +50,7 @@ agent:
 
 register:
   --exe <file> --name <name> --icon <png> [--grid <png>] [--hero <png>] [--logo <png>]
+  [--header <png>] [--portrait <png>]
 `;
 
 function fail(msg) {
@@ -50,14 +58,46 @@ function fail(msg) {
   process.exit(1);
 }
 
+function readConfig() {
+  try { return util.readJson(configPath); } catch { return {}; }
+}
+
+async function cmdInit(values = {}) {
+  const current = readConfig();
+  const defaultSource = values.source || current.source || "D:\\EldenRingMods";
+  const defaultOut = values.out || current.out || path.join("packs", "eldenring-graceborne");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const sourceAnswer = await rl.question(`Working install [${defaultSource}]: `);
+    const source = sourceAnswer.trim() || defaultSource;
+    const outAnswer = await rl.question(`Pack output [${defaultOut}]: `);
+    const out = outAnswer.trim() || defaultOut;
+    util.ensureDir(path.dirname(configPath));
+    util.writeJson(configPath, { source, out });
+    console.log(`Wrote ${configPath}`);
+    if (!fs.existsSync(source)) console.log(`WARNING: ${source} does not exist yet.`);
+    return { source, out };
+  } finally {
+    rl.close();
+  }
+}
+
 async function cmdPack(values) {
-  const source = values.source || "D:\\EldenRingMods";
-  const out = path.resolve(values.out || path.join(repoRoot, "packs", "eldenring-graceborne"));
+  if (!fs.existsSync(configPath) && !values.source && !values.out && process.stdin.isTTY) {
+    console.log("No pack config yet. Set it once; press Enter to accept each default.\n");
+    await cmdInit(values);
+    console.log("");
+  }
+  const config = readConfig();
+  const source = values.source || config.source || "D:\\EldenRingMods";
+  const out = path.resolve(values.out || config.out || path.join(repoRoot, "packs", "eldenring-graceborne"));
+  console.log(`Source: ${source}`);
+  console.log(`Output: ${out}`);
   const result = await buildPack({
     source,
     out,
     link: !values.copy,
-    version: values.version,
+    version: values.version || config.version,
     log: (m) => console.log(m),
   });
   console.log(`\nPack: ${result.packRoot}`);
@@ -170,9 +210,12 @@ async function cmdRegister(values) {
       grid: values.grid ? path.resolve(values.grid) : "",
       hero: values.hero ? path.resolve(values.hero) : "",
       logo: values.logo ? path.resolve(values.logo) : "",
+      header: values.header ? path.resolve(values.header) : "",
+      portrait: values.portrait ? path.resolve(values.portrait) : "",
+      icon: values.icon ? path.resolve(values.icon) : "",
     },
   });
-  console.log(`Steam shortcut: ${out.appId} in ${out.configDir}`);
+  console.log(`Steam shortcut: ${out.appId} in ${out.configDir} (${out.action}${out.deduped ? `, removed ${out.deduped} duplicate(s)` : ""})`);
   console.log("Restart Steam if it does not appear.");
 }
 
@@ -187,11 +230,13 @@ async function main(argv) {
       "rebuild-bootstrap": { type: "boolean" }, "skip-bootstrap": { type: "boolean" },
       exe: { type: "string" }, name: { type: "string" }, icon: { type: "string" },
       grid: { type: "string" }, hero: { type: "string" }, logo: { type: "string" },
+      header: { type: "string" }, portrait: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
   const cmd = positionals[0] || "help";
   if (cmd === "help" || values.help) return console.log(help);
+  if (cmd === "init") return cmdInit(values);
   if (cmd === "pack") return cmdPack(values);
   if (cmd === "serve") return cmdServe(values);
   if (cmd === "agent") return cmdAgent(values);

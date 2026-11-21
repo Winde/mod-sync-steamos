@@ -9,6 +9,7 @@ const util = require("./util");
 const steam = require("./steam");
 const installer = require("./installer");
 const preconditions = require("./preconditions");
+const storage = require("./storage");
 
 function contentType(p) {
   switch (path.extname(p).toLowerCase()) {
@@ -66,6 +67,34 @@ function createAgent(config) {
 
   const packRoot = (id) => path.join(root, "packs", id);
 
+  function localPack(id) {
+    const file = path.join(packRoot(id), "pack.json");
+    if (!fs.existsSync(file)) return null;
+    try { return util.readJson(file); } catch { return null; }
+  }
+
+  function localPacks() {
+    const dir = path.join(root, "packs");
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => localPack(e.name))
+      .filter(Boolean);
+  }
+
+  function localSummary(pack) {
+    let files = 0;
+    let totalBytes = 0;
+    try {
+      const doc = util.readJson(path.join(packRoot(pack.id), pack.files || "files.json"));
+      if (Array.isArray(doc.files)) {
+        files = doc.files.length;
+        totalBytes = doc.files.reduce((n, f) => n + (f.size || 0), 0);
+      }
+    } catch { }
+    return { ...pack, files, totalBytes };
+  }
+
   function readConfirmations() {
     try { return util.readJson(confirmFile); } catch { return {}; }
   }
@@ -109,6 +138,7 @@ function createAgent(config) {
       installed: !!current,
       installedVersion: current || null,
       versions,
+      canRollback: !!current && versions.indexOf(current) > 0,
       status: !current ? "not-installed" : (current === pack.mod.version ? "up-to-date" : "update-available"),
       staging: fs.existsSync(path.join(versionsDir, `.staging-${pack.mod.version}`)),
       packRoot: pr,
@@ -137,7 +167,13 @@ function createAgent(config) {
   async function state() {
     const remote = await fetchRemote();
     const confirmed = readConfirmations();
-    const packs = (remote.packs || []).map((p) => {
+    const local = new Map(localPacks().map((p) => [p.id, p]));
+    const merged = new Map();
+    for (const p of remote.packs || []) merged.set(p.id, p);
+    for (const [id, pack] of local) {
+      if (!merged.has(id)) merged.set(id, localSummary(pack));
+    }
+    const packs = [...merged.values()].map((p) => {
       const li = localInfo(p);
       const game = steam.findGame(p.game);
       const pre = preconditions.evaluatePreconditions({
@@ -147,9 +183,12 @@ function createAgent(config) {
         totalBytes: p.totalBytes,
         confirmed: confirmed[p.id] || {},
       });
-      return { ...p, ...li, preconditions: pre, blocked: pre.blocked };
+      return { ...p, ...li, preconditions: pre, blocked: pre.blocked, local: local.has(p.id) };
+    }).sort((a, b) => {
+      const game = String(a.game?.title || "").localeCompare(String(b.game?.title || ""));
+      return game || String(a.name || "").localeCompare(String(b.name || ""));
     });
-    const first = (remote.packs || [])[0];
+    const first = packs[0];
     return {
       agent: { version: "0.1.0", root, port },
       pc: { url: pcUrl, online: !remote.error && !!pcUrl, error: remote.error || null },
@@ -237,7 +276,8 @@ function createAgent(config) {
   }
 
   async function launchPack(packId) {
-    const { pack } = await getPack(packId);
+    const pack = localPack(packId);
+    if (!pack) throw new Error("Pack is not installed on this TV.");
     const info = localInfo(pack);
     if (!info.installed) throw new Error("Pack is not installed.");
     if (!info.launcher) throw new Error("Launcher is missing. Reinstall the pack.");
@@ -309,6 +349,29 @@ function createAgent(config) {
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify(jobSummary(job)));
       }
+      if (url.pathname === "/api/storage" && req.method === "GET") {
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify(storage.computeStorage(root)));
+      }
+      if (url.pathname === "/api/storage/clear" && req.method === "POST") {
+        if (activeJob) {
+          res.writeHead(409, { "content-type": "application/json" });
+          return res.end(JSON.stringify({ error: "Cancel the running install first." }));
+        }
+        const body = await readBody(req);
+        if (body.scope !== "logs" && body.packId) {
+          try {
+            const pack = util.readJson(path.join(root, "packs", body.packId, "pack.json"));
+            if (util.isGameRunning(pack.launch && pack.launch.gameProcess)) {
+              res.writeHead(409, { "content-type": "application/json" });
+              return res.end(JSON.stringify({ error: "Close the game before removing installed files." }));
+            }
+          } catch { }
+        }
+        const out = storage.clearStorage(root, body);
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ ok: true, ...out, storage: storage.computeStorage(root) }));
+      }
       if (url.pathname === "/api/preconditions/confirm" && req.method === "POST") {
         const body = await readBody(req);
         if (!body.packId || !body.checkId) {
@@ -335,7 +398,8 @@ function createAgent(config) {
       if (url.pathname === "/api/rollback" && req.method === "POST") {
         const body = await readBody(req);
         if (!body.packId) { res.writeHead(400); return res.end(JSON.stringify({ error: "packId required" })); }
-        const { pack } = await getPack(body.packId);
+        const pack = localPack(body.packId);
+        if (!pack) throw new Error("Pack is not installed on this TV.");
         const out = installer.rollback({ pack, root, log: () => { } });
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify(out));

@@ -39,18 +39,24 @@ if ! curl -fsS http://127.0.0.1:8788/api/health >/dev/null 2>&1; then
   done
 fi
 
-# TV-first: add the dashboard to Steam automatically when possible.
-"$ROOT/tools/node/bin/node" "$ROOT/agent/bin/modsync.js" register \
+# TV-first: add the dashboard to Steam automatically when possible. This is
+# idempotent: re-running the bootstrap updates the existing shortcut instead of
+# adding a second one.
+if ! "$ROOT/tools/node/bin/node" "$ROOT/agent/bin/modsync.js" register \
   --exe "$ROOT/launchers/modsync-dashboard.sh" \
   --name "ModSync" \
   --icon "$ROOT/web/icon.png" \
   --grid "$ROOT/web/modsync-grid.png" \
+  --header "$ROOT/web/modsync-header.png" \
+  --portrait "$ROOT/web/modsync-portrait.png" \
   --hero "$ROOT/web/modsync-hero.png" \
-  --logo "$ROOT/web/modsync-logo.png" >/dev/null 2>&1 || true
+  --logo "$ROOT/web/modsync-logo.png"; then
+  echo "Steam shortcut could not be added automatically."
+  echo "Restart Steam and run the bootstrap once more, or add ~/Desktop/ModSync.desktop manually."
+fi
 
 echo ""
 echo "ModSync installed at $ROOT"
 echo "Dashboard: http://127.0.0.1:8788"
-echo "Add ~/Desktop/ModSync.desktop to Steam if it does not appear."
-echo "Restart Steam if the shortcut is not visible."
+echo "The ModSync shortcut is registered in Steam; restart Steam once if it is not visible."
 echo ""

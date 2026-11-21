@@ -27,12 +27,19 @@ BG3, BG2 and others are added as drivers/packs later.
 cd D:\source\mod-sync-steamos
 npm install
 
+# First time only: remember the working install and pack output.
+node bin/modsync.js init
+
 # Build a pack from the working install. Hardlinks the 7.3 GB payload.
-node bin/modsync.js pack --source "D:\EldenRingMods" --out packs\eldenring-graceborne
+node bin/modsync.js pack
 
 # Serve it on the LAN. Prints the TV bootstrap one-liner and the current URL.
 node bin/modsync.js serve --lan --packs packs --port 8787
 ```
+
+`init` writes `state/config.json`; after that `pack` needs no arguments. The
+full form is still available: `pack --source <dir> --out <dir> --version <ver>`.
+The planned PC pack-builder app uses the same source/output fields.
 
 `serve` binds loopback by default. `--lan` binds the detected LAN IPv4 and
 prints the URL/token the TV needs; `--host <ip>` picks a specific interface.
@@ -49,9 +56,10 @@ The TV does **not** need Node or SSH; it pulls over HTTP.
    ```bash
    curl -fsSL 'http://<PC-LAN-IP>:8787/bootstrap.sh?token=<token>' | bash
    ```
-3. Add `~/Desktop/ModSync.desktop` to Steam as a non-Steam game.
-4. Open ModSync and install the pack. The agent writes a launch shortcut for the
-   pack (`~/Desktop/<Pack>.desktop`); add it to Steam if it is not there.
+3. The bootstrap registers ModSync in Steam automatically (idempotent: running
+   it again updates the same shortcut). Restart Steam once if it is not visible.
+4. Open ModSync and install the pack. The installer registers the game shortcut
+   automatically; restart Steam once if it is not visible.
 5. Launch from Game Mode. Saves stay local to each machine in v1.
 
 ## Network (one-time, generic)
@@ -116,7 +124,9 @@ the game is closed.
 ## Docs
 
 - [`docs/DESIGN.md`](docs/DESIGN.md) — pack/driver/platform model and restrictions
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — PC server vs Steam Machine, one-time setup and every use
 - [`docs/TRANSPORT.md`](docs/TRANSPORT.md) — HTTP pull, token, firewall/VPN
 - [`docs/DRIVERS.md`](docs/DRIVERS.md) — adding Skyrim/BG3/BG2 drivers
 - [`docs/TESTING.md`](docs/TESTING.md) — manual acceptance test (install, resume, rollback)
+- [`docs/CONTRACT-TESTS.md`](docs/CONTRACT-TESTS.md) — automated black-box suite and refactor rules
 - [`docs/packs/eldenring-graceborne.md`](docs/packs/eldenring-graceborne.md) — pack-specific setup
