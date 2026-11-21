@@ -152,7 +152,13 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     ipcMain.handle("modsync:version", () => app.getVersion());
-    ipcMain.handle("modsync:update-check", () => updater.check());
+    ipcMain.handle("modsync:update-check", async () => {
+      try {
+        return await updater.check();
+      } catch (err) {
+        return { current: app.getVersion(), latest: null, available: false, canInstall: false, error: err.message };
+      }
+    });
     ipcMain.handle("modsync:update-install", async () => {
       const appImage = await updater.install();
       app.relaunch({ execPath: appImage, args: relaunchArgs(process.argv.slice(1)) });
