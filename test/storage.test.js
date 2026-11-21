@@ -11,7 +11,12 @@ function setup() {
   const versions = path.join(packRoot, "mods", "demo", "versions");
   fs.mkdirSync(path.join(versions, "1"), { recursive: true });
   fs.mkdirSync(path.join(versions, "2"), { recursive: true });
-  fs.writeFileSync(path.join(packRoot, "pack.json"), JSON.stringify({ id: "demo", name: "Demo", mod: { id: "demo", version: "2" } }));
+  fs.writeFileSync(path.join(packRoot, "pack.json"), JSON.stringify({
+    id: "demo",
+    name: "Demo",
+    mod: { id: "demo", version: "2" },
+    profilePattern: "profiles/{mod}-{version}.me3",
+  }));
   fs.writeFileSync(path.join(versions, "1", "a.bin"), Buffer.alloc(100, 1));
   fs.writeFileSync(path.join(versions, "2", "b.bin"), Buffer.alloc(200, 2));
   fs.mkdirSync(path.join(packRoot, "profiles"), { recursive: true });

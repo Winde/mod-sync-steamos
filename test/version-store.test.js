@@ -89,9 +89,10 @@ test("path helpers match the TV layout", () => {
     path.join(packRoot, "mods", "graceborne", "versions", "0.2.7.bak-20260101-000000"),
   );
   assert.equal(
-    store.profileFile(packRoot, "graceborne", "0.2.7"),
+    store.profileFile(packRoot, { mod: { id: "graceborne" }, profilePattern: "profiles/{mod}-{version}.me3" }, "0.2.7"),
     path.join(packRoot, "profiles", "graceborne-0.2.7.me3"),
   );
+  assert.equal(store.profileFile(packRoot, { mod: { id: "graceborne" } }, "0.2.7"), null);
   assert.equal(
     store.launcherFile(packRoot, "graceborne"),
     path.join(packRoot, "launchers", "launch-graceborne.sh"),

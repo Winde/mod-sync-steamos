@@ -111,18 +111,22 @@ function detectLanIp() {
   return preferred ? preferred.address : "127.0.0.1";
 }
 
-function isGameRunning(processName) {
-  if (!processName) return false;
-  try {
-    if (process.platform === "win32") {
-      const out = execFileSync("tasklist", ["/FI", `IMAGENAME eq ${processName}`], { encoding: "utf8" });
-      return out.toLowerCase().includes(processName.toLowerCase());
+function isGameRunning(processNames) {
+  const names = (Array.isArray(processNames) ? processNames : [processNames]).filter(Boolean);
+  for (const processName of names) {
+    try {
+      if (process.platform === "win32") {
+        const out = execFileSync("tasklist", ["/FI", `IMAGENAME eq ${processName}`], { encoding: "utf8" });
+        if (out.toLowerCase().includes(processName.toLowerCase())) return true;
+      } else {
+        execFileSync("pgrep", ["-x", processName], { stdio: "ignore" });
+        return true;
+      }
+    } catch {
+      // Try the next configured process name.
     }
-    execFileSync("pgrep", ["-x", processName], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
   }
+  return false;
 }
 
 async function mapLimit(items, limit, fn) {
@@ -155,9 +159,7 @@ function materialize(src, dst, link = true) {
 }
 
 function modeFor(rel) {
-  if (rel.endsWith(".sh")) return "755";
-  if (rel.replace(/\\/g, "/") === "tools/me3-linux/bin/me3") return "755";
-  return "644";
+  return rel.replace(/\\/g, "/").endsWith(".sh") ? "755" : "644";
 }
 
 function tailText(text, lines = 200) {

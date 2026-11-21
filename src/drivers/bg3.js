@@ -7,10 +7,16 @@ const {
 } = require("../util");
 const steam = require("../steam");
 const paths = require("../paths");
+const { ensureBg3le, VERSION: BG3LE_VERSION } = require("../../scripts/fetch-bg3le");
 
 const PACK_ID = "bg3-modded";
 const MOD_ID = "bg3";
 const WINDOWS_EXTENDER_PLATFORMS = ["windows", "linux-proton"];
+const BG3LE_EXECUTABLES = new Set([
+  "tools/bg3le/install.py",
+  "tools/bg3le/installer/bg3le-launch",
+  "tools/bg3le/client/bg3lua",
+]);
 const GAME = {
   id: "bg3",
   title: "Baldur's Gate 3",
@@ -41,7 +47,10 @@ const DEFAULT_PLATFORMS = {
     dataDir: "%DATA_HOME%/Larian Studios/Baldur's Gate 3",
     saveDir: "%DATA_HOME%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
     exe: "bin/bg3",
-    gameProcess: "bg3",
+    gameProcess: "bg3.bg3le-real",
+    gameProcessAlt: "bg3",
+    shortcut: "Baldur's Gate 3 (with mods)",
+    template: "games/bg3-native.sh",
   },
 };
 
@@ -139,7 +148,7 @@ function copyTree(src, dst) {
   fs.cpSync(src, dst, { recursive: true });
 }
 
-async function buildPack({ recipe, source, out, link = true, version: requestedVersion, gameRoot: requestedGameRoot, log = () => {} }) {
+async function buildPack({ recipe, source, out, link = true, version: requestedVersion, gameRoot: requestedGameRoot, bg3leRoot: requestedBg3le, log = () => {} }) {
   if (recipe && recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for Baldur's Gate 3`);
   const packId = recipe && recipe.id ? recipe.id : PACK_ID;
   const modId = recipe && recipe.modId ? recipe.modId : MOD_ID;
@@ -174,6 +183,10 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   const payload = path.join(dst, "payload", "versions", version);
   ensureDir(path.join(payload, "Mods"));
   ensureDir(path.join(payload, "bg3se"));
+
+  const bg3leRoot = requestedBg3le ? path.resolve(requestedBg3le) : await ensureBg3le();
+  log(`Including BG3LE ${BG3LE_VERSION} for native Linux`);
+  copyTree(bg3leRoot, path.join(dst, "tools", "bg3le"));
 
   let copied = 0;
   let bytes = 0;
@@ -227,14 +240,16 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   const files = [];
   let processed = 0;
   const payloadFiles = walkFiles(payload);
+  const bg3leFiles = walkFiles(path.join(dst, "tools", "bg3le"));
   const artFiles = walkFiles(artDst);
-  const total = payloadFiles.length + artFiles.length;
+  const total = payloadFiles.length + bg3leFiles.length + artFiles.length;
   const byHash = new Map();
   const add = async (sourceRel, targetRel, platformList) => {
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
-    const entry = { source: sourceRel, target: targetRel, size, sha256, mode: modeFor(targetRel) };
+    const mode = BG3LE_EXECUTABLES.has(targetRel) ? "755" : modeFor(targetRel);
+    const entry = { source: sourceRel, target: targetRel, size, sha256, mode };
     if (platformList) entry.platforms = [...platformList];
     const shared = byHash.get(sha256);
     if (shared) {
@@ -260,6 +275,9 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
       extenderFile(file.rel) ? WINDOWS_EXTENDER_PLATFORMS : null,
     );
   }
+  for (const file of bg3leFiles) {
+    await add(`tools/bg3le/${file.rel}`, `tools/bg3le/${file.rel}`, ["linux-native"]);
+  }
   for (const art of artFiles) {
     await add(`art/${modId}/${art.rel}`, `art/${modId}/${art.rel}`);
   }
@@ -269,7 +287,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   notes.push({
     title: "Script Extender",
     body: bg3seFiles
-      ? "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. The native Linux build uses BG3LE instead; install it before launching the pack."
+      ? "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. BG3LE is bundled for the native Linux build and installed with the pack."
       : "This pack has no BG3 Script Extender files. Install BG3SE (Windows/Proton) or BG3LE (native Linux) before using Script Extender mods.",
     tone: bg3seFiles ? "info" : "warning",
   });
@@ -309,6 +327,8 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
       type: "bg3",
       dataDir: "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
       bg3se: bg3seFiles > 0,
+      bg3le: { version: BG3LE_VERSION, path: "tools/bg3le" },
+      label: "modsettings + script extender",
     },
     art: {
       grid: `art/${modId}/grid.png`,

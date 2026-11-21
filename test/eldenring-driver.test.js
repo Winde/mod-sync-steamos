@@ -67,7 +67,8 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     assert.equal(grace.pack.contents.count, 1);
     assert.match(grace.pack.contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
     assert.equal(grace.pack.platforms.windows.loader, "tools/me3-win/bin/me3.exe");
-    assert.equal(grace.pack.platforms["linux-proton"].windowsBinaries, "tools/me3-win/bin");
+    assert.equal(grace.pack.platforms["linux-proton"].loaderSupport, "tools/me3-win/bin");
+    assert.equal(grace.pack.platforms["linux-proton"].template, "loaders/me3.sh");
     const graceDoc = loadPack(path.join(outRoot, "grace")).files;
     assert.ok(graceDoc.files.some((f) => f.target.startsWith("mods/graceborne/")));
     assert.deepEqual(

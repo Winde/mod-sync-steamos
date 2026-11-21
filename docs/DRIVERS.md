@@ -22,13 +22,15 @@ conversion is a new recipe, not a driver change.
     "windows": {
       "exe": "Game/eldenring.exe",
       "gameProcess": "eldenring.exe",
-      "loader": "tools/me3-win/bin/me3.exe"
+      "loader": "tools/me3-win/bin/me3.exe",
+      "template": "loaders/me3.sh"
     },
     "linux-proton": {
       "exe": "Game/eldenring.exe",
       "gameProcess": "eldenring.exe",
       "loader": "tools/me3-linux/bin/me3",
-      "windowsBinaries": "tools/me3-win/bin"
+      "loaderSupport": "tools/me3-win/bin",
+      "template": "loaders/me3.sh"
     }
   },
   "notes": [],
@@ -41,6 +43,12 @@ entries that differ. The builder merges both into `pack.json.platforms`, and the
 agent selects a profile from the target OS and the detected game build. A
 recipe that does not list `linux-native` makes the agent report that native
 Linux needs Proton rather than guessing at a prefix path.
+
+`platforms.<variant>.template` names a launcher template under
+`templates/linux`; loader templates (`loaders/`) and game templates (`games/`)
+are selected by pack data, never by a game check in the generic installer.
+`install.type` selects an adapter in `src/installers/` for apply/revert steps.
+`profilePattern` is the versioned profile path used by rollback and cleanup.
 
 `modsync init` lists recipes; `modsync pack --recipe <id>` builds one. The
 generated `pack.json` remains the definition the agent serves.

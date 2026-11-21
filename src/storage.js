@@ -3,6 +3,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { readJson, freeBytes } = require("./util");
 const versionStore = require("./version-store");
+const installers = require("./installers");
 
 function dirBytes(dir) {
   if (!fs.existsSync(dir)) return 0;
@@ -96,10 +97,10 @@ function validPackId(id) {
   return typeof id === "string" && /^[a-zA-Z0-9._-]+$/.test(id) && path.basename(id) === id;
 }
 
-function removeProfile(packRoot, modId, version) {
-  if (!modId || !version) return;
-  const profile = versionStore.profileFile(packRoot, modId, version);
-  if (fs.existsSync(profile)) fs.rmSync(profile, { force: true });
+function removeProfile(packRoot, pack, version) {
+  if (!pack || !version) return;
+  const profile = versionStore.profileFile(packRoot, pack, version);
+  if (profile && fs.existsSync(profile)) fs.rmSync(profile, { force: true });
 }
 
 function removeDesktopShortcuts(modId) {
@@ -150,12 +151,13 @@ function clearStorage(root, { packId, scope }) {
         if (entry.name === current) continue;
         if (versionStore.isStaging(entry.name)) continue;
         fs.rmSync(path.join(versionsDir, entry.name), { recursive: true, force: true });
-        if (!versionStore.isBackup(entry.name)) removeProfile(packRoot, modId, entry.name);
+        if (!versionStore.isBackup(entry.name)) removeProfile(packRoot, pack, entry.name);
       }
     }
   } else if (scope === "pack") {
-    if (pack && pack.install && pack.install.type === "bg3") {
-      try { require("./installers/bg3").revertBg3({ pack, root, log: () => { } }); } catch { }
+    const adapter = installers.forPack(pack);
+    if (adapter && adapter.revert) {
+      try { adapter.revert({ pack, root, log: () => { } }); } catch { }
     }
     fs.rmSync(packRoot, { recursive: true, force: true });
     removeDesktopShortcuts(modId);

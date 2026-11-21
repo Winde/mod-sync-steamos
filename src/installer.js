@@ -11,7 +11,7 @@ const steam = require("./steam");
 const preconditions = require("./preconditions");
 const versionStore = require("./version-store");
 const paths = require("./paths");
-const bg3 = require("./installers/bg3");
+const installers = require("./installers");
 
 function renderTemplate(file, values) {
   let text = fs.readFileSync(file, "utf8");
@@ -53,7 +53,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   if (game && !target.supported) {
     throw new Error(`${pack.game.title} is the ${target.variant} build, but this pack does not support it.`);
   }
-  if (isGameRunning(target.gameProcess)) {
+  if (isGameRunning(target.processes)) {
     throw new Error(`${pack.game.title} is running. Close it before installing.`);
   }
   if (game && pack.game.build && game.build && game.build !== String(pack.game.build)) {
@@ -199,49 +199,49 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   fs.renameSync(staging, versionDir);
   versionStore.writeCurrent(packRoot, pack.mod.id, version);
 
-  if (pack.install && pack.install.type === "bg3") {
+  const adapter = installers.forPack(pack);
+  if (adapter && adapter.apply) {
     progress({ phase: "apply" });
-    bg3.applyBg3({ pack, root, game, version, log });
+    adapter.apply({ pack, root, game, version, log });
   }
 
   progress({ phase: "launcher" });
   const templates = path.join(__dirname, "..", "templates", "linux");
   const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
-  const isSteam = pack.launch.type === "steam";
-  if (!isSteam && !target.loader) throw new Error(`This pack has no loader for ${target.variant}.`);
-  const launcherText = isSteam
-    ? renderTemplate(path.join(templates, "launch-bg3.sh"), {
-      ROOT: packRoot,
-      MOD: pack.mod.id,
-      GAME: game ? game.root : "",
-      PREFIX: game && game.prefix ? game.prefix : "",
-      DATA_DIR: target.dataDir || "",
-      STEAM_APP_ID: pack.launch.steamAppId,
-      GAME_PROCESS: target.gameProcess,
-    })
-    : renderTemplate(path.join(templates, "launch-mod.sh"), {
-      ROOT: packRoot,
-      MOD: pack.mod.id,
-      GAME: game ? game.root : "",
-      EXE: target.exe,
-      GAME_PROCESS: target.gameProcess,
-      STEAM_APP_ID: pack.launch.steamAppId,
-      SAVE_FILE: pack.launch.saveFile,
-      ME3: path.join(packRoot, target.loader),
-      WIN64: target.windowsBinaries ? path.join(packRoot, target.windowsBinaries) : "",
-    });
+  const defaultTemplates = { steam: "launch-steam.sh" };
+  const templateName = target.template || defaultTemplates[pack.launch.type];
+  if (!templateName) throw new Error(`No launcher template for launch type ${pack.launch.type}.`);
+  const templateFile = path.resolve(templates, templateName);
+  if (!templateFile.startsWith(path.resolve(templates) + path.sep)) {
+    throw new Error(`Launcher template escapes the template directory: ${templateName}`);
+  }
+  const launcherText = renderTemplate(templateFile, {
+    ROOT: packRoot,
+    MOD: pack.mod.id,
+    GAME: game ? game.root : "",
+    PREFIX: game && game.prefix ? game.prefix : "",
+    DATA_DIR: target.dataDir || "",
+    DATA_HOME: paths.contextFor(game).dataHome,
+    STEAM_APP_ID: pack.launch.steamAppId,
+    GAME_PROCESS: target.gameProcess,
+    EXE: target.exe,
+    SAVE_FILE: pack.launch.saveFile,
+    LOADER: target.loader ? path.join(packRoot, target.loader) : "",
+    LOADER_SUPPORT: target.loaderSupport ? path.join(packRoot, target.loaderSupport) : "",
+  });
   writeText(launcher, launcherText, 0o755);
 
   const icon = path.join(packRoot, pack.art.icon);
+  const shortcutName = target.shortcut || (pack.launch.mode !== "default" ? pack.name : "");
   let desktopFile = null;
   if (process.platform === "linux") {
     log(`Launcher: ${launcher}`);
-    if (pack.launch.mode === "default") {
+    if (!shortcutName) {
       log(`Default exe: use the regular Steam link for ${pack.game.title}. No non-Steam shortcut was added.`);
     } else {
       const desktopText = `[Desktop Entry]
 Type=Application
-Name=${pack.name}
+Name=${shortcutName}
 Comment=${pack.description || "Modded " + pack.game.title}
 Exec=${launcher}
 Path=${packRoot}
@@ -259,7 +259,7 @@ Categories=Game;
       try {
         const shortcut = await steam.registerShortcut({
           exePath: launcher,
-          name: pack.name,
+          name: shortcutName,
           icon,
           art: {
             grid: path.join(packRoot, pack.art.grid),
@@ -289,14 +289,13 @@ function rollback({ pack, root, log = () => {} }) {
   const idx = versions.indexOf(current);
   if (idx <= 0) throw new Error("No previous version to roll back to.");
   const previous = versions[idx - 1];
-  const isBg3 = pack.install && pack.install.type === "bg3";
-  const profile = isBg3
-    ? path.join(versionStore.versionDir(packRoot, pack.mod.id, previous), "modsettings.lsx")
-    : versionStore.profileFile(packRoot, pack.mod.id, previous);
-  if (!fs.existsSync(profile)) throw new Error(`Profile for ${previous} is missing.`);
-  const game = isBg3 ? steam.findGame(pack.game) : null;
-  if (isBg3 && !game) throw new Error(`${pack.game.title} was not found in the Steam libraries.`);
-  if (isBg3) bg3.applyBg3({ pack, root, game, version: previous, log });
+  const adapter = installers.forPack(pack);
+  if (adapter && adapter.rollback) {
+    adapter.rollback({ pack, root, version: previous, log });
+  } else {
+    const profile = versionStore.profileFile(packRoot, pack, previous);
+    if (profile && !fs.existsSync(profile)) throw new Error(`Profile for ${previous} is missing.`);
+  }
   versionStore.writeCurrent(packRoot, pack.mod.id, previous);
   log(`Rolled back ${pack.name} to ${previous}`);
   return { previous, current };

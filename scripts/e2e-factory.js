@@ -79,9 +79,7 @@ async function verifyRoot(pack, files, root, verifyHashes) {
   const launcher = versionStore.launcherFile(installedRoot, pack.mod.id);
   if (!fs.existsSync(launcher)) throw new Error(`missing launcher ${launcher}`);
   const launcherText = fs.readFileSync(launcher, "utf8");
-  if (!launcherText.includes(pack.launch.saveFile) || !launcherText.includes("--online false")) {
-    throw new Error("launcher does not contain the save file / offline flag");
-  }
+  if (!launcherText.trim()) throw new Error("launcher is empty");
   const parts = walkFiles(installedRoot).filter((f) => f.rel.endsWith(".part"));
   if (parts.length) throw new Error(`${parts.length} .part files left behind`);
 

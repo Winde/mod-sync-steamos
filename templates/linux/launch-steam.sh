@@ -18,8 +18,8 @@ if command -v pgrep >/dev/null 2>&1 && pgrep -x "$GAME_PROCESS" >/dev/null 2>&1;
   exit 0
 fi
 
-# The pack apply step has already placed the mods, modsettings, and BG3SE files
-# in the Proton prefix. Start the game through Steam so it uses that prefix.
+# The pack apply step has already placed the pack's files. Start the game
+# through Steam so it uses the correct runtime and prefix.
 if command -v steam >/dev/null 2>&1; then
   steam -applaunch "$STEAM_APP_ID" >>"$LOG" 2>&1 &
   exit 0

@@ -99,10 +99,10 @@ the game is closed.
 - Verifies the game build declared by the pack and the Proton prefix.
 - Refuses to install while the game is running.
 - Downloads each file with SHA-256 verification; writes to a staging version.
-- Writes the loader artifacts the pack declares: an me3 profile for ELDEN RING,
-  or `modsettings.lsx` plus BG3 Script Extender for Baldur's Gate 3.
-- Writes a launcher and adds a Steam shortcut for loader/alternate-exe packs.
-  Default-exe packs use the regular Steam game link.
+- Writes the loader artifacts the pack declares: profiles, `modsettings.lsx`,
+  and the platform's script extender.
+- Writes the launcher selected by the pack profile and adds a Steam shortcut
+  when the pack asks for one. Default Steam packs use the regular game link.
 
 ## Docs
 

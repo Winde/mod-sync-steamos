@@ -23,11 +23,13 @@ const DEFAULT_PLATFORMS = {
     exe: "Game/eldenring.exe",
     gameProcess: "eldenring.exe",
     loader: "tools/me3-win/bin/me3.exe",
+    template: "loaders/me3.sh",
   },
   "linux-proton": {
     exe: "Game/eldenring.exe",
     gameProcess: "eldenring.exe",
     loader: "tools/me3-linux/bin/me3",
+    template: "loaders/me3.sh",
   },
 };
 
@@ -207,7 +209,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   log("Copying profile, tools, and art...");
   fs.cpSync(profileSrc, path.join(dst, "profiles", path.basename(profileSrc)), { recursive: true });
   const windowsBinaries = copyMe3Runtime(me3Linux, me3Win, path.join(dst, "tools"));
-  platforms["linux-proton"].windowsBinaries = windowsBinaries;
+  platforms["linux-proton"].loaderSupport = windowsBinaries;
   fs.cpSync(artSrc, path.join(dst, "art", artId), { recursive: true });
 
   const toolFiles = walkFiles(path.join(dst, "tools"));
@@ -220,7 +222,8 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
-    const entry = { source: sourceRel, target: targetRel, size, sha256, mode: modeFor(targetRel) };
+    const mode = targetRel === "tools/me3-linux/bin/me3" ? "755" : modeFor(targetRel);
+    const entry = { source: sourceRel, target: targetRel, size, sha256, mode };
     if (platformList) entry.platforms = [...platformList];
     const shared = byHash.get(sha256);
     if (shared) {
@@ -260,6 +263,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     platforms,
     mod: { id: modId, version },
     loader: { type: "me3", profile: `profiles/${modId}-${version}.me3` },
+    profilePattern: "profiles/{mod}-{version}.me3",
     launch: {
       type: "me3",
       mode: "loader",
@@ -269,8 +273,6 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
       steamAppId: GAME.appId,
       profile: `profiles/${modId}-${version}.me3`,
       saveFile,
-      me3: "tools/me3-linux/bin/me3",
-      windowsBinaries,
     },
     art: {
       grid: `art/${artId}/grid.png`,

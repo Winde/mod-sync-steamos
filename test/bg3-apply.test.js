@@ -76,9 +76,15 @@ test("BG3 apply switches versions and reverts to the original files", (t) => {
   assert.equal(fs.existsSync(path.join(packRoot, "applied.json")), false);
 });
 
-test("BG3 apply on a native Linux build skips the Windows script extender", (t) => {
+test("BG3 apply on a native Linux build installs BG3LE and wraps the game binary", (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-bg3-native-"));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
+  const oldDataHome = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = path.join(base, "datahome");
+  t.after(() => {
+    if (oldDataHome === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = oldDataHome;
+    fs.rmSync(base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  });
 
   const gameRoot = path.join(base, "game");
   const dataDir = path.join(base, "data");
@@ -87,6 +93,9 @@ test("BG3 apply on a native Linux build skips the Windows script extender", (t) 
   const root = path.join(base, "tv");
   const packRoot = path.join(root, "packs", pack.id);
   const src = path.join(packRoot, "mods", "bg3", "versions", "1.0.0");
+  write(path.join(gameRoot, "bin", "bg3"), "native-binary");
+  write(path.join(packRoot, "tools", "bg3le", "build", "libbg3le.so"), "library");
+  write(path.join(packRoot, "tools", "bg3le", "install.py"), "installer");
   write(path.join(src, "Mods", "a.pak"), "native-a");
   write(path.join(src, "modsettings.lsx"), "native-settings");
   write(path.join(src, "bg3se", "DWrite.dll"), "windows-dll");
@@ -101,9 +110,16 @@ test("BG3 apply on a native Linux build skips the Windows script extender", (t) 
   assert.equal(fs.readFileSync(path.join(dataDir, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8"), "native-settings");
   assert.equal(fs.existsSync(path.join(gameRoot, "bin", "DWrite.dll")), false);
   assert.equal(fs.readFileSync(path.join(dataDir, "Script Extender", "Test", "Config.json"), "utf8"), "windows-config");
+  assert.equal(fs.readFileSync(path.join(gameRoot, "bin", "bg3.bg3le-real"), "utf8"), "native-binary");
+  assert.match(fs.readFileSync(path.join(gameRoot, "bin", "bg3"), "utf8"), /ModSync BG3LE wrapper/);
+  assert.equal(fs.readFileSync(path.join(process.env.XDG_DATA_HOME, "bg3le", "build", "libbg3le.so"), "utf8"), "library");
+  assert.equal(applied.nativeLoader.wrapper, "bin/bg3");
 
   revertBg3({ pack, root, log: () => { } });
   assert.equal(fs.existsSync(path.join(dataDir, "Mods", "a.pak")), false);
   assert.equal(fs.existsSync(path.join(dataDir, "Script Extender", "Test", "Config.json")), false);
   assert.equal(fs.readFileSync(path.join(dataDir, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8"), "vanilla-settings");
+  assert.equal(fs.readFileSync(path.join(gameRoot, "bin", "bg3"), "utf8"), "native-binary");
+  assert.equal(fs.existsSync(path.join(gameRoot, "bin", "bg3.bg3le-real")), false);
+  assert.equal(fs.existsSync(path.join(process.env.XDG_DATA_HOME, "bg3le")), false);
 });

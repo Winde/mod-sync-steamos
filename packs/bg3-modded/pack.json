@@ -32,7 +32,10 @@
       "dataDir": "%DATA_HOME%/Larian Studios/Baldur's Gate 3",
       "saveDir": "%DATA_HOME%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
       "exe": "bin/bg3",
-      "gameProcess": "bg3"
+      "gameProcess": "bg3.bg3le-real",
+      "gameProcessAlt": "bg3",
+      "shortcut": "Baldur's Gate 3 (with mods)",
+      "template": "games/bg3-native.sh"
     }
   },
   "mod": {
@@ -57,7 +60,12 @@
   "install": {
     "type": "bg3",
     "dataDir": "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
-    "bg3se": true
+    "bg3se": true,
+    "bg3le": {
+      "version": "0.4.6",
+      "path": "tools/bg3le"
+    },
+    "label": "modsettings + script extender"
   },
   "art": {
     "grid": "art/bg3/grid.png",
@@ -79,13 +87,13 @@
       "tone": "warning"
     },
     {
-      "title": "Native Linux needs BG3LE",
-      "body": "On the native Linux build, install BG3LE (https://www.nexusmods.com/baldursgate3/mods/25431) with its install.py before this pack. BG3LE provides the Script Extender API natively; the pack installs the same mods and modsettings. Launch the game from Steam so BG3LE's launch wrapper runs.",
-      "tone": "warning"
+      "title": "Native Linux is self-contained",
+      "body": "On the native Linux build, this pack bundles BG3LE and installs a reversible game-binary wrapper. Use the Baldur's Gate 3 (with mods) entry; it repairs the wrapper after a Steam game update and then launches the real Steam app.",
+      "tone": "info"
     },
     {
       "title": "Script Extender",
-      "body": "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. The native Linux build uses BG3LE instead; install it before launching the pack.",
+      "body": "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. BG3LE is bundled for the native Linux build and installed with the pack.",
       "tone": "info"
     }
   ],
@@ -109,20 +117,6 @@
       "required": true,
       "title": "Game data location is ready",
       "hint": "Launch the vanilla game once from Steam."
-    },
-    {
-      "id": "bg3le",
-      "type": "path-exists",
-      "scope": "home",
-      "paths": [
-        ".local/share/bg3le"
-      ],
-      "platforms": [
-        "linux-native"
-      ],
-      "required": true,
-      "title": "BG3LE is installed",
-      "hint": "Install BG3LE (Nexus mod 25431) with its install.py before installing this pack. https://www.nexusmods.com/baldursgate3/mods/25431"
     },
     {
       "id": "game-closed",
@@ -149,7 +143,7 @@
   "contents": {
     "kind": "mods",
     "source": "modsettings.lsx",
-    "generatedAt": "2026-11-21T12:02:41.640Z",
+    "generatedAt": "2026-11-21T12:32:38.385Z",
     "count": 72,
     "modules": 74,
     "paks": 78,

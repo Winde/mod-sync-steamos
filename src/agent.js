@@ -163,7 +163,7 @@ function createAgent(config) {
       variant: target.variant,
       supported: target.supported,
       prefixReady: g ? g.prefixReady : null,
-      running: util.isGameRunning(target.gameProcess),
+      running: util.isGameRunning(target.processes),
       ok: !!g
         && (!pack.game.build || g.build === String(pack.game.build))
         && target.supported
@@ -303,7 +303,7 @@ function createAgent(config) {
     if (!info.installed) throw new Error("Pack is not installed.");
     if (!info.launcher) throw new Error("Launcher is missing. Reinstall the pack.");
     const target = paths.resolve(pack, steam.findGame(pack.game));
-    if (util.isGameRunning(target.gameProcess)) throw new Error("The game is already running.");
+    if (util.isGameRunning(target.processes)) throw new Error("The game is already running.");
     const child = spawn("bash", [info.launcher], { detached: true, stdio: "ignore" });
     child.unref();
     return { ok: true, launcher: info.launcher };
@@ -385,7 +385,7 @@ function createAgent(config) {
           try {
             const pack = util.readJson(versionStore.packFile(versionStore.packRoot(root, body.packId)));
             const target = paths.resolve(pack, steam.findGame(pack.game));
-            if (util.isGameRunning(target.gameProcess)) {
+            if (util.isGameRunning(target.processes)) {
               res.writeHead(409, { "content-type": "application/json" });
               return res.end(JSON.stringify({ error: "Close the game before removing installed files." }));
             }

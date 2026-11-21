@@ -41,6 +41,9 @@ test("the BG3 driver records the active module list in the pack", async () => {
     write(path.join(source, "PlayerProfiles", "Public", "modsettings.lsx"), xml);
     write(path.join(gameRoot, "bin", "DWrite.dll"), "dll");
     write(path.join(gameRoot, "bin", "ScriptExtenderSettings.json"), "{}");
+    const bg3le = path.join(base, "bg3le");
+    write(path.join(bg3le, "build", "libbg3le.so"), "library");
+    write(path.join(bg3le, "install.py"), "installer");
 
     const result = await buildPack({
       recipe: loadRecipe("bg3-modded"),
@@ -48,6 +51,7 @@ test("the BG3 driver records the active module list in the pack", async () => {
       out,
       version: "2026.11.21",
       gameRoot,
+      bg3leRoot: bg3le,
     });
 
     assert.equal(result.pack.id, "bg3-modded");
@@ -61,10 +65,12 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.equal(result.pack.contents.mods[1].builtin, true);
 
     assert.equal(result.pack.platforms["linux-native"].exe, "bin/bg3");
-    assert.equal(result.pack.platforms["linux-native"].gameProcess, "bg3");
+    assert.equal(result.pack.platforms["linux-native"].gameProcess, "bg3.bg3le-real");
+    assert.equal(result.pack.platforms["linux-native"].gameProcessAlt, "bg3");
+    assert.equal(result.pack.platforms["linux-native"].template, "games/bg3-native.sh");
     assert.equal(result.pack.platforms["linux-proton"].gameProcess, "bg3.exe");
     assert.match(result.pack.platforms["linux-proton"].dataDir, /^%PREFIX%/);
-    assert.ok(result.pack.preconditions.some((check) => check.id === "bg3le" && check.platforms.includes("linux-native")));
+    assert.equal(result.pack.install.bg3le.version, "0.4.6");
 
     const loaded = loadPack(out);
     assert.equal(loaded.pack.contents.count, 1);
@@ -77,6 +83,7 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.equal(extConfig.platforms, undefined);
     const nativeFiles = loaded.files.files.filter((f) => !f.platforms || f.platforms.includes("linux-native"));
     assert.ok(nativeFiles.some((f) => f.target.endsWith("/Script Extender/Test/Config.json")));
+    assert.ok(nativeFiles.some((f) => f.target === "tools/bg3le/build/libbg3le.so"));
     assert.ok(!nativeFiles.some((f) => f.target.endsWith("/bg3se/DWrite.dll")));
   } finally {
     fs.rmSync(base, { recursive: true, force: true });

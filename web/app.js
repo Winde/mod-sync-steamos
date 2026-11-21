@@ -235,11 +235,10 @@
   function packContents(p) {
     const base = labels.stats(gb(p.totalBytes), p.files);
     const contents = p.contents ? ` · ${contentsCount(p.contents)}` : "";
-    if (p.loader && p.loader.type === "me3") return `${base}${contents} · ${labels.me3Included}`;
-    if (p.loader && p.loader.type === "bg3se") {
-      return `${base}${contents} · ${p.install && p.install.bg3se ? labels.bg3seIncluded : labels.modsettingsIncluded}`;
-    }
-    return p.loader && p.loader.type ? `${base}${contents} · ${labels.loaderIncluded(p.loader.type)}` : `${base}${contents}`;
+    const installed = p.install && p.install.label
+      ? p.install.label
+      : (p.loader && p.loader.type ? labels.loaderIncluded(p.loader.type) : "");
+    return installed ? `${base}${contents} · ${installed}` : `${base}${contents}`;
   }
 
   function renderUpdateButton() {

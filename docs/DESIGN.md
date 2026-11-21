@@ -64,16 +64,19 @@ A pack never contains the base game or saves.
     "windows": {
       "exe": "Game/eldenring.exe",
       "gameProcess": "eldenring.exe",
-      "loader": "tools/me3-win/bin/me3.exe"
+      "loader": "tools/me3-win/bin/me3.exe",
+      "template": "loaders/me3.sh"
     },
     "linux-proton": {
       "exe": "Game/eldenring.exe",
       "gameProcess": "eldenring.exe",
       "loader": "tools/me3-linux/bin/me3",
-      "windowsBinaries": "tools/me3-win/bin"
+      "loaderSupport": "tools/me3-win/bin",
+      "template": "loaders/me3.sh"
     }
   },
   "loader": { "type": "me3", "profile": "profiles/graceborne-0.2.7.me3" },
+  "profilePattern": "profiles/{mod}-{version}.me3",
   "launch": {
     "type": "me3",
     "mode": "loader",
@@ -82,9 +85,7 @@ A pack never contains the base game or saves.
     "gameProcess": "eldenring.exe",
     "steamAppId": 1245620,
     "profile": "profiles/graceborne-0.2.7.me3",
-    "saveFile": "ER0000.graceborne.sl2",
-    "me3": "tools/me3-linux/bin/me3",
-    "windowsBinaries": "tools/me3-win/bin"
+    "saveFile": "ER0000.graceborne.sl2"
   },
   "art": {
     "grid": "art/graceborne/grid.png",
@@ -155,6 +156,16 @@ binaries carry platform tags. When two targets have identical content, the pack
 keeps one source file and both targets point at it. Run `npm run packs:check`
 before serving a pack to verify profiles, loader coverage, target portability,
 and duplicate storage.
+
+The generic installer has no game or loader names. `install.type` selects an
+adapter in `src/installers/` for game-specific apply/revert work. The launcher
+is a template chosen by `platforms.<variant>.template`; the only built-in
+default is the generic `launch-steam.sh`. Loader templates live under
+`templates/linux/loaders/`, game-specific templates under
+`templates/linux/games/`. `loader` and `loaderSupport` are pack-relative paths
+passed to the template as `LOADER` and `LOADER_SUPPORT`. `profilePattern` is
+the versioned profile path used by rollback and old-version cleanup. The
+dashboard summarizes `install` with `install.label`.
 
 ### Notes
 

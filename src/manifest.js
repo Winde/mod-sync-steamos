@@ -55,6 +55,18 @@ function validatePack(pack) {
   requireString(pack.launch, "type", "pack.json.launch");
   requireString(pack.launch, "profile", "pack.json.launch");
   requireString(pack.launch, "saveFile", "pack.json.launch");
+  if (pack.profilePattern != null) {
+    if (typeof pack.profilePattern !== "string" || !pack.profilePattern.includes("{version}")) {
+      throw new Error("pack.json.profilePattern must be a string containing {version}");
+    }
+  }
+  if (pack.install != null) {
+    if (typeof pack.install !== "object") throw new Error("pack.json.install must be an object");
+    requireString(pack.install, "type", "pack.json.install");
+    if (pack.install.label != null && typeof pack.install.label !== "string") {
+      throw new Error("pack.json.install.label must be a string");
+    }
+  }
   if (pack.platforms != null) {
     paths.validatePlatforms(pack.platforms, "pack.json.platforms");
     if (!Object.keys(pack.platforms).length) throw new Error("pack.json.platforms: no profiles");

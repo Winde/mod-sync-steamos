@@ -63,8 +63,12 @@ function writeCurrent(packRoot, modId, version) {
   writeText(currentFile(packRoot, modId), `${version}\n`);
 }
 
-function profileFile(packRoot, modId, version) {
-  return path.join(packRoot, "profiles", `${modId}-${version}.me3`);
+function profileFile(packRoot, pack, version) {
+  if (!pack || !pack.profilePattern) return null;
+  const rel = pack.profilePattern
+    .replace(/\{mod\}/g, pack.mod.id)
+    .replace(/\{version\}/g, version);
+  return path.join(packRoot, rel);
 }
 
 function launcherFile(packRoot, modId) {

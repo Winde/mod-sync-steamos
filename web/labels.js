@@ -57,9 +57,6 @@
 
     filesCount: (n) => `${n} file${n === 1 ? "" : "s"}`,
     stats: (gb, n) => `${gb} GB · ${n} file${n === 1 ? "" : "s"}`,
-    me3Included: "me3 profile included",
-    bg3seIncluded: "modsettings + BG3SE included",
-    modsettingsIncluded: "modsettings included",
     loaderIncluded: (type) => `${type} loader included`,
 
     kicker: (game, name) => `${game} · ${name}`,

@@ -18,8 +18,11 @@ const PROFILE_KEYS = [
   "saveDir",
   "exe",
   "gameProcess",
+  "gameProcessAlt",
   "loader",
-  "windowsBinaries",
+  "loaderSupport",
+  "shortcut",
+  "template",
 ];
 
 const PATH_KEYS = new Set(["dataDir", "saveDir"]);
@@ -39,6 +42,9 @@ function validatePlatforms(platforms, where = "platforms") {
     for (const [key, value] of Object.entries(profile)) {
       if (!PROFILE_KEYS.includes(key)) throw new Error(`${where}.${variant}: unknown key ${key}`);
       if (typeof value !== "string" || !value) throw new Error(`${where}.${variant}.${key}: must be a non-empty string`);
+      if (key === "template" && (path.isAbsolute(value) || value.split(/[\\/]/).includes(".."))) {
+        throw new Error(`${where}.${variant}.template: must stay under templates/linux`);
+      }
     }
   }
   return platforms;
@@ -141,10 +147,14 @@ function resolve(pack, game, platform = process.platform) {
     saveDir: null,
     exe: profile.exe || launch.exe || "",
     gameProcess: profile.gameProcess || launch.gameProcess || "",
-    loader: profile.loader || launch.me3 || "",
-    windowsBinaries: profile.windowsBinaries || launch.windowsBinaries || "",
+    gameProcessAlt: profile.gameProcessAlt || "",
+    loader: profile.loader || "",
+    loaderSupport: profile.loaderSupport || "",
+    shortcut: profile.shortcut || "",
+    template: profile.template || "",
     error: null,
   };
+  result.processes = [result.gameProcess, result.gameProcessAlt].filter(Boolean);
 
   const dataDirSpec = profile.dataDir || legacyDataDir(pack, ctx);
   for (const key of PATH_KEYS) {

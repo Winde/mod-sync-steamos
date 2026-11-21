@@ -13,10 +13,8 @@ const path = require("node:path");
 const { loadPack } = require("../src/manifest");
 const paths = require("../src/paths");
 
-const EXECUTABLES = new Set(["tools/me3-linux/bin/me3"]);
-
 function executableExpected(target) {
-  return target.endsWith(".sh") || EXECUTABLES.has(target);
+  return target.endsWith(".sh");
 }
 
 function auditPackRoot(packRoot) {
@@ -39,23 +37,32 @@ function auditPackRoot(packRoot) {
       }
     }
 
-    if (profile.loader) {
-      if (!targets.has(profile.loader)) {
-        errors.push(`${variant}: loader is not downloaded for this platform: ${profile.loader}`);
-      } else if (variant.startsWith("linux") && !executableExpected(profile.loader)) {
-        errors.push(`${variant}: loader has no executable mode: ${profile.loader}`);
+    if (profile.loader && !targets.has(profile.loader)) {
+      errors.push(`${variant}: loader is not downloaded for this platform: ${profile.loader}`);
+    }
+
+    if (profile.loaderSupport) {
+      const prefix = `${profile.loaderSupport.replace(/\/+$/, "")}/`;
+      if (!selected.some((file) => file.target.startsWith(prefix))) {
+        errors.push(`${variant}: loaderSupport has no files for this platform: ${profile.loaderSupport}`);
       }
     }
 
-    if (profile.windowsBinaries) {
-      for (const name of ["me3-launcher.exe", "me3_mod_host.dll"]) {
-        const target = `${profile.windowsBinaries.replace(/\/+$/, "")}/${name}`;
-        if (!targets.has(target)) errors.push(`${variant}: windowsBinaries is missing ${target}`);
+    const templateName = profile.template || (pack.launch.type === "steam" ? "launch-steam.sh" : "");
+    if (!templateName) {
+      errors.push(`${variant}: no launcher template for launch type ${pack.launch.type}`);
+    } else {
+      const template = path.resolve(__dirname, "..", "templates", "linux", templateName);
+      if (!template.startsWith(path.resolve(__dirname, "..", "templates", "linux") + path.sep)) {
+        errors.push(`${variant}: launcher template escapes templates/linux: ${templateName}`);
+      } else if (!fs.existsSync(template)) {
+        errors.push(`${variant}: launcher template missing: ${templateName}`);
       }
     }
 
     for (const file of selected) {
-      if (executableExpected(file.target) && file.mode !== "755") {
+      const mustExecute = file.target === profile.loader && variant.startsWith("linux");
+      if ((executableExpected(file.target) || mustExecute) && file.mode !== "755") {
         errors.push(`${variant}: ${file.target} should have mode 755`);
       }
       for (const tag of file.platforms || []) {

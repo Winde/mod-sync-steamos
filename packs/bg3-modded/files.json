@@ -628,6 +628,226 @@
       "mode": "644"
     },
     {
+      "source": "tools/bg3le/build/libbg3le.so",
+      "target": "tools/bg3le/build/libbg3le.so",
+      "size": 57720968,
+      "sha256": "7c9e5064196f04d69aa51f667538823ecddc82a5644566793d26f8245158433b",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/client/bg3lua",
+      "target": "tools/bg3le/client/bg3lua",
+      "size": 32190,
+      "sha256": "3ecb85bbc1bc1dc24303667da6e1034cb9db69a1d6a9c6e5dbac838e5a058a5c",
+      "mode": "755",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/include/bg3le_plugin.h",
+      "target": "tools/bg3le/include/bg3le_plugin.h",
+      "size": 3953,
+      "sha256": "557abaf9d9858929794a5b0caa55e019f168c8cf617001e9eadd5f2f1043a17b",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/install.py",
+      "target": "tools/bg3le/install.py",
+      "size": 13232,
+      "sha256": "b7970ced3ad792c379323b835f5c21f5c8e1cfa149194a9d4c41608df06bbdfe",
+      "mode": "755",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/INSTALL.txt",
+      "target": "tools/bg3le/INSTALL.txt",
+      "size": 745,
+      "sha256": "615613fe397a93e283768d94d8c9d3496c6e2c9de8eccd31a0af03bb7efd0220",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/installer/bg3le-launch",
+      "target": "tools/bg3le/installer/bg3le-launch",
+      "size": 1233,
+      "sha256": "bb8032fa7a5e8f40ce8c3fef04273dbaa4e8e4f96b8825a1cf3866bcef0e539e",
+      "mode": "755",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/LICENSE",
+      "target": "tools/bg3le/LICENSE",
+      "size": 1486,
+      "sha256": "ff923165ac418f6748d9df85f59342f21ad6b585da95eb5021fdd1b7d5f97faa",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/abseil.txt",
+      "target": "tools/bg3le/licenses/abseil.txt",
+      "size": 11361,
+      "sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/bg3se.txt",
+      "target": "tools/bg3le/licenses/bg3se.txt",
+      "size": 1946,
+      "sha256": "2f1d1ceb35e996019341ffae8e0b3d0a18d555847b3c2a585d69344cf86ca84a",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/glm.txt",
+      "target": "tools/bg3le/licenses/glm.txt",
+      "size": 2865,
+      "sha256": "62d2d642c7d054d4fb4c9b42faad617d6c88fcd91e317f8035aa9f277cc159c3",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/imgui.txt",
+      "target": "tools/bg3le/licenses/imgui.txt",
+      "size": 1083,
+      "sha256": "c80c5789748d955c4a650562baa0d750494e2c7128c2ca66aaebe2e3c4e198bf",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/libcxx.txt",
+      "target": "tools/bg3le/licenses/libcxx.txt",
+      "size": 16703,
+      "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/libcxxabi.txt",
+      "target": "tools/bg3le/licenses/libcxxabi.txt",
+      "size": 16706,
+      "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/lua.txt",
+      "target": "tools/bg3le/licenses/lua.txt",
+      "size": 1066,
+      "sha256": "2c900706552b19a2b9c4e670f0b4abadb5b5f31b93725e8274e3651a101365a5",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/lz4.txt",
+      "target": "tools/bg3le/licenses/lz4.txt",
+      "size": 646,
+      "sha256": "4bc9c403f6b679cc076dee210e0e21c27b4e8f6d3fb43d85364c76657bfaaac5",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/optick.txt",
+      "target": "tools/bg3le/licenses/optick.txt",
+      "size": 1083,
+      "sha256": "c871561429f407acb4eef5d6d0562ea4b1e934567ba5c1fab8464a5c84281028",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/protobuf.txt",
+      "target": "tools/bg3le/licenses/protobuf.txt",
+      "size": 1732,
+      "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/rapidjson.txt",
+      "target": "tools/bg3le/licenses/rapidjson.txt",
+      "size": 5152,
+      "sha256": "a140e5d46fe734a1c78f1a3c3ef207871dd75648be71fdda8e309b23ab8b1f32",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/tinycrypt.txt",
+      "target": "tools/bg3le/licenses/tinycrypt.txt",
+      "size": 3313,
+      "sha256": "b2d451fcba3577b118741d733d37ebd15bdd0b6b381e554a7345bdbfa3743108",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/licenses/vulkan-headers.md",
+      "target": "tools/bg3le/licenses/vulkan-headers.md",
+      "size": 495,
+      "sha256": "95ad366d23fadf701d355bc45fb8b82ae2d700239471d35d41286ac3b08ff903",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/README.md",
+      "target": "tools/bg3le/README.md",
+      "size": 23771,
+      "sha256": "b03876acf76cf265b101c3672b8aad2387e33cfae661c5d0b56b7011c5e8515e",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
+      "source": "tools/bg3le/VERSION",
+      "target": "tools/bg3le/VERSION",
+      "size": 7,
+      "sha256": "c94596bdf16a29a86e1022a2b791d4afde5a558cf336900bbe45c9949bd57aeb",
+      "mode": "644",
+      "platforms": [
+        "linux-native"
+      ]
+    },
+    {
       "source": "art/bg3/grid.png",
       "target": "art/bg3/grid.png",
       "size": 37275,

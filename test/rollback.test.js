@@ -8,7 +8,7 @@ const { listVersions } = require("../src/version-store");
 
 test("rollback switches current.txt to the previous installed version", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-rollback-"));
-  const pack = { id: "eldenring-graceborne", name: "Graceborne", mod: { id: "graceborne" } };
+  const pack = { id: "eldenring-graceborne", name: "Graceborne", mod: { id: "graceborne" }, profilePattern: "profiles/{mod}-{version}.me3" };
   const packRoot = path.join(root, "packs", pack.id);
   fs.mkdirSync(path.join(packRoot, "mods", "graceborne", "versions", "0.2.5"), { recursive: true });
   fs.mkdirSync(path.join(packRoot, "mods", "graceborne", "versions", "0.2.7"), { recursive: true });
@@ -26,7 +26,7 @@ test("rollback switches current.txt to the previous installed version", () => {
 
 test("rollback refuses when there is no previous version", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-rollback-"));
-  const pack = { id: "eldenring-graceborne", name: "Graceborne", mod: { id: "graceborne" } };
+  const pack = { id: "eldenring-graceborne", name: "Graceborne", mod: { id: "graceborne" }, profilePattern: "profiles/{mod}-{version}.me3" };
   const packRoot = path.join(root, "packs", pack.id);
   fs.mkdirSync(path.join(packRoot, "mods", "graceborne", "versions", "0.2.7"), { recursive: true });
   fs.mkdirSync(path.join(packRoot, "profiles"), { recursive: true });

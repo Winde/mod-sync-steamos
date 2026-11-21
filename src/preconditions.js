@@ -153,7 +153,7 @@ function checkOne(check, { pack, game, root, totalBytes, target }) {
         : fail(`Build ${game.build}; this pack needs ${expected}.`);
     }
     case "game-not-running":
-      return util.isGameRunning(target.gameProcess)
+      return util.isGameRunning(target.processes)
         ? fail(`${pack.game.title} is running.`)
         : pass(`${pack.game.title} is closed.`);
     case "proton-prefix":

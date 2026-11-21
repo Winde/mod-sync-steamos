@@ -11,12 +11,15 @@
     "windows": {
       "exe": "Game/eldenring.exe",
       "gameProcess": "eldenring.exe",
-      "loader": "tools/me3-win/bin/me3.exe"
+      "loader": "tools/me3-win/bin/me3.exe",
+      "template": "loaders/me3.sh"
     },
     "linux-proton": {
       "exe": "Game/eldenring.exe",
       "gameProcess": "eldenring.exe",
-      "loader": "tools/me3-linux/bin/me3"
+      "loader": "tools/me3-linux/bin/me3",
+      "loaderSupport": "tools/me3-win/bin",
+      "template": "loaders/me3.sh"
     }
   },
   "notes": [
