@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {
   ensureDir, readJson, writeJson, writeText, walkFiles, materialize,
-  sha256File, modeFor, formatBytes, relPosix,
+  sha256File, modeFor, formatBytes,
 } = require("../util");
 
 const MOD_ID = "graceborne";
@@ -37,38 +37,50 @@ async function buildPack({ source, out, link = true, version: requestedVersion, 
 
   let links = 0;
   let copies = 0;
-  for (const file of walkFiles(payloadSrc)) {
+  const payloadFiles = walkFiles(payloadSrc);
+  for (let i = 0; i < payloadFiles.length; i++) {
+    const file = payloadFiles[i];
     const target = path.join(dst, "payload", "versions", version, file.rel);
     const how = materialize(file.abs, target, link);
     if (how === "link") links++; else copies++;
+    if ((i + 1) % 250 === 0 || i + 1 === payloadFiles.length) {
+      log(`Hardlinking ${i + 1}/${payloadFiles.length}...`);
+    }
   }
   log(`Payload: ${links} hardlinks, ${copies} copies`);
 
+  log("Copying profile, tools, and art...");
   fs.cpSync(profileSrc, path.join(dst, "profiles", path.basename(profileSrc)), { recursive: true });
   fs.cpSync(me3Linux, path.join(dst, "tools", "me3-linux"), { recursive: true });
   fs.cpSync(me3Win, path.join(dst, "tools", "me3-win"), { recursive: true });
   fs.cpSync(artSrc, path.join(dst, "art", MOD_ID), { recursive: true });
 
+  const toolFiles = walkFiles(path.join(dst, "tools"));
+  const artFiles = walkFiles(path.join(dst, "art", MOD_ID));
+  const totalEntries = payloadFiles.length + 1 + toolFiles.length + artFiles.length;
+  let processed = 0;
   const files = [];
   const add = async (sourceRel, targetRel) => {
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
     files.push({ source: sourceRel, target: targetRel, size, sha256, mode: modeFor(targetRel) });
+    processed++;
+    const step = Math.max(1, Math.ceil(totalEntries / 10));
+    if (processed === totalEntries || processed % step === 0) {
+      log(`Hashing ${processed}/${totalEntries} (${Math.round((processed / totalEntries) * 100)}%)`);
+    }
   };
 
-  for (const file of walkFiles(path.join(dst, "payload", "versions", version))) {
-    const rel = relPosix(path.join(dst, "payload", "versions", version), file.abs);
-    await add(`payload/versions/${version}/${rel}`, `mods/${MOD_ID}/versions/${version}/${rel}`);
+  for (const file of payloadFiles) {
+    await add(`payload/versions/${version}/${file.rel}`, `mods/${MOD_ID}/versions/${version}/${file.rel}`);
   }
   await add(`profiles/${path.basename(profileSrc)}`, `profiles/${path.basename(profileSrc)}`);
-  for (const tool of walkFiles(path.join(dst, "tools"))) {
-    const rel = relPosix(path.join(dst, "tools"), tool.abs);
-    await add(`tools/${rel}`, `tools/${rel}`);
+  for (const tool of toolFiles) {
+    await add(`tools/${tool.rel}`, `tools/${tool.rel}`);
   }
-  for (const art of walkFiles(path.join(dst, "art", MOD_ID))) {
-    const rel = relPosix(path.join(dst, "art", MOD_ID), art.abs);
-    await add(`art/${MOD_ID}/${rel}`, `art/${MOD_ID}/${rel}`);
+  for (const art of artFiles) {
+    await add(`art/${MOD_ID}/${art.rel}`, `art/${MOD_ID}/${art.rel}`);
   }
 
   const totalBytes = files.reduce((n, f) => n + f.size, 0);

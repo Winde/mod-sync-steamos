@@ -83,8 +83,7 @@ were not touched: the installer writes under
 The source still has 0.2.5, so build a second pack in a disposable directory:
 
 ```powershell
-node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.5 `
-  --out "state\packs-0.2.5\eldenring-graceborne"
+node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.5 --out "state\packs-0.2.5\eldenring-graceborne"
 ```
 
 Then:
