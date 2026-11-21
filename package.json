@@ -1,0 +1,20 @@
+{
+  "name": "mod-sync-steamos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable mod-pack deployment for Windows and SteamOS. Mods only in v1.",
+  "type": "commonjs",
+  "bin": {
+    "modsync": "bin/modsync.js"
+  },
+  "scripts": {
+    "start": "node bin/modsync.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "steam-shortcut-editor": "^3.1.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

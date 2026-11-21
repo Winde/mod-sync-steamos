@@ -1,0 +1,10 @@
+node_modules/
+packs/*
+!packs/.gitkeep
+dist/
+state/
+logs/
+.tmp/
+*.log
+*.tar.gz
+tools/node-linux/
