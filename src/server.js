@@ -89,9 +89,11 @@ function loadPacks(packsDir) {
 }
 
 function createServer({ packsDir, token, baseUrl }) {
+  const tokens = new Set(String(token || "").split(",").map((value) => value.trim()).filter(Boolean));
   return http.createServer((req, res) => {
     const url = new URL(req.url, baseUrl || "http://localhost");
-    const authorized = url.searchParams.get("token") === token || req.headers["x-modsync-token"] === token;
+    const given = url.searchParams.get("token") || req.headers["x-modsync-token"] || "";
+    const authorized = tokens.has(given);
 
     if (url.pathname === "/api/health") {
       return sendJson(res, 200, { ok: true, name: "modsync", version: "0.1.0" });

@@ -67,6 +67,10 @@
       S.offline = false;
       S.error = null;
       const packs = S.data.packs || [];
+      if (!packs.length && S.data.pc && S.data.pc.online === false) {
+        S.offline = true;
+        S.error = S.data.pc.error || labels.offlineTitle;
+      }
       const list = groupGames(packs);
       if (!S.selectedGame || !list.some((g) => g.id === S.selectedGame)) {
         S.selectedGame = list[0] ? list[0].id : null;
