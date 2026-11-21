@@ -39,6 +39,11 @@ The token in **Settings** is the live token. **New token** generates a random
 replacement; saving restarts a running server so the change takes effect
 immediately. Copy the install one-liner again after changing it.
 
+A TV that has the wrong token or no token yet appears in the pack library as a
+pairing request. **Allow** sends it the current token; **Deny** dismisses it.
+The Client stores the token and reconnects without asking again. Changing the
+token later requires one new approval per TV.
+
 ## Pack library
 
 The path beside the pack count is the folder the library reads. **Change folder**
@@ -61,6 +66,15 @@ build date, and folder. Actions:
 library yet. The recipe list comes from `recipes/`. Version is optional; the
 driver uses its normal default (Elden Ring's `current.txt`, BG3's date) when it
 is empty.
+
+The form also shows the selected driver's own options. For BG3 these are an
+optional game folder (used to include the Windows/Proton Script Extender) and an
+optional BG3LE folder (defaults to the pinned download for native Linux).
+Directory fields are checked before the build starts.
+
+The progress dialog reports the phase and percent sent by the driver itself:
+copying, hashing, then swapping the staged pack into place. The log remains
+available for detail but no longer drives progress.
 
 ## Settings
 

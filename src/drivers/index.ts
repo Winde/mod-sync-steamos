@@ -1,6 +1,7 @@
 import * as eldenring from "./eldenring";
 import * as bg3 from "./bg3";
 import type {
+  BuildOption,
   BuildPackOptions,
   BuildPackResult,
   ContentsInput,
@@ -11,6 +12,7 @@ import type {
 export interface Driver {
   GAME: GameInfo;
   defaultSource(): string;
+  buildOptions(): BuildOption[];
   buildPack(options: BuildPackOptions): Promise<BuildPackResult>;
   contentsFor(input: ContentsInput): ContentsSummary;
 }

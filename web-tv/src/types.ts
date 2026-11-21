@@ -133,9 +133,15 @@ export interface JobView {
   [key: string]: unknown;
 }
 
+export interface PairingView {
+  status?: "idle" | "pending" | "approved" | "denied" | "error" | string;
+  message?: string | null;
+}
+
 export interface AgentStateView {
   agent?: { version?: string; root?: string; port?: number };
-  pc?: { url?: string; online?: boolean; error?: string | null };
+  pc?: { url?: string; online?: boolean; error?: string | null; auth?: "ok" | "rejected" | "unknown" | "unconfigured" | string };
+  pairing?: PairingView | null;
   packs?: PackView[];
   diskFreeBytes?: number | null;
   job?: JobView | null;

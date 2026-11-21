@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createAgent } from "../src/agent";
-import { errorMessage, readJson } from "../src/util";
+import { errorMessage, readJson, writeJson } from "../src/util";
 import { projectRoot } from "../src/root";
 import {
   RELEASES_PAGE, Updater, currentAppImage, relaunchArgs,
@@ -53,9 +53,16 @@ function loadConfig(): AgentConfig {
   return { root: path.join(os.homedir(), "ModSync") };
 }
 
+function saveConnection(connection: { pcUrl: string; token: string }): void {
+  const file = configPath() || path.join(os.homedir(), "ModSync", "agent.json");
+  let current: Record<string, unknown> = {};
+  try { current = readJson<Record<string, unknown>>(file); } catch { /* first pair writes a new file */ }
+  writeJson(file, { ...current, pcUrl: connection.pcUrl, token: connection.token });
+}
+
 async function startAgent(): Promise<string> {
   const config = loadConfig();
-  const instance = createAgent({ ...config, port: 0 });
+  const instance = createAgent({ ...config, port: 0, saveConnection });
   agent = instance;
   await new Promise<void>((resolve, reject) => {
     instance.server.once("error", reject);

@@ -66,7 +66,8 @@ The Server console:
   install, open the folder, or remove it.
 - **Pack server** — start and stop the LAN server, copy its URL, token, and the
   Client install one-liner. A server error (busy port, no LAN address) is shown
-  in the same card.
+  in the same card. A TV with an old or missing token appears as a pairing
+  request; **Allow** sends it the current token once.
 - **Settings** — packs folder, bind address, port, token (with generate), start
   the server on launch, start ModSync Server at sign-in, and minimize to the
   tray instead of the taskbar. The app starts hidden in the tray for sign-in

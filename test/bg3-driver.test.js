@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildPack, contentsFor } = require("../dist/src/drivers/bg3");
+const { buildOptions, buildPack, contentsFor } = require("../dist/src/drivers/bg3");
 const { loadRecipe } = require("../dist/src/recipes");
 const { loadPack } = require("../dist/src/manifest");
 
@@ -45,15 +45,23 @@ test("the BG3 driver records the active module list in the pack", async () => {
     write(path.join(bg3le, "build", "libbg3le.so"), "library");
     write(path.join(bg3le, "install.py"), "installer");
 
+    assert.deepEqual(buildOptions().map((option) => option.key), ["gameRoot", "bg3leRoot"]);
+    const updates = [];
     const result = await buildPack({
       recipe: loadRecipe("bg3-modded"),
       source,
       out,
       version: "2026.11.21",
-      gameRoot,
-      driverOptions: { bg3leRoot: bg3le },
+      driverOptions: { gameRoot, bg3leRoot: bg3le },
+      progress: (update) => updates.push(update),
     });
 
+    assert.equal(updates[0].phase, "copying");
+    assert.equal(updates[0].done, 0);
+    assert.ok(updates.some((update) => update.phase === "copying" && update.done === 2 && update.total === 2));
+    assert.ok(updates.some((update) => update.phase === "hashing"));
+    assert.equal(updates.at(-1).phase, "hashing");
+    assert.equal(updates.at(-1).done, updates.at(-1).total);
     assert.equal(result.pack.id, "bg3-modded");
     assert.equal(result.pack.contents.count, 1);
     assert.equal(result.pack.contents.itemsLabel, "Included mods");

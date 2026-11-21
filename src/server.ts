@@ -4,7 +4,9 @@ import path from "node:path";
 import { URL } from "node:url";
 import { loadPack, packSummary } from "./manifest";
 import labels from "./labels";
+import { createPairingStore } from "./pairing";
 import { errorMessage, safeJoin } from "./util";
+import type { PairingStore } from "./pairing";
 import type { ArtInfo, PackSummary } from "./types";
 
 export function contentType(p: string): string {
@@ -29,6 +31,29 @@ function sendJson(res: http.ServerResponse, code: number, value: unknown): void 
 function sendText(res: http.ServerResponse, code: number, text: string, type = "text/plain; charset=utf-8"): void {
   res.writeHead(code, { "content-type": type, "content-length": Buffer.byteLength(text) });
   res.end(text);
+}
+
+function readJsonBody(req: http.IncomingMessage, limit = 8192): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk: Buffer) => {
+      data += chunk;
+      if (data.length > limit) {
+        reject(new Error("body too large"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      if (!data) return resolve({});
+      try {
+        const parsed = JSON.parse(data) as unknown;
+        resolve(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {});
+      } catch {
+        reject(new Error("invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
 }
 
 export type RangeResult =
@@ -102,6 +127,11 @@ export function loadPacks(packsDir: string): PackEntry[] {
   return out;
 }
 
+export interface PackServer extends http.Server {
+  /** Pending device approvals for this server instance. */
+  pairing: PairingStore;
+}
+
 export function createServer({
   packsDir,
   token,
@@ -110,15 +140,18 @@ export function createServer({
   packsDir: string;
   token?: string | null;
   baseUrl?: string;
-}): http.Server {
+}): PackServer {
   const tokens = new Set(String(token || "").split(",").map((value) => value.trim()).filter(Boolean));
-  return http.createServer((req, res) => {
+  const pairing = createPairingStore({ token: [...tokens][0] || "" });
+
+  async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = new URL(req.url || "/", baseUrl || "http://localhost");
     const headerToken = req.headers["x-modsync-token"];
     const given = url.searchParams.get("token")
       || (Array.isArray(headerToken) ? headerToken[0] : headerToken)
       || "";
     const authorized = tokens.has(given);
+    const address = req.socket.remoteAddress;
 
     if (url.pathname === "/api/health") {
       return sendJson(res, 200, { ok: true, name: "modsync", version: "0.1.0" });
@@ -127,6 +160,25 @@ export function createServer({
       const packs = loadPacks(packsDir);
       const list = packs.map((p) => `<li>${p.summary.name} ${p.summary.mod.version} <span>(${p.summary.files} files)</span></li>`).join("");
       return sendText(res, 200, `<!doctype html><meta charset="utf-8"><title>${labels.brand}</title><style>body{font:15px system-ui;background:#0b0e14;color:#e9edf5;padding:24px}code{background:#151b27;padding:2px 6px;border-radius:4px}li{margin:6px 0}span{color:#8b94a7}</style><h2>${labels.server.title}</h2><ul>${list || `<li>${labels.server.noPacks}</li>`}</ul><p>${labels.server.installHint}</p>`, "text/html; charset=utf-8");
+    }
+    if (url.pathname === "/api/pair/request" && req.method === "POST") {
+      let body: Record<string, unknown> = {};
+      try {
+        body = await readJsonBody(req);
+      } catch (err) {
+        return sendJson(res, 400, { error: errorMessage(err) });
+      }
+      try {
+        return sendJson(res, 202, pairing.request({ device: body.device, address }));
+      } catch (err) {
+        return sendJson(res, 429, { error: errorMessage(err) });
+      }
+    }
+    if (url.pathname === "/api/pair/status") {
+      const id = url.searchParams.get("id") || "";
+      const result = pairing.status(id, address || "");
+      if (result.status === "missing") return sendJson(res, 404, { error: "pairing request not found" });
+      return sendJson(res, 200, result);
     }
     if (!authorized) return sendJson(res, 403, { error: "bad or missing token" });
 
@@ -167,5 +219,14 @@ export function createServer({
       }
     }
     return sendJson(res, 404, { error: "not found" });
-  });
+  }
+
+  const server = http.createServer((req, res) => {
+    void handle(req, res).catch((err) => {
+      if (!res.headersSent) sendJson(res, 500, { error: errorMessage(err) });
+      else res.end();
+    });
+  }) as PackServer;
+  server.pairing = pairing;
+  return server;
 }

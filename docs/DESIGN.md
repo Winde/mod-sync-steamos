@@ -23,7 +23,8 @@ Adding a game means adding a driver and a pack. The core does not change.
   to the local subnet. It is never port-forwarded. The Windows PC console owns
   that server and serves its control UI from `127.0.0.1` only, on a separate
   ephemeral port. The console can start the server with Windows sign-in, start
-  or stop it by hand, and change the token.
+  or stop it by hand, change the token, and approve a TV without typing the
+  token on the TV.
 - **Steam Machine** — the Electron app runs the installer in its main process.
   The renderer uses IPC; there is no LAN listener. If a local control API is
   kept for automation, it binds `127.0.0.1` and uses a per-run token.

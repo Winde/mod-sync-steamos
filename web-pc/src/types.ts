@@ -40,6 +40,15 @@ export interface PackState {
   error: string | null;
 }
 
+export interface BuildOptionView {
+  key: string;
+  label: string;
+  type: "directory" | "text" | string;
+  optional?: boolean;
+  placeholder?: string;
+  help?: string;
+}
+
 export interface RecipeState {
   id: string;
   name: string;
@@ -51,6 +60,7 @@ export interface RecipeState {
   source: string;
   out: string;
   packExists: boolean;
+  buildOptions: BuildOptionView[];
 }
 
 export interface BuildJobState {
@@ -65,6 +75,13 @@ export interface BuildJobState {
   finishedAt: string | null;
   log: string[];
   result: { version: string; files: number; totalBytes: number } | null;
+}
+
+export interface PairRequestState {
+  id: string;
+  device: string;
+  address: string;
+  createdAt: string;
 }
 
 export interface LanAddress {
@@ -88,6 +105,7 @@ export interface ConsoleState {
   recipes: RecipeState[];
   lan: { detected: string; addresses: LanAddress[] };
   build: BuildJobState | null;
+  pairRequests: PairRequestState[];
   guide: { installCommand: string; firewallCommand: string; installUrl: string };
 }
 
@@ -107,6 +125,7 @@ export interface BuildFormState {
   source: string;
   version: string;
   copy: boolean;
+  driverOptions: Record<string, string>;
 }
 
 export interface ToastItem {

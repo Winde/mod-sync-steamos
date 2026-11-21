@@ -7,6 +7,7 @@ import {
 import * as me3 from "../loaders/me3";
 import * as paths from "../paths";
 import type {
+  BuildOption,
   BuildPackOptions,
   BuildPackResult,
   GameInfo,
@@ -49,6 +50,10 @@ export function defaultSource(): string {
   return "D:\\EldenRingMods";
 }
 
+export function buildOptions(): BuildOption[] {
+  return [];
+}
+
 function requirePath(p: string, label: string): void {
   if (!fs.existsSync(p)) throw new Error(`${label} not found: ${p}`);
 }
@@ -59,6 +64,7 @@ export async function buildPack({
   out,
   link = true,
   version: requestedVersion,
+  progress = () => {},
   log = () => {},
 }: BuildPackOptions): Promise<BuildPackResult> {
   if (recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for ELDEN RING`);
@@ -93,12 +99,14 @@ export async function buildPack({
   let links = 0;
   let copies = 0;
   const payloadFiles = walkFiles(payloadSrc);
+  progress({ phase: "copying", done: 0, total: payloadFiles.length });
   for (let i = 0; i < payloadFiles.length; i++) {
     const file = payloadFiles[i];
     const target = path.join(dst, "payload", "versions", version, file.rel);
     const how = materialize(file.abs, target, link);
     if (how === "link") links++; else copies++;
     if ((i + 1) % 250 === 0 || i + 1 === payloadFiles.length) {
+      progress({ phase: "copying", done: i + 1, total: payloadFiles.length });
       log(`Hardlinking ${i + 1}/${payloadFiles.length}...`);
     }
   }
@@ -136,7 +144,8 @@ export async function buildPack({
     processed++;
     const step = Math.max(1, Math.ceil(totalEntries / 10));
     if (processed === totalEntries || processed % step === 0) {
-      log(`Hashing ${processed}/${totalEntries} (${Math.round((processed / totalEntries) * 100)}%)`);
+      progress({ phase: "hashing", done: processed, total: totalEntries });
+      log(`Hashing ${processed}/${totalEntries}`);
     }
   };
 

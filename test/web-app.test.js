@@ -210,6 +210,48 @@ test("renders the offline screen when the agent is unreachable", async () => {
   }
 });
 
+test("a rejected token asks the Server for approval and shows the wait", async () => {
+  let pairing = { status: "idle", message: null };
+  let pairPosted = false;
+  const dom = await boot({
+    fetchImpl: async (url, options = {}) => {
+      const path = String(url).replace(/^https?:\/\/[^/]+/, "").replace(/\?.*$/, "");
+      if (path === "/api/state") {
+        return jsonResponse(stateFixture([], {
+          pc: {
+            url: "http://192.168.1.10:8787",
+            online: false,
+            error: "HTTP 403 http://192.168.1.10:8787/api/packs",
+            auth: "rejected",
+          },
+          pairing,
+        }));
+      }
+      if (path === "/api/pair" && String(options.method || "").toUpperCase() === "POST") {
+        pairPosted = true;
+        pairing = { status: "pending", message: "Waiting for approval on the Server." };
+        return jsonResponse(pairing);
+      }
+      throw new Error(`no route: ${path}`);
+    },
+    desktop: {
+      checkUpdate: async () => ({ current: "0.6.0", latest: null, available: false, canInstall: false }),
+    },
+  });
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".empty h1")?.textContent === "Pair with the Server");
+    const doc = window.document;
+    assert.equal(doc.querySelector("#pc span:last-child").textContent, "Not paired");
+    assert.equal(doc.querySelector("#update-btn").classList.contains("hidden"), false);
+    await waitFor(window, () => pairPosted);
+    await waitFor(window, (w) => /Waiting for approval on the Server/.test(w.document.querySelector(".empty")?.textContent || ""));
+    assert.equal(doc.querySelector('[data-key="pair"]'), null);
+  } finally {
+    window.close();
+  }
+});
+
 test("groups packs by game and switches the selected pack", async () => {
   const dom = await boot({
     fetchImpl: async () => jsonResponse(stateFixture([packFixture(), bg3Fixture()])),

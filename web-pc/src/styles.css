@@ -152,6 +152,10 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 .callout.error { border-color: rgba(248, 113, 113, 0.4); background: rgba(56, 16, 16, 0.5); color: #fecaca; }
 .callout.info { border-color: rgba(158, 201, 232, 0.32); background: rgba(13, 32, 47, 0.5); color: #d7ecfa; }
 .callout + .callout { margin-top: 8px; }
+.pairlist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.pairrequest { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.pairrequest .hint { margin-top: 3px; }
+.pairrequest .actions { flex: 0 0 auto; }
 .empty {
   border: 1px dashed var(--line-strong); border-radius: 12px;
   padding: 34px 26px; text-align: center; color: var(--muted);

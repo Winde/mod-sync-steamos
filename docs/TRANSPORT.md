@@ -58,6 +58,12 @@ is required by `/api/*`. The install one-liner includes it; the TV app stores it
 in `~/ModSync/agent.json`. The dashboard is local and never exposes the token to
 the browser.
 
+The Server app can also pair a TV without typing the token. If the TV gets
+`HTTP 403`, it asks `/api/pair/request`. The Server console shows the request,
+and **Allow** sends the current token to that TV. The Client saves the token in
+`agent.json`, so later launches connect without another approval. The approval
+is per token: rotating the Server token requires approving the TV again.
+
 ## Steam Machine install
 
 In Desktop Mode:
@@ -78,8 +84,10 @@ Do not hardcode a PC address in the client. The intended Electron flow is:
 1. Discover the PC over mDNS (`_modsync._tcp`) on the LAN, or
 2. Ask for the URL printed by `serve --lan` once, then store it.
 
-If the stored address stops answering, rediscover or let the user re-pair. The
-token stays in `agent.json`; the base URL is not a secret.
+If the stored address stops answering, rediscover or let the user re-pair. If
+the Server rejects the stored token, the Client request appears in the Server
+console for one-click approval. The token stays in `agent.json`; the base URL
+is not a secret.
 
 ## Updates
 

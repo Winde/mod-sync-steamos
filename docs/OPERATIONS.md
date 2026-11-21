@@ -41,7 +41,9 @@ The useful flow is:
 4. **Pack server → Stop server**.
 
 The token in **Settings** is the live token. Change or generate it there; a
-running server restarts and the install one-liner updates.
+running server restarts and the install one-liner updates. A TV with an old or
+missing token shows up as a pairing request in the Server console; **Allow**
+sends it the current token once, and the Client keeps it in `agent.json`.
 
 ## Steam Machine: one-time setup
 

@@ -23,6 +23,7 @@ import type {
   ConfirmView,
   GameGroup,
   JobView,
+  PairingView,
   PackView,
   StorageView,
 } from "./types";
@@ -83,7 +84,7 @@ export function Checks({ pack, allowConfirm, onConfirm }: {
   );
 }
 
-export function Library({ data, groups, selectedGame, selected, libraryView, onOpenGame, onSelectPack, onAllGames, onStorage }: {
+export function Library({ data, groups, selectedGame, selected, libraryView, onOpenGame, onSelectPack, onAllGames, onStorage, onPair }: {
   data: AgentStateView | null;
   groups: GameGroup[];
   selectedGame: string | null;
@@ -93,6 +94,7 @@ export function Library({ data, groups, selectedGame, selected, libraryView, onO
   onSelectPack: (id: string) => void;
   onAllGames: () => void;
   onStorage: () => void;
+  onPair: () => void;
 }) {
   if (!groups.length) return null;
   if (libraryView === "games") {
@@ -139,8 +141,19 @@ export function Library({ data, groups, selectedGame, selected, libraryView, onO
         </div>
         {offline ? (
           <div className="sidecard">
-            <div className="libtitle">{labels.pcOfflineTitle}</div>
-            <div className="meta">{labels.pcOfflineBody}</div>
+            <div className="libtitle">{data?.pc?.auth === "rejected" ? labels.pairTitle : labels.pcOfflineTitle}</div>
+            <div className="meta">{data?.pc?.auth === "rejected" ? labels.pairSideBody : labels.pcOfflineBody}</div>
+            {data?.pc?.auth === "rejected" ? (
+              data?.pairing?.status === "pending" || data?.pairing?.status === "approved"
+                ? <div className="meta">{data.pairing?.status === "approved" ? labels.pairApproved : labels.pairPending}</div>
+                : (
+                  <div className="actions">
+                    <button className="btn ghost small" data-action="pair" data-focusable data-key="side-pair" onClick={onPair}>
+                      {data?.pairing?.status === "idle" ? labels.pairAction : labels.pairAgain}
+                    </button>
+                  </div>
+                )
+            ) : null}
           </div>
         ) : null}
       </>
@@ -309,17 +322,45 @@ export function ProgressView({ job, pack, rate, onRetry, onDismiss, onCancel }: 
   );
 }
 
-export function OfflineView({ onRetry, detail }: { onRetry: () => void; detail?: string | null }) {
+export function OfflineView({ onRetry, detail, auth, pairing, onPair }: {
+  onRetry: () => void;
+  detail?: string | null;
+  auth?: string;
+  pairing?: PairingView | null;
+  onPair: () => void;
+}) {
+  const rejected = auth === "rejected";
+  const phase = pairing?.status || "idle";
+  const waiting = phase === "pending" || phase === "approved";
   return (
     <section className="empty">
       <div className="kicker">{labels.appName.toUpperCase()}</div>
-      <h1>{labels.offlineTitle}</h1>
-      <div className="meta">{labels.offlineBody}</div>
-      {detail ? <div className="callout error">{detail}</div> : null}
-      <div className="actions">
-        <button className="btn primary" data-action="retry" data-autofocus data-focusable data-key="retry" onClick={onRetry}>{labels.retry}</button>
-      </div>
-      <div className="hint">{labels.offlineHint}</div>
+      <h1>{rejected ? labels.pairTitle : labels.offlineTitle}</h1>
+      <div className="meta">{rejected ? labels.pairRejected : labels.offlineBody}</div>
+      {rejected ? (
+        <>
+          {waiting ? (
+            <p className="busy" role="status"><span className="spinner" aria-hidden="true" /><span>{phase === "approved" ? labels.pairApproved : labels.pairPending}</span></p>
+          ) : (
+            <div className="actions">
+              <button className="btn primary" data-action="pair" data-autofocus data-focusable data-key="pair" onClick={onPair}>
+                {phase === "idle" ? labels.pairAction : labels.pairAgain}
+              </button>
+            </div>
+          )}
+          {pairing?.message && !waiting ? <div className="callout">{pairing.message}</div> : null}
+          {detail ? <div className="hint">{detail}</div> : null}
+          <div className="hint">{labels.pairHint}</div>
+        </>
+      ) : (
+        <>
+          {detail ? <div className="callout error">{detail}</div> : null}
+          <div className="actions">
+            <button className="btn primary" data-action="retry" data-autofocus data-focusable data-key="retry" onClick={onRetry}>{labels.retry}</button>
+          </div>
+          <div className="hint">{labels.offlineHint}</div>
+        </>
+      )}
     </section>
   );
 }

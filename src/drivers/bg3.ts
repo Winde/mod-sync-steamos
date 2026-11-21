@@ -10,6 +10,7 @@ import * as paths from "../paths";
 import { projectRoot } from "../root";
 import * as bg3le from "../loaders/bg3le";
 import type {
+  BuildOption,
   BuildPackOptions,
   BuildPackResult,
   ContentsInput,
@@ -72,6 +73,27 @@ export function defaultSource(): string {
     if (resolved.dataDir) return resolved.dataDir;
   }
   return paths.expand("%DATA_HOME%/Larian Studios/Baldur's Gate 3", paths.contextFor(null));
+}
+
+export function buildOptions(): BuildOption[] {
+  return [
+    {
+      key: "gameRoot",
+      label: "BG3 game folder",
+      type: "directory",
+      optional: true,
+      placeholder: "Detected from Steam",
+      help: "Reads bin/DWrite.dll and ScriptExtenderSettings.json for the Windows and Proton script extender.",
+    },
+    {
+      key: "bg3leRoot",
+      label: "BG3LE folder",
+      type: "directory",
+      optional: true,
+      placeholder: "Downloaded automatically",
+      help: "Native Linux loader bundled in the pack. Leave empty to use the pinned BG3LE release.",
+    },
+  ];
 }
 
 function defaultVersion(): string {
@@ -177,8 +199,8 @@ export async function buildPack({
   out,
   link = true,
   version: requestedVersion,
-  gameRoot: requestedGameRoot,
   driverOptions,
+  progress = () => {},
   log = () => {},
 }: BuildPackOptions): Promise<BuildPackResult> {
   if (recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for Baldur's Gate 3`);
@@ -193,6 +215,7 @@ export async function buildPack({
   const modsettings = path.join(src, "PlayerProfiles", "Public", "modsettings.lsx");
   const scriptExtender = path.join(src, "Script Extender");
   const game: SteamGame | null = steam.findGame(GAME) || null;
+  const requestedGameRoot = typeof driverOptions?.gameRoot === "string" ? driverOptions.gameRoot : "";
   const gameRoot = requestedGameRoot ? path.resolve(requestedGameRoot) : (game ? game.root : "");
   const requestedBg3le = typeof driverOptions?.bg3leRoot === "string" ? driverOptions.bg3leRoot : "";
 
@@ -221,6 +244,7 @@ export async function buildPack({
 
   let copied = 0;
   let bytes = 0;
+  progress({ phase: "copying", done: 0, total: paks.length });
   for (const name of paks) {
     const from = path.join(modsDir, name);
     const to = path.join(payload, "Mods", name);
@@ -228,6 +252,7 @@ export async function buildPack({
     bytes += fs.statSync(to).size;
     copied++;
     if (copied % 10 === 0 || copied === paks.length) {
+      progress({ phase: "copying", done: copied, total: paks.length, bytesDone: bytes });
       log(`Mods ${copied}/${paks.length} (${formatBytes(bytes)})`);
     }
   }
@@ -294,7 +319,8 @@ export async function buildPack({
     processed++;
     const step = Math.max(1, Math.ceil(total / 10));
     if (processed === total || processed % step === 0) {
-      log(`Hashing ${processed}/${total} (${Math.round((processed / total) * 100)}%)`);
+      progress({ phase: "hashing", done: processed, total });
+      log(`Hashing ${processed}/${total}`);
     }
   };
 

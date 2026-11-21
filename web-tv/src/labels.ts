@@ -6,6 +6,7 @@ const labels = {
   pc: "Server",
   pcOnline: "Server online",
   pcOffline: "Server offline",
+  pcNotPaired: "Not paired",
   footer: "Mods only in v1",
 
   games: "Games",
@@ -80,6 +81,15 @@ const labels = {
   offlineTitle: "Server offline",
   offlineBody: "Start ModSync Server on the server machine, keep both devices on the same LAN, then retry.",
   offlineHint: "The client only pulls over HTTP. No SSH, no USB.",
+  pairTitle: "Pair with the Server",
+  pairRejected: "The Server rejected this Client. Approve this TV on the Server to connect.",
+  pairAction: "Request access",
+  pairAgain: "Request again",
+  pairPending: "Waiting for approval on the Server…",
+  pairApproved: "Approved. Connecting…",
+  pairDenied: "The Server denied this TV.",
+  pairHint: "On the PC, open ModSync Server and click Allow for this TV.",
+  pairSideBody: "This TV is not paired. Open ModSync Server on the PC and allow it.",
   noPacksTitle: "No packs yet",
   noPacksBody: "Build a pack on the server, keep the server running, then refresh.",
 

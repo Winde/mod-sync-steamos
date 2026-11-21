@@ -6,6 +6,7 @@ import type {
   BuildJobState,
   ConsoleState,
   PackState,
+  PairRequestState,
   SettingsDraft,
   ToastItem,
 } from "./types";
@@ -80,10 +81,36 @@ export function BuildBanner({ job, name, onShow }: {
   );
 }
 
-export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onShowBuild, onChangeFolder }: {
+export function PairRequests({ requests, busy, onApprove, onDeny }: {
+  requests: PairRequestState[];
+  busy: boolean;
+  onApprove: (id: string) => void;
+  onDeny: (id: string) => void;
+}) {
+  if (!requests.length) return null;
+  return (
+    <div className="pairlist">
+      {requests.map((request) => (
+        <div className="callout pairrequest" key={request.id}>
+          <div>
+            <b>{request.device}</b> wants to connect to this Server.
+            <div className="hint">{request.address} · {formatDate(request.createdAt)}</div>
+          </div>
+          <div className="actions">
+            <button className="btn small primary" data-action="pair-approve" data-id={request.id} disabled={busy} onClick={() => onApprove(request.id)}>Allow</button>
+            <button className="btn small" data-action="pair-deny" data-id={request.id} disabled={busy} onClick={() => onDeny(request.id)}>Deny</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
   data: ConsoleState | null;
   error: string | null;
   job: BuildJobState | null;
+  pairBusy: boolean;
   onRefresh: () => void;
   onBuildNew: () => void;
   onRebuild: (pack: PackState) => void;
@@ -91,6 +118,8 @@ export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild
   onRemove: (pack: PackState) => void;
   onShowBuild: () => void;
   onChangeFolder: () => void;
+  onApprovePair: (id: string) => void;
+  onDenyPair: (id: string) => void;
 }) {
   const valid = data?.packs.filter((pack) => pack.valid) || [];
   const bytes = valid.reduce((sum, pack) => sum + pack.totalBytes, 0);
@@ -126,6 +155,12 @@ export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild
       <div id="notice">
         {error ? <div className="callout error"><b>The server console could not refresh.</b><br />{error}</div> : null}
       </div>
+      <PairRequests
+        requests={data?.pairRequests || []}
+        busy={pairBusy}
+        onApprove={onApprovePair}
+        onDeny={onDenyPair}
+      />
       <BuildBanner job={job} name={buildName} onShow={onShowBuild} />
       <div id="packs" className="packlist">
         {!data ? <div className="empty"><strong>Connecting to the console…</strong></div> : null}
@@ -474,6 +509,7 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
     source: initialRecipe?.source || "",
     version: "",
     copy: false,
+    driverOptions: {},
   });
   const recipe = data.recipes.find((entry) => entry.id === form.recipeId) || initialRecipe;
   const jobName = data.recipes.find((entry) => entry.id === job?.recipeId)?.name || job?.packId || "";
@@ -482,7 +518,7 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
     const done = job.status === "done";
     const failed = job.status === "error";
     const status = job.status === "running"
-      ? `${job.phase === "hashing" ? "Hashing files" : job.phase === "copying" ? "Copying payload" : "Preparing"} · ${job.percent}%`
+      ? `${job.phase === "hashing" ? "Hashing files" : job.phase === "copying" ? "Copying payload" : job.phase === "swapping" ? "Swapping pack" : "Preparing"} · ${job.percent}%`
       : done && job.result
         ? `${job.result.version} · ${job.result.files} files · ${formatBytes(job.result.totalBytes)}`
         : failed ? "Build failed" : "Finished";
@@ -548,7 +584,12 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
             value={form.recipeId}
             onChange={(event) => {
               const next = recipeFor(data, event.target.value);
-              setForm((value) => ({ ...value, recipeId: event.target.value, source: next?.source || value.source }));
+              setForm((value) => ({
+                ...value,
+                recipeId: event.target.value,
+                source: next?.source || value.source,
+                driverOptions: {},
+              }));
             }}
           >
             {data.recipes.map((entry) => (
@@ -575,6 +616,49 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
           </div>
           <p className="hint">The folder ModSync reads the installed mod from. It is not modified.</p>
         </div>
+        {(recipe.buildOptions || []).map((option) => {
+          const id = `build-option-${option.key}`;
+          return (
+            <div className="field" key={option.key}>
+              <label htmlFor={id}>{option.label}{option.optional ? " (optional)" : ""}</label>
+              <div className="inputrow">
+                <input
+                  id={id}
+                  className="input"
+                  type="text"
+                  spellCheck={false}
+                  placeholder={option.placeholder || ""}
+                  value={form.driverOptions[option.key] || ""}
+                  onChange={(event) => setForm((value) => ({
+                    ...value,
+                    driverOptions: { ...value.driverOptions, [option.key]: event.target.value },
+                  }))}
+                />
+                {option.type === "directory" ? (
+                  <button
+                    className="btn small"
+                    type="button"
+                    data-action="build-option-browse"
+                    data-option={option.key}
+                    disabled={!desktopBridge()?.pickFolder}
+                    onClick={async () => {
+                      const picked = await desktopBridge()?.pickFolder?.(`Choose ${option.label.toLowerCase()}`);
+                      if (picked) {
+                        setForm((value) => ({
+                          ...value,
+                          driverOptions: { ...value.driverOptions, [option.key]: picked },
+                        }));
+                      }
+                    }}
+                  >
+                    Browse
+                  </button>
+                ) : null}
+              </div>
+              {option.help ? <p className="hint">{option.help}</p> : null}
+            </div>
+          );
+        })}
         <div className="field two">
           <div>
             <label htmlFor="build-version">Version (optional)</label>

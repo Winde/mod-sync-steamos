@@ -60,9 +60,11 @@ function fixture(overrides = {}) {
       source: "D:\\EldenRingMods",
       out: "C:\\ModSync\\packs\\eldenring-graceborne",
       packExists: true,
+      buildOptions: [],
     }],
     lan: { detected: "192.168.1.20", addresses: [{ name: "Ethernet", address: "192.168.1.20" }] },
     build: null,
+    pairRequests: [],
     guide: {
       installCommand: "curl -fsSL 'install.sh' | bash -s -- --pc 'http://192.168.1.20:8787' --token 'token-1234'",
       firewallCommand: 'New-NetFirewallRule -DisplayName "ModSync HTTP 8787"',
@@ -130,6 +132,40 @@ test("Server console renders packs, settings, and the server control", async () 
   }
 });
 
+test("Server console shows a pending TV request and approves it", async () => {
+  let posted = null;
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/pair/approve") && init.method === "POST") {
+      posted = JSON.parse(init.body);
+      return response({ ok: true, pairRequests: [] });
+    }
+    if (String(url).endsWith("/api/state")) {
+      return response(fixture({
+        pairRequests: [{
+          id: "req-1",
+          device: "Living room TV",
+          address: "192.168.1.50",
+          createdAt: "2026-11-21T12:00:00.000Z",
+        }],
+      }));
+    }
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    assert.match(doc.querySelector(".pairlist").textContent, /Living room TV/);
+    assert.match(doc.querySelector(".pairlist").textContent, /192\.168\.1\.50/);
+    doc.querySelector('[data-action="pair-approve"]').click();
+    await waitFor(window, () => posted !== null);
+    assert.deepEqual(posted, { id: "req-1" });
+  } finally {
+    window.close();
+  }
+});
+
 test("Server console starts the server and opens the rebuild dialog", async () => {
   let running = false;
   const fetchImpl = async (url) => {
@@ -167,6 +203,87 @@ test("Server console starts the server and opens the rebuild dialog", async () =
     await waitFor(window, (w) => !!w.document.querySelector("#build-form"));
     assert.equal(doc.querySelector("#build-source").value, "D:\\EldenRingMods");
     assert.match(doc.querySelector("#build-recipe").textContent, /Graceborne/);
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console renders driver build options and submits them", async () => {
+  let posted = null;
+  const bg3Recipe = {
+    id: "bg3-modded",
+    name: "BG3 Modded",
+    game: "bg3",
+    gameTitle: "Baldur's Gate 3",
+    modId: "bg3",
+    description: "",
+    version: "",
+    source: "D:\\BG3Mods",
+    out: "C:\\ModSync\\packs\\bg3-modded",
+    packExists: false,
+    buildOptions: [
+      {
+        key: "gameRoot",
+        label: "BG3 game folder",
+        type: "directory",
+        optional: true,
+        placeholder: "Detected from Steam",
+        help: "Reads DWrite.dll and ScriptExtenderSettings.json.",
+      },
+      {
+        key: "bg3leRoot",
+        label: "BG3LE folder",
+        type: "directory",
+        optional: true,
+        placeholder: "Downloaded automatically",
+        help: "Native Linux loader bundled in the pack.",
+      },
+    ],
+  };
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/build") && init.method === "POST") {
+      posted = JSON.parse(init.body);
+      return response({
+        id: "job-1",
+        recipeId: posted.recipeId,
+        packId: posted.recipeId,
+        status: "running",
+        phase: "copying",
+        percent: 0,
+        error: null,
+        startedAt: "2026-11-21T12:00:00.000Z",
+        finishedAt: null,
+        log: [],
+        result: null,
+      }, 202);
+    }
+    if (String(url).endsWith("/api/state")) {
+      return response(fixture({ recipes: [bg3Recipe], build: null }));
+    }
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    doc.querySelector('[data-action="build"]').click();
+    await waitFor(window, (w) => !!w.document.querySelector("#build-form"));
+    assert.match(doc.querySelector("#build-form").textContent, /BG3 game folder/);
+    assert.match(doc.querySelector("#build-form").textContent, /BG3LE folder/);
+
+    const setInput = (id, value) => {
+      const input = doc.querySelector(id);
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(input, value);
+      input.dispatchEvent(new window.Event("input", { bubbles: true }));
+    };
+    setInput("#build-option-gameRoot", "D:\\Steam\\BG3");
+    setInput("#build-option-bg3leRoot", "D:\\BG3LE");
+
+    doc.querySelector("#build-form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await waitFor(window, () => posted !== null);
+    assert.deepEqual(posted.driverOptions, { gameRoot: "D:\\Steam\\BG3", bg3leRoot: "D:\\BG3LE" });
   } finally {
     window.close();
   }

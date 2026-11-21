@@ -36,7 +36,7 @@ test("pack CLI produces a complete pack contract", { timeout: 60000 }, async (t)
   ]);
 
   assert.match(result.stdout, /Hardlinking \d+\/\d+/);
-  assert.match(result.stdout, /Hashing \d+\/\d+ \(\d+%\)/);
+  assert.match(result.stdout, /Hashing \d+\/\d+/);
 
   const pack = readJson(path.join(out, "pack.json"));
   const doc = readJson(path.join(out, "files.json"));

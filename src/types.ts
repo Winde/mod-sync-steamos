@@ -336,14 +336,31 @@ export interface ContentsInput {
   version: string;
 }
 
+export interface BuildProgress {
+  phase: "copying" | "hashing" | "swapping" | "done" | string;
+  done?: number;
+  total?: number;
+  bytesDone?: number;
+  bytesTotal?: number;
+}
+
+export interface BuildOption {
+  key: string;
+  label: string;
+  type: "directory" | "text";
+  optional?: boolean;
+  placeholder?: string;
+  help?: string;
+}
+
 export interface BuildPackOptions {
   recipe: Recipe;
   source: string;
   out: string;
   link?: boolean;
   version?: string;
-  gameRoot?: string;
   driverOptions?: Record<string, unknown>;
+  progress?: (update: BuildProgress) => void;
   log?: (message: string) => void;
 }
 

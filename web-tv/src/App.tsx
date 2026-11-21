@@ -59,6 +59,7 @@ export default function App() {
   const mainRef = useRef<HTMLElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const canRefreshRef = useRef(true);
+  const pairRequestedRef = useRef(false);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
 
   const setSelected = (id: string | null) => {
@@ -148,6 +149,16 @@ export default function App() {
     }
   }, []);
 
+  const requestPairing = useCallback(async () => {
+    pairRequestedRef.current = true;
+    try {
+      await api("/api/pair", { method: "POST", body: "{}" });
+      await refresh();
+    } catch (err) {
+      setError(messageOf(err));
+    }
+  }, [refresh]);
+
   const packs = data?.packs || [];
   const groups = useMemo(() => groupGames(packs), [packs]);
   const selectedPack = packs.find((pack) => pack.id === selectedState) || null;
@@ -162,6 +173,16 @@ export default function App() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (data?.pc?.auth !== "rejected") {
+      pairRequestedRef.current = false;
+      return;
+    }
+    if (!data?.pc?.url || pairRequestedRef.current) return;
+    if ((data?.pairing?.status || "idle") !== "idle") return;
+    void requestPairing();
+  }, [data?.pc?.auth, data?.pc?.url, data?.pairing?.status, requestPairing]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -605,7 +626,15 @@ export default function App() {
   if (viewState === "storage") {
     mainContent = <StorageView storage={storage} onClose={() => setView("home")} onClear={(packId, scope, bytes) => { void requestStorageClear(packId, scope, bytes); }} />;
   } else if (offline || error) {
-    mainContent = <OfflineView detail={error} onRetry={() => { void refresh(); }} />;
+    mainContent = (
+      <OfflineView
+        detail={error}
+        auth={data?.pc?.auth}
+        pairing={data?.pairing}
+        onRetry={() => { void refresh(); }}
+        onPair={() => { void requestPairing(); }}
+      />
+    );
   } else if (!packs.length) {
     mainContent = <NoPacksView onRetry={() => { void refresh(); }} />;
   } else if (!selectedPack) {
@@ -651,6 +680,7 @@ export default function App() {
         onSelectPack={selectPack}
         onAllGames={() => setLibraryView("games")}
         onStorage={() => { void openStorage(); }}
+        onPair={() => { void requestPairing(); }}
       />
     );
   }
@@ -689,7 +719,7 @@ export default function App() {
           </button>
           <div id="pc" className={`pc${data?.pc?.online ? " online" : ""}`}>
             <span className="dot" />
-            <span>{data?.pc?.online ? labels.pcOnline : labels.pcOffline}</span>
+            <span>{data?.pc?.online ? labels.pcOnline : data?.pc?.auth === "rejected" ? labels.pcNotPaired : labels.pcOffline}</span>
           </div>
         </div>
       </header>

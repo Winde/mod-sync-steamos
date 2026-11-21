@@ -50,6 +50,7 @@ export default function App() {
   const [data, setData] = useState<ConsoleState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pairBusy, setPairBusy] = useState(false);
   const [tokenVisible, setTokenVisible] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -196,9 +197,14 @@ export default function App() {
     }
     setBusy(true);
     try {
+      const driverOptions: Record<string, string> = {};
+      for (const [key, value] of Object.entries(form.driverOptions)) {
+        const trimmed = value.trim();
+        if (trimmed) driverOptions[key] = trimmed;
+      }
       const job = await api<BuildJobState>("/api/build", {
         method: "POST",
-        body: JSON.stringify({ ...form, source: form.source.trim(), version: form.version.trim() }),
+        body: JSON.stringify({ ...form, source: form.source.trim(), version: form.version.trim(), driverOptions }),
       });
       setData((current) => current ? { ...current, build: job } : current);
       lastBuildStatus.current = job.status;
@@ -209,6 +215,19 @@ export default function App() {
       toast(messageOf(err), "error");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const answerPair = async (id: string, action: "approve" | "deny") => {
+    setPairBusy(true);
+    try {
+      await api(`/api/pair/${action}`, { method: "POST", body: JSON.stringify({ id }) });
+      await refresh();
+      toast(action === "approve" ? "TV approved." : "Pairing request denied.", action === "approve" ? "success" : "neutral");
+    } catch (err) {
+      toast(messageOf(err), "error");
+    } finally {
+      setPairBusy(false);
     }
   };
 
@@ -334,6 +353,9 @@ export default function App() {
             onRemove={openRemove}
             onShowBuild={() => openBuild(buildRecipeId)}
             onChangeFolder={() => { void changePacksFolder(); }}
+            pairBusy={pairBusy}
+            onApprovePair={(id) => { void answerPair(id, "approve"); }}
+            onDenyPair={(id) => { void answerPair(id, "deny"); }}
           />
           <aside className="side">
             <ServerPanel

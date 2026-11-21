@@ -152,7 +152,7 @@ async function cmdPack(values: CliValues): Promise<void> {
     out,
     link: !values.copy,
     version: values.version || config.version || recipe.version,
-    gameRoot: values["game-root"],
+    driverOptions: values["game-root"] ? { gameRoot: values["game-root"] } : {},
     log: (m) => console.log(m),
   });
   console.log(`\nPack: ${result.packRoot}`);
@@ -212,7 +212,12 @@ async function cmdAgent(values: CliValues): Promise<void> {
   if (!fs.existsSync(agentConfigPath)) fail(`agent config not found: ${agentConfigPath} (install the TV app once)`);
   const config = util.readJson<AgentConfig>(agentConfigPath);
   if (values.port) config.port = Number(values.port);
-  const agent = createAgent(config);
+  const saveConnection = (connection: { pcUrl: string; token: string }): void => {
+    let current: Record<string, unknown> = {};
+    try { current = util.readJson<Record<string, unknown>>(agentConfigPath); } catch { /* write a fresh file */ }
+    util.writeJson(agentConfigPath, { ...current, pcUrl: connection.pcUrl, token: connection.token });
+  };
+  const agent = createAgent({ ...config, saveConnection });
   agent.listen(() => {
     console.log(labels.agent.dashboard(Number(config.port || 8788)));
     console.log(labels.agent.root(config.root || "~/ModSync"));

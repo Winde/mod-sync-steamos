@@ -10,7 +10,9 @@ import * as recipes from "./recipes";
 import { projectRoot } from "./root";
 import { createServer } from "./server";
 import * as util from "./util";
-import type { PackSummary, Recipe, Variant } from "./types";
+import type { Driver } from "./drivers";
+import type { PairingStore, PairRequestView } from "./pairing";
+import type { BuildOption, BuildProgress, PackSummary, Recipe, Variant } from "./types";
 
 /**
  * PC-side pack console.
@@ -68,6 +70,7 @@ export interface ConsoleRecipe {
   source: string;
   out: string;
   packExists: boolean;
+  buildOptions: BuildOption[];
 }
 
 export interface ServerStatus {
@@ -111,6 +114,7 @@ export interface ConsoleState {
   recipes: ConsoleRecipe[];
   lan: { detected: string; addresses: util.LanAddress[] };
   build: BuildJobSummary | null;
+  pairRequests: PairRequestView[];
   guide: { installCommand: string; firewallCommand: string; installUrl: string };
 }
 
@@ -145,7 +149,7 @@ export interface Console {
   updateSettings: (input: Partial<ConsoleConfig> & { workingSource?: { recipeId: string; source: string } }) => Promise<ConsoleState>;
   listPacks: () => ConsolePack[];
   listRecipes: () => ConsoleRecipe[];
-  startBuild: (input: { recipeId: string; source?: string; version?: string; copy?: boolean }) => BuildJobSummary;
+  startBuild: (input: { recipeId: string; source?: string; version?: string; copy?: boolean; driverOptions?: Record<string, unknown> }) => BuildJobSummary;
   removePack: (id: string) => Promise<void>;
   revealPack: (id: string) => void;
   revealPacksDir: () => void;
@@ -154,6 +158,7 @@ export interface Console {
 
 interface ServerRuntime {
   server: http.Server;
+  pairing: PairingStore;
   host: string;
   port: number;
   url: string;
@@ -163,6 +168,61 @@ interface ServerRuntime {
 const DEFAULT_PORT = 8787;
 const TOKEN_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const PACK_ID = /^[a-zA-Z0-9._-]+$/;
+
+// Each phase owns a slice of the bar so switching from one driver phase to the
+// next never moves progress backwards.
+const PHASE_PERCENT: Record<string, readonly [number, number]> = {
+  preparing: [0, 1],
+  copying: [1, 35],
+  hashing: [35, 95],
+  swapping: [95, 99],
+};
+
+function normalizeDriverOptions(driver: Driver, input: unknown): Record<string, unknown> {
+  const values = input && typeof input === "object" && !Array.isArray(input)
+    ? input as Record<string, unknown>
+    : {};
+  const out: Record<string, unknown> = {};
+  for (const option of driver.buildOptions()) {
+    const raw = values[option.key];
+    if (raw != null && typeof raw !== "string") {
+      throw new Error(`${option.label} must be text.`);
+    }
+    const value = String(raw ?? "").trim();
+    if (!value) {
+      if (!option.optional) throw new Error(`${option.label} is required.`);
+      continue;
+    }
+    if (option.type === "directory") {
+      const resolved = path.resolve(value);
+      let isDirectory = false;
+      try {
+        isDirectory = fs.statSync(resolved).isDirectory();
+      } catch {
+        isDirectory = false;
+      }
+      if (!isDirectory) throw new Error(`${option.label} not found: ${resolved}`);
+      out[option.key] = resolved;
+      continue;
+    }
+    out[option.key] = value;
+  }
+  return out;
+}
+
+function percentForProgress(update: BuildProgress): number | null {
+  const range = PHASE_PERCENT[update.phase];
+  if (!range) return null;
+  let ratio: number | null = null;
+  if (update.bytesDone != null && update.bytesTotal) {
+    ratio = update.bytesDone / update.bytesTotal;
+  } else if (update.done != null && update.total) {
+    ratio = update.done / update.total;
+  }
+  if (ratio == null) return null;
+  const clamped = Math.max(0, Math.min(1, ratio));
+  return Math.round(range[0] + (range[1] - range[0]) * clamped);
+}
 
 function randomToken(): string {
   let out = "";
@@ -431,10 +491,12 @@ export function createConsole(options: ConsoleOptions): Console {
     for (const recipe of all) {
       let gameTitle = recipe.game;
       let source = "";
+      let buildOptions: BuildOption[] = [];
       try {
         const driver = drivers.driverFor(recipe.game);
         gameTitle = driver.GAME.title || recipe.game;
         source = config.working[recipe.id]?.source || driver.defaultSource();
+        buildOptions = driver.buildOptions();
       } catch { /* an unknown driver is still useful to see */ }
       out.push({
         id: recipe.id,
@@ -447,6 +509,7 @@ export function createConsole(options: ConsoleOptions): Console {
         source,
         out: path.join(config.packsDir, recipe.id),
         packExists: fs.existsSync(path.join(config.packsDir, recipe.id, "pack.json")),
+        buildOptions,
       });
     }
     recipeCache = { at: Date.now(), value: out };
@@ -563,6 +626,7 @@ export function createConsole(options: ConsoleOptions): Console {
       recipes: listRecipes(),
       lan: { detected: util.detectLanIp(), addresses: util.lanAddresses() },
       build: jobSummary(activeJob || lastJob),
+      pairRequests: runtime ? runtime.pairing.list() : [],
       guide: guide(),
     };
   }
@@ -612,6 +676,7 @@ export function createConsole(options: ConsoleOptions): Console {
     const actualPort = address && typeof address === "object" ? address.port : port;
     runtime = {
       server,
+      pairing: server.pairing,
       host,
       port: actualPort,
       url: `http://${host}:${actualPort}`,
@@ -723,11 +788,12 @@ export function createConsole(options: ConsoleOptions): Console {
     return state();
   }
 
-  function startBuild(input: { recipeId: string; source?: string; version?: string; copy?: boolean }): BuildJobSummary {
+  function startBuild(input: { recipeId: string; source?: string; version?: string; copy?: boolean; driverOptions?: Record<string, unknown> }): BuildJobSummary {
     if (activeJob) throw new Error("A build is already running.");
     if (!PACK_ID.test(String(input.recipeId || ""))) throw new Error("Invalid recipe id.");
     const recipe = recipes.loadRecipe(String(input.recipeId || ""));
     const driver = drivers.driverFor(recipe.game);
+    const driverOptions = normalizeDriverOptions(driver, input.driverOptions);
     const requestedVersion = String(input.version || "").trim();
     if (requestedVersion && !/^[A-Za-z0-9._+-]+$/.test(requestedVersion)) {
       throw new Error("Version can only use letters, numbers, dots, dashes, underscores, and plus signs.");
@@ -762,11 +828,11 @@ export function createConsole(options: ConsoleOptions): Console {
     const log = (line: string): void => {
       job.log.push(line);
       if (job.log.length > 400) job.log.shift();
-      const percent = /\((\d+)%\)/.exec(line);
-      if (percent) job.percent = Math.max(job.percent, Math.min(99, Number(percent[1])));
-      if (/^Packing /.test(line)) job.phase = "copying";
-      if (/^(Hardlinking|Payload)/.test(line)) job.phase = "copying";
-      if (/^(Hashing|Wrote )/.test(line)) job.phase = "hashing";
+    };
+    const progress = (update: BuildProgress): void => {
+      if (update.phase) job.phase = update.phase;
+      const percent = percentForProgress(update);
+      if (percent != null) job.percent = Math.max(job.percent, Math.min(99, percent));
     };
     util.ensureDir(staging);
 
@@ -780,6 +846,8 @@ export function createConsole(options: ConsoleOptions): Console {
           out: tempOut,
           link: input.copy !== true,
           version: requestedVersion,
+          driverOptions,
+          progress,
           log,
         });
         job.phase = "swapping";
@@ -931,6 +999,16 @@ export function createConsole(options: ConsoleOptions): Console {
     if (url.pathname === "/api/server/stop" && method === "POST") {
       return sendJson(res, 200, await stopServer());
     }
+    if ((url.pathname === "/api/pair/approve" || url.pathname === "/api/pair/deny") && method === "POST") {
+      const body = await readBody(req);
+      const id = String(body.id || "");
+      if (!runtime) return sendJson(res, 409, { error: "Start the pack server before approving a TV." });
+      const accepted = url.pathname.endsWith("/approve")
+        ? runtime.pairing.approve(id)
+        : runtime.pairing.deny(id);
+      if (!accepted) return sendJson(res, 404, { error: "Pairing request not found or expired." });
+      return sendJson(res, 200, { ok: true, pairRequests: runtime.pairing.list() });
+    }
     if (url.pathname === "/api/settings" && method === "POST") {
       const body = await readBody(req);
       return sendJson(res, 200, await updateSettings(body as Partial<ConsoleConfig> & { workingSource?: { recipeId: string; source: string } }));
@@ -942,6 +1020,9 @@ export function createConsole(options: ConsoleOptions): Console {
         source: body.source == null ? undefined : String(body.source),
         version: body.version == null ? undefined : String(body.version),
         copy: body.copy === true,
+        driverOptions: body.driverOptions && typeof body.driverOptions === "object" && !Array.isArray(body.driverOptions)
+          ? body.driverOptions as Record<string, unknown>
+          : undefined,
       }));
     }
     if (url.pathname === "/api/packs/remove" && method === "POST") {

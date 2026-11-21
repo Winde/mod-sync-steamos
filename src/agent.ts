@@ -81,6 +81,18 @@ export interface AgentConfig {
   steamLibraries?: string[];
 }
 
+export interface AgentOptions extends AgentConfig {
+  /** Persist a token received through Server approval. */
+  saveConnection?: (connection: { pcUrl: string; token: string }) => void;
+}
+
+export type PairingPhase = "idle" | "pending" | "approved" | "denied" | "error";
+
+export interface PairingState {
+  status: PairingPhase;
+  message: string | null;
+}
+
 interface Job {
   id: string;
   type: string;
@@ -172,7 +184,8 @@ interface AgentPackState extends AgentPackInput, LocalInfo {
 
 interface AgentState {
   agent: { version: string; root: string; port: number };
-  pc: { url: string; online: boolean; error: string | null };
+  pc: { url: string; online: boolean; error: string | null; auth: "ok" | "rejected" | "unknown" | "unconfigured" };
+  pairing: PairingState;
   packs: AgentPackState[];
   diskFreeBytes: number | null;
   job: JobSummary | null;
@@ -189,14 +202,19 @@ export interface Agent {
   listen: (callback?: () => void) => void;
   state: () => Promise<AgentState>;
   startInstallJob: (packId: string) => Job;
+  startPairing: () => PairingState;
   config: { root: string; port: number; pcUrl: string };
 }
 
-export function createAgent(config: AgentConfig): Agent {
+export function createAgent(config: AgentOptions): Agent {
   const root = config.root || path.join(os.homedir(), "ModSync");
   const port = Number(config.port || 8788);
-  const pcUrl = String(config.pcUrl || "").replace(/\/+$/, "");
-  const token = config.token || "";
+  let pcUrl = String(config.pcUrl || "").replace(/\/+$/, "");
+  let token = config.token || "";
+  let pairing: PairingState = { status: "idle", message: null };
+  let pairingRun = 0;
+  const pairWaitMs = 2 * 60 * 1000;
+  const fetchTimeoutMs = 8000;
   if (config.steamRoot) process.env.STEAM_ROOT = String(config.steamRoot);
   if (Array.isArray(config.steamLibraries)) steam.setExtraLibraries(config.steamLibraries);
   const webDir = path.join(projectRoot, "web");
@@ -260,12 +278,72 @@ export function createAgent(config: AgentConfig): Agent {
     if (!force && Date.now() - remoteCache.at < 2500) return remoteCache;
     if (!pcUrl) return (remoteCache = { at: Date.now(), packs: [], error: "PC URL is not configured" });
     try {
-      const packs = await util.fetchJson<PackSummary[]>(`${pcUrl}/api/packs`, { headers: { "x-modsync-token": token } });
+      const packs = await util.fetchJson<PackSummary[]>(`${pcUrl}/api/packs`, {
+        headers: { "x-modsync-token": token },
+        signal: AbortSignal.timeout(fetchTimeoutMs),
+      });
       remoteCache = { at: Date.now(), packs, error: null };
     } catch (err) {
-      remoteCache = { at: Date.now(), packs: [], error: util.errorMessage(err) };
+      const message = util.errorMessage(err);
+      if (/HTTP 403\b/.test(message) && pairing.status === "approved") {
+        pairing = { status: "idle", message: null };
+      }
+      remoteCache = { at: Date.now(), packs: [], error: message };
     }
     return remoteCache;
+  }
+
+  function startPairing(): PairingState {
+    if (!pcUrl) {
+      pairing = { status: "error", message: "The Server address is not configured." };
+      return pairing;
+    }
+    if (pairing.status === "pending") return pairing;
+    const run = ++pairingRun;
+    pairing = { status: "pending", message: "Waiting for approval on the Server." };
+    void (async () => {
+      try {
+        const request = await util.fetchJson<{ requestId?: string }>(`${pcUrl}/api/pair/request`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ device: `ModSync Client (${os.hostname()})` }),
+          signal: AbortSignal.timeout(fetchTimeoutMs),
+        });
+        const requestId = String(request.requestId || "");
+        if (!requestId) throw new Error("The Server did not return a pairing request id.");
+        const deadline = Date.now() + pairWaitMs;
+        while (Date.now() < deadline) {
+          if (run !== pairingRun) return;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          let result: { status?: string; token?: string } | null = null;
+          try {
+            result = await util.fetchJson<{ status?: string; token?: string }>(
+              `${pcUrl}/api/pair/status?id=${encodeURIComponent(requestId)}`,
+              { signal: AbortSignal.timeout(fetchTimeoutMs) },
+            );
+          } catch (err) {
+            if (/HTTP 404\b/.test(util.errorMessage(err))) throw err;
+            continue;
+          }
+          if (result.status === "approved" && result.token) {
+            token = result.token;
+            remoteCache = { at: 0, packs: [], error: null };
+            try { config.saveConnection?.({ pcUrl, token }); } catch { /* the in-memory token still works */ }
+            pairing = { status: "approved", message: "Approved. The Server token is saved on this TV." };
+            return;
+          }
+          if (result.status === "denied") {
+            pairing = { status: "denied", message: "The Server denied this TV." };
+            return;
+          }
+        }
+        pairing = { status: "error", message: "The Server did not approve the request. Try again." };
+      } catch (err) {
+        if (run !== pairingRun) return;
+        pairing = { status: "error", message: util.errorMessage(err) };
+      }
+    })();
+    return pairing;
   }
 
   function localInfo(pack: { id: string; mod: { id: string; version: string } }): LocalInfo {
@@ -326,9 +404,17 @@ export function createAgent(config: AgentConfig): Agent {
       const game = String(a.game?.title || "").localeCompare(String(b.game?.title || ""));
       return game || String(a.name || "").localeCompare(String(b.name || ""));
     });
+    const auth: AgentState["pc"]["auth"] = !pcUrl
+      ? "unconfigured"
+      : !remote.error
+        ? "ok"
+        : /HTTP 403\b/.test(remote.error)
+          ? "rejected"
+          : "unknown";
     return {
       agent: { version: "0.1.0", root, port },
-      pc: { url: pcUrl, online: !remote.error && !!pcUrl, error: remote.error || null },
+      pc: { url: pcUrl, online: !remote.error && !!pcUrl, error: remote.error || null, auth },
+      pairing,
       packs,
       diskFreeBytes: util.freeBytes(root),
       job: activeJob ? jobSummary(activeJob) : (lastJob ? jobSummary(lastJob) : null),
@@ -465,6 +551,10 @@ export function createAgent(config: AgentConfig): Agent {
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify(await state()));
       }
+      if (url.pathname === "/api/pair" && req.method === "POST") {
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify(startPairing()));
+      }
       if (url.pathname === "/api/logs") {
         const text = util.tailFile(path.join(root, "logs", "agent.log"), 120)
           + "\n" + util.tailFile(path.join(root, "logs", "install.log"), 120);
@@ -586,6 +676,7 @@ export function createAgent(config: AgentConfig): Agent {
     listen: (cb?: () => void) => server.listen(port, "127.0.0.1", cb),
     state,
     startInstallJob,
+    startPairing,
     config: { root, port, pcUrl },
   };
 }

@@ -56,10 +56,17 @@ generated `pack.json` remains the definition the agent serves.
 ## v1 contract (implemented in `src/drivers/eldenring.ts`)
 
 - `id` — `eldenring`
-- `buildPack({ recipe, source, out, link })` — read the working install and
-  write `pack.json`, `files.json`, payload, profile/tools/art. The recipe is
-  required and owns the pack's id, name, save file, `notes`, and
-  `preconditions`; they are data, not driver code.
+- `buildPack({ recipe, source, out, link, driverOptions, progress, log })` —
+  read the working install and write `pack.json`, `files.json`,
+  payload, profile/tools/art. The recipe is required and owns the pack's id,
+  name, save file, `notes`, and `preconditions`; they are data, not driver code.
+  Drivers call `progress({ phase, done, total, bytesDone, bytesTotal })` as
+  they copy and hash, so the Server does not parse log text for status.
+- `buildOptions()` — declare the driver-specific fields the Server build form
+  should show. Each option has a `key`, `label`, `type` (`directory` or `text`),
+  and optional `placeholder`/`help`. BG3 declares `gameRoot` and `bg3leRoot`;
+  Elden Ring declares none. The Server validates directory values, then passes
+  them to `buildPack` as `driverOptions`.
 - `contentsFor({ recipe, source, version })` — return the normalized contents
   summary. Every driver exposes the same method and emits `items`/`itemsLabel`,
   so renderers and PC tooling do not branch on the game id.

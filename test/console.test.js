@@ -52,6 +52,14 @@ test("Server console lists, rebuilds, serves, and removes packs", async (t) => {
   assert.equal(controlState.app.version, "0.0.0-test");
   assert.equal(controlState.settings.packsDir, packsDir);
   assert.equal(controlState.packs.length, 0);
+  assert.deepEqual(
+    controlState.recipes.find((recipe) => recipe.id === "eldenring-graceborne").buildOptions,
+    [],
+  );
+  assert.deepEqual(
+    controlState.recipes.find((recipe) => recipe.id === "bg3-modded").buildOptions.map((option) => option.key),
+    ["gameRoot", "bg3leRoot"],
+  );
   const localPost = await fetch(`${control}/api/settings`, {
     method: "POST",
     headers: { "content-type": "application/json", origin: control },
@@ -141,4 +149,60 @@ test("Server console keeps the token out of the config when protected storage is
   } finally {
     await reopened.close();
   }
+});
+
+test("Server console passes driver build options and progress to a BG3 build", async (t) => {
+  const root = h.tempDir("modsync-console-bg3-");
+  const packsDir = path.join(root, "packs");
+  const source = h.bg3WorkingInstall({ version: "1.2.3" });
+  const bg3le = h.bg3leRuntime();
+  const gameRoot = h.tempDir("modsync-console-bg3-game-");
+  h.write(gameRoot, "bin/DWrite.dll", "dwrite");
+  const configFile = path.join(root, "state", "console.json");
+  const service = createConsole({
+    configFile,
+    defaultPacksDir: packsDir,
+    version: "0.0.0-test",
+    reveal: () => {},
+  });
+  t.after(async () => {
+    await service.close();
+    h.remove(root);
+    h.remove(source);
+    h.remove(bg3le);
+    h.remove(gameRoot);
+  });
+
+  assert.throws(
+    () => service.startBuild({
+      recipeId: "bg3-modded",
+      source,
+      driverOptions: { gameRoot: path.join(root, "missing-game-root") },
+    }),
+    /BG3 game folder not found/,
+  );
+
+  const control = await service.listen();
+  const response = await fetch(`${control}/api/build`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: control },
+    body: JSON.stringify({
+      recipeId: "bg3-modded",
+      source,
+      version: "1.2.3",
+      driverOptions: { gameRoot, bg3leRoot: bg3le },
+    }),
+  });
+  assert.equal(response.status, 202);
+  const started = await response.json();
+  assert.equal(started.status, "running");
+  const built = await waitForBuild(service);
+  assert.equal(built.status, "done", built.error || "");
+  assert.equal(built.phase, "done");
+  assert.equal(built.percent, 100);
+
+  const pack = h.readJson(path.join(packsDir, "bg3-modded", "pack.json"));
+  assert.equal(pack.install.options.bg3se, true);
+  const doc = h.readJson(path.join(packsDir, "bg3-modded", "files.json"));
+  assert.ok(doc.files.some((file) => file.target === "mods/bg3/versions/1.2.3/bg3se/DWrite.dll"));
 });
