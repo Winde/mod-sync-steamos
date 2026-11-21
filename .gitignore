@@ -1,6 +1,4 @@
 node_modules/
-packs/*
-!packs/.gitkeep
 dist/
 state/
 logs/
@@ -8,3 +6,6 @@ logs/
 *.log
 *.tar.gz
 tools/node-linux/
+
+# Generated packs are NEVER committed. They contain multi-GB payloads.
+packs/*

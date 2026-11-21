@@ -1,0 +1,29 @@
+#!/bin/sh
+# Refuse to commit generated packs or very large files.
+set -e
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+bad=$(printf '%s\n' "$staged" | grep -E '^packs/' || true)
+if [ -n "$bad" ]; then
+  echo "Refusing to commit generated packs:"
+  printf '%s\n' "$bad"
+  exit 1
+fi
+
+big=""
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  [ -f "$f" ] || continue
+  size=$(wc -c <"$f" | tr -d ' ')
+  if [ "$size" -gt 52428800 ]; then
+    big="$big$f ($size bytes)\n"
+  fi
+done <<EOF
+$staged
+EOF
+
+if [ -n "$big" ]; then
+  printf "Refusing to commit files larger than 50 MB:\n%b" "$big"
+  exit 1
+fi
