@@ -104,16 +104,25 @@ function readInstalledDepots(library, appId) {
 
 function findGame(game) {
   if (!game || !game.appId) return null;
-  for (const lib of libraries()) {
+  const libs = libraries();
+  for (const lib of libs) {
     const manifest = readManifest(lib, game.appId);
     const installDir = (manifest && manifest.installDir) || game.installDir;
     if (!installDir) continue;
     const gameRoot = path.join(lib, "steamapps", "common", installDir);
     if (!fs.existsSync(gameRoot)) continue;
     const exe = game.exe ? path.join(gameRoot, game.exe) : null;
-    const prefix = process.platform === "win32"
+    const expectedPrefix = process.platform === "win32"
       ? null
       : path.join(lib, "steamapps", "compatdata", String(game.appId), "pfx");
+    let prefix = null;
+    if (process.platform !== "win32") {
+      for (const candidate of libs) {
+        const p = path.join(candidate, "steamapps", "compatdata", String(game.appId), "pfx");
+        if (fs.existsSync(p)) { prefix = p; break; }
+      }
+      if (!prefix) prefix = expectedPrefix;
+    }
     return {
       library: lib,
       root: gameRoot,

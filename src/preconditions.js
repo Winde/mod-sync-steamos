@@ -144,9 +144,11 @@ function checkOne(check, { pack, game, root, totalBytes }) {
     case "proton-prefix":
       if (process.platform === "win32") return pass("Not needed on Windows.");
       if (!game) return unknown("Game not found.");
-      return game.prefixReady
-        ? pass("Proton prefix exists.")
-        : fail("Proton prefix is missing. Launch the vanilla game once from Steam.");
+      if (game.prefixReady) return pass("Proton prefix exists.");
+      {
+        const checked = steam.libraries().map((lib) => path.join(lib, "steamapps", "compatdata", String(pack.game.appId), "pfx"));
+        return fail(`Proton prefix is missing${checked.length ? ` (checked ${checked.join(", ")})` : ""}.`);
+      }
     case "disk-free": {
       const reserve = Number.isFinite(check.reserveBytes) ? check.reserveBytes : 1024 * 1024 * 1024;
       const need = Number.isFinite(check.bytes) ? check.bytes : (totalBytes || 0) + reserve;

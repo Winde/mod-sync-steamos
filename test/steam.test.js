@@ -97,6 +97,36 @@ test("registerShortcut writes one Steam entry and updates it on a second run", a
   }
 });
 
+test("findGame checks every Steam library for the Proton prefix", { skip: process.platform === "win32" }, (t) => {
+  const gameRoot = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-game-"));
+  const prefixRoot = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-prefix-"));
+  const oldRoot = process.env.STEAM_ROOT;
+  t.after(() => {
+    if (oldRoot === undefined) delete process.env.STEAM_ROOT; else process.env.STEAM_ROOT = oldRoot;
+    steam.setExtraLibraries([]);
+    fs.rmSync(gameRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    fs.rmSync(prefixRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  });
+
+  process.env.STEAM_ROOT = gameRoot;
+  steam.setExtraLibraries([prefixRoot]);
+  fs.mkdirSync(path.join(gameRoot, "steamapps", "common", "Actual Folder", "bin"), { recursive: true });
+  fs.writeFileSync(path.join(gameRoot, "steamapps", "appmanifest_999999.acf"), `"AppState"
+{
+  "appid" "999999"
+  "installdir" "Actual Folder"
+  "buildid" "12345"
+}
+`);
+  fs.writeFileSync(path.join(gameRoot, "steamapps", "common", "Actual Folder", "bin", "game.exe"), "");
+  fs.mkdirSync(path.join(prefixRoot, "steamapps", "compatdata", "999999", "pfx"), { recursive: true });
+
+  const game = steam.findGame({ appId: 999999, installDir: "Wrong Folder", exe: "bin/game.exe" });
+  assert.ok(game);
+  assert.equal(game.prefix, path.join(prefixRoot, "steamapps", "compatdata", "999999", "pfx"));
+  assert.equal(game.prefixReady, true);
+});
+
 test("findGame reads the install directory from the app manifest", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-manifest-"));
   const oldRoot = process.env.STEAM_ROOT;
