@@ -4,10 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { URL } from "node:url";
-import { spawn } from "node:child_process";
 import * as util from "./util";
 import * as steam from "./steam";
 import * as installer from "./installer";
+import * as linux from "./platforms/linux";
 import * as preconditions from "./preconditions";
 import * as paths from "./paths";
 import * as storage from "./storage";
@@ -287,7 +287,7 @@ export function createAgent(config: AgentConfig): Agent {
     const current = versionStore.readCurrent(pr, pack.mod.id);
     const versions = versionStore.listVersions(pr, pack.mod.id);
     const launcher = versionStore.launcherFile(pr, pack.mod.id);
-    const desktop = path.join(os.homedir(), ".local", "share", "applications", `${pack.mod.id}.desktop`);
+    const desktop = linux.desktopFileFor(pack.mod.id);
     return {
       installed: !!current,
       installedVersion: current || null,
@@ -457,9 +457,8 @@ export function createAgent(config: AgentConfig): Agent {
     const game = steam.findGame(pack.game);
     const target = paths.resolve(pack, game);
     if (util.isGameRunning(target.processes)) throw new Error("The game is already running.");
-    const launcher = installer.writeLauncher({ pack, root, game });
-    const child = spawn("bash", [launcher], { detached: true, stdio: "ignore" });
-    child.unref();
+    const launcher = linux.writeLauncher({ pack, root, game });
+    linux.launch(launcher);
     return { ok: true, launcher };
   }
 
@@ -561,7 +560,7 @@ export function createAgent(config: AgentConfig): Agent {
         const shortcutLauncher = shortcutPackRoot && shortcutMod ? versionStore.launcherFile(shortcutPackRoot, shortcutMod) : "";
         const out = storage.clearStorage(root, { packId: body.packId, scope: String(body.scope || "") });
         if (body.scope === "pack" && shortcutLauncher) {
-          try { await steam.removeShortcut({ exePath: shortcutLauncher }); } catch { /* Steam data may be absent */ }
+          try { await linux.removeShortcut(shortcutLauncher); } catch { /* Steam data may be absent */ }
         }
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify({ ok: true, ...out, storage: storage.computeStorage(root) }));
@@ -615,9 +614,9 @@ export function createAgent(config: AgentConfig): Agent {
   for (const pack of localPacks()) {
     const game = steam.findGame(pack.game);
     if (!game) continue;
-    try { installer.writeLauncher({ pack, root, game }); } catch { /* regenerate on install */ }
+    try { linux.writeLauncher({ pack, root, game }); } catch { /* regenerate on install */ }
   }
-  steam.pruneMissingShortcuts({ prefix: path.join(root, "packs") + path.sep }).catch(() => { /* Steam data may be absent */ });
+  linux.pruneShortcuts(root).catch(() => { /* Steam data may be absent */ });
 
   return {
     server,

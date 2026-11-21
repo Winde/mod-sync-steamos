@@ -258,10 +258,58 @@ function entryAppId(entry: ShortcutEntry): number {
   return shortcutId(`${entry.Exe || entry.exe || ""}${entry.appname || entry.AppName || ""}`).unsigned;
 }
 
+/**
+ * Find the shortcut whose serialized entry contains one of the given paths.
+ * Steam's add flow stores the .desktop path in the entry; direct registration
+ * stores the launcher path. Matching the raw VDF keeps both paths working.
+ */
+export function findShortcutAppId(targets: string[]): number | null {
+  const ud = findUserData();
+  if (!ud) return null;
+  const file = path.join(ud.configDir, "shortcuts.vdf");
+  if (!fs.existsSync(file)) return null;
+  const data = fs.readFileSync(file);
+  const marker = Buffer.from([0x02, ...Buffer.from("appid"), 0x00]);
+  for (const target of targets) {
+    if (!target) continue;
+    const needle = Buffer.from(target, "utf8");
+    let start = 0;
+    while (start < data.length) {
+      const index = data.indexOf(needle, start);
+      if (index < 0) break;
+      const appIdAt = data.lastIndexOf(marker, index);
+      if (appIdAt >= 0 && appIdAt + 11 <= data.length) {
+        return data.readUInt32LE(appIdAt + 7) >>> 0;
+      }
+      start = index + needle.length;
+    }
+  }
+  return null;
+}
+
 function removeGridArt(configDir: string, id: number): void {
   const grid = path.join(configDir, "grid");
   for (const suffix of [".png", "p.png", "_grid.png", "_hero.png", "_logo.png", "_icon.png"]) {
     fs.rmSync(path.join(grid, `${id}${suffix}`), { force: true });
+  }
+}
+
+export function applyShortcutArt({ appId, art }: { appId: number; art?: ShortcutArt }): void {
+  const ud = findUserData();
+  if (!ud || !appId) return;
+  const grid = path.join(ud.configDir, "grid");
+  fs.mkdirSync(grid, { recursive: true });
+  const src = art || {};
+  const pairs: Array<[string | undefined, string]> = [
+    [src.header, `${appId}.png`],
+    [src.portrait || src.grid, `${appId}p.png`],
+    [src.grid, `${appId}_grid.png`],
+    [src.hero, `${appId}_hero.png`],
+    [src.logo, `${appId}_logo.png`],
+    [src.icon, `${appId}_icon.png`],
+  ];
+  for (const [from, to] of pairs) {
+    if (from && fs.existsSync(from)) fs.copyFileSync(from, path.join(grid, to));
   }
 }
 
@@ -403,20 +451,7 @@ export async function registerShortcut({
     shortcut.writeFile(file, { shortcuts: merged.list }, (err) => err ? reject(err) : resolve());
   });
 
-  const grid = path.join(ud.configDir, "grid");
-  fs.mkdirSync(grid, { recursive: true });
-  const src = art || {};
-  const pairs: Array<[string | undefined, string]> = [
-    [src.header, `${id.unsigned}.png`],
-    [src.portrait || src.grid, `${id.unsigned}p.png`],
-    [src.grid, `${id.unsigned}_grid.png`],
-    [src.hero, `${id.unsigned}_hero.png`],
-    [src.logo, `${id.unsigned}_logo.png`],
-    [src.icon, `${id.unsigned}_icon.png`],
-  ];
-  for (const [from, to] of pairs) {
-    if (from && fs.existsSync(from)) fs.copyFileSync(from, path.join(grid, to));
-  }
+  applyShortcutArt({ appId: id.unsigned, art });
   return {
     appId: id.unsigned,
     configDir: ud.configDir,

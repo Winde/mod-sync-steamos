@@ -1,9 +1,9 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { readJson, freeBytes } from "./util";
 import * as versionStore from "./version-store";
 import * as installers from "./installers";
+import * as linux from "./platforms/linux";
 import type {
   ClearPlan,
   ClearResult,
@@ -111,16 +111,6 @@ function removeProfile(packRoot: string, pack: Pack | null, version: string): vo
   if (profile && fs.existsSync(profile)) fs.rmSync(profile, { force: true });
 }
 
-function removeDesktopShortcuts(modId: string): void {
-  if (process.platform !== "linux" || !modId) return;
-  for (const file of [
-    path.join(os.homedir(), ".local", "share", "applications", `${modId}.desktop`),
-    path.join(os.homedir(), "Desktop", `${modId}.desktop`),
-  ]) {
-    if (fs.existsSync(file)) fs.rmSync(file, { force: true });
-  }
-}
-
 export function planClear(root: string, { packId, scope }: { packId?: string; scope: string }): ClearPlan {
   if (scope === "logs") {
     return { ok: true, scope, actions: ["Clear the log files"], errors: [], warnings: [] };
@@ -210,7 +200,7 @@ export function clearStorage(root: string, { packId, scope }: { packId?: string;
       adapter.revert({ pack, root, log: () => { } });
     }
     fs.rmSync(packRoot, { recursive: true, force: true });
-    removeDesktopShortcuts(modId);
+    linux.removeDesktopShortcuts(modId);
   } else {
     throw new Error(`unknown scope: ${scope}`);
   }

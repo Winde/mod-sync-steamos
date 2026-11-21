@@ -73,6 +73,7 @@ test("registerShortcut writes one Steam entry and updates it on a second run", a
     };
 
     const first = await steam.registerShortcut(args);
+    assert.equal(steam.findShortcutAppId([args.exePath]), first.appId);
     const second = await steam.registerShortcut(args);
     assert.equal(first.action, "added");
     assert.equal(second.action, "updated");

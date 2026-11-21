@@ -1,18 +1,16 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
-  ensureDir, writeText, writeJson, sha256File, safeJoin, mapLimit,
+  ensureDir, writeJson, sha256File, safeJoin, mapLimit,
   nowStamp, formatBytes, errorMessage,
 } from "./util";
-import * as steam from "./steam";
 import * as preconditions from "./preconditions";
 import * as versionStore from "./version-store";
 import * as paths from "./paths";
 import * as installers from "./installers";
-import { projectRoot } from "./root";
+import * as linux from "./platforms/linux";
 import type {
   Confirmations,
   FilesDoc,
@@ -37,54 +35,6 @@ export interface InstallResult {
   desktopFile: string | null;
   files: number;
   totalBytes: number;
-}
-
-function renderTemplate(file: string, values: Record<string, unknown>): string {
-  let text = fs.readFileSync(file, "utf8");
-  for (const [key, value] of Object.entries(values)) {
-    text = text.split(`{{${key}}}`).join(String(value));
-  }
-  return text;
-}
-
-export function writeLauncher({
-  pack,
-  root,
-  game,
-}: {
-  pack: Pack;
-  root: string;
-  game: SteamGame | null | undefined;
-}): string {
-  const packRoot = versionStore.packRoot(root, pack.id);
-  const target = paths.resolve(pack, game);
-  const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
-  const templates = path.join(projectRoot, "templates", "linux");
-  const defaultTemplates: Record<string, string> = { steam: "launch-steam.sh" };
-  const templateName = target.template || defaultTemplates[pack.launch.type];
-  if (!templateName) throw new Error(`No launcher template for launch type ${pack.launch.type}.`);
-  const templateFile = path.resolve(templates, templateName);
-  if (!templateFile.startsWith(path.resolve(templates) + path.sep)) {
-    throw new Error(`Launcher template escapes the template directory: ${templateName}`);
-  }
-  const launcherText = renderTemplate(templateFile, {
-    ROOT: packRoot,
-    MOD: pack.mod.id,
-    GAME: game ? game.root : "",
-    PREFIX: game && game.prefix ? game.prefix : "",
-    DATA_DIR: target.dataDir || "",
-    DATA_HOME: paths.contextFor(game).dataHome,
-    STEAM_APP_ID: pack.launch.steamAppId,
-    GAME_PROCESS: target.gameProcess,
-    EXE: target.exe,
-    SAVE_FILE: pack.loader?.saveFile || "",
-    LOADER: target.loader ? path.join(packRoot, target.loader) : "",
-    LOADER_SUPPORT: target.loaderSupport ? path.join(packRoot, target.loaderSupport) : "",
-    LOADER_REL: target.loader,
-    LOADER_SUPPORT_REL: target.loaderSupport,
-  });
-  writeText(launcher, launcherText, 0o755);
-  return launcher;
 }
 
 function snapshotLoaderFiles({
@@ -313,53 +263,10 @@ export async function installPack({
   }
 
   progress({ phase: "launcher" });
-  const launcher = writeLauncher({ pack, root, game });
-
-  const icon = path.join(packRoot, pack.art.icon || "");
-  const shortcutName = target.shortcut || (pack.launch.mode !== "default" ? pack.name : "");
+  const launcher = linux.writeLauncher({ pack, root, game });
   let desktopFile: string | null = null;
   if (process.platform === "linux") {
-    log(`Launcher: ${launcher}`);
-    if (!shortcutName) {
-      log(`Default exe: use the regular Steam link for ${pack.game.title}. No non-Steam shortcut was added.`);
-    } else {
-      const desktopText = `[Desktop Entry]
-Type=Application
-Name=${shortcutName}
-Comment=${pack.description || "Modded " + pack.game.title}
-Exec=${launcher}
-Path=${packRoot}
-Icon=${icon}
-Terminal=false
-Categories=Game;
-`;
-      const apps = path.join(os.homedir(), ".local", "share", "applications");
-      desktopFile = path.join(apps, `${pack.mod.id}.desktop`);
-      writeText(desktopFile, desktopText);
-      const userDesktop = path.join(os.homedir(), "Desktop", `${pack.mod.id}.desktop`);
-      try { writeText(userDesktop, desktopText); } catch { /* Desktop may not exist */ }
-
-      log(`Shortcut: ${desktopFile}`);
-      try {
-        const shortcut = await steam.registerShortcut({
-          exePath: launcher,
-          name: shortcutName,
-          icon,
-          allowOverlay: pack.launch.allowOverlay !== false,
-          art: {
-            grid: path.join(packRoot, pack.art.grid || ""),
-            hero: path.join(packRoot, pack.art.hero || ""),
-            logo: path.join(packRoot, pack.art.logo || ""),
-            header: pack.art.header ? path.join(packRoot, pack.art.header) : "",
-            portrait: pack.art.portrait ? path.join(packRoot, pack.art.portrait) : "",
-            icon,
-          },
-        });
-        log(`Steam shortcut ${shortcut.action}: app ${shortcut.appId}. Restart Steam if it is not visible.`);
-      } catch (err) {
-        log(`Steam shortcut was not added automatically: ${errorMessage(err)}`);
-      }
-    }
+    desktopFile = await linux.installShortcut({ pack, root, game, launcher, log });
   } else {
     log(`Launcher: ${launcher} (Linux integration skipped on ${process.platform}.)`);
   }
