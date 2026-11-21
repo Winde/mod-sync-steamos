@@ -54,7 +54,7 @@ jobs:
           echo "Release version: ${tag}"
 
   build:
-    name: AppImage
+    name: Linux apps
     needs: verify
     runs-on: ubuntu-latest
     steps:
@@ -92,7 +92,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
-    name: Windows installer
+    name: Windows apps
     needs: verify
     runs-on: windows-latest
     steps:
