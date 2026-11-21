@@ -1,5 +1,6 @@
-// Renders the app icon and the transparent Steam logo from build/icon.svg.
-// Run from the repository root with an Electron binary:
+// Renders the app icon and the transparent logomark from build/icon.svg.
+// generate.ps1 composes the logomark and the MODSYNC wordmark into the Steam
+// logo asset. Run from the repository root with an Electron binary:
 //   electron packaging/steam-art/generate/render-art.js
 const { app, BrowserWindow } = require("electron");
 const fs = require("node:fs");
@@ -39,6 +40,6 @@ async function render(svg, size, out) {
 app.whenReady().then(async () => {
   const svg = fs.readFileSync(path.join(process.cwd(), "build/icon.svg"), "utf8");
   await render(svg, 512, "build/icon.png");
-  await render(svg.replace(/<rect[^>]*\/>/, ""), 512, "packaging/steam-art/logo.png");
+  await render(svg.replace(/<rect[^>]*\/>/, ""), 512, "build/logo-mark.png");
   app.quit();
 });

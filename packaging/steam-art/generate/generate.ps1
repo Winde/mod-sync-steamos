@@ -6,11 +6,13 @@ Add-Type -AssemblyName System.Drawing
 
 $root = (Resolve-Path '.').Path
 $iconPath = Join-Path $root 'build/icon.png'
+$markPath = Join-Path $root 'build/logo-mark.png'
 $outDir = Join-Path $root 'packaging/steam-art'
 $webDir = Join-Path $root 'web'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 $icon = [System.Drawing.Image]::FromFile($iconPath)
+$mark = [System.Drawing.Image]::FromFile($markPath)
 
 $bgTop = [System.Drawing.Color]::FromArgb(18, 19, 23)
 $bgBottom = [System.Drawing.Color]::FromArgb(8, 9, 11)
@@ -63,16 +65,25 @@ function Save-Bitmap($bmp, $g, [string]$name) {
   Write-Output $path
 }
 
-# Hero 1920x620
+# Hero 1920x620. Steam layers the logo over the hero, and its library-asset
+# guidance says the hero must not contain text. Keep the left side calm so the
+# logo stays legible, and add a soft accent glow on the right.
 $pair = New-OpaqueBitmap 1920 620
 $bmp = $pair[0]; $g = $pair[1]
-Draw-Icon $g 150 160 300
-$line = [System.Drawing.SolidBrush]::new($accent)
-$g.FillRectangle($line, 520, 178, 96, 6)
-$line.Dispose()
-Draw-Text $g 'MODSYNC' 112 ([System.Drawing.FontStyle]::Bold) $white 520 200 1200
-Draw-Text $g 'MOD PACK SYNC FOR STEAMOS' 30 ([System.Drawing.FontStyle]::Regular) $muted 524 350 1200
-Draw-Text $g 'PC -> TV / NO SSH / NO USB' 22 ([System.Drawing.FontStyle]::Regular) $accent 524 410 1200
+$glow = [System.Drawing.Drawing2D.GraphicsPath]::new()
+$glow.AddEllipse(1160, -160, 1040, 940)
+$brush = [System.Drawing.Drawing2D.PathGradientBrush]::new($glow)
+$brush.CenterColor = [System.Drawing.Color]::FromArgb(44, 225, 75, 59)
+$brush.SurroundColors = [System.Drawing.Color[]]@([System.Drawing.Color]::FromArgb(0, 225, 75, 59))
+$g.FillPath($brush, $glow)
+$brush.Dispose(); $glow.Dispose()
+$alpha = [System.Drawing.Imaging.ImageAttributes]::new()
+$matrix = [System.Drawing.Imaging.ColorMatrix]::new()
+$matrix.Matrix33 = 0.12
+$alpha.SetColorMatrix($matrix)
+$dest = [System.Drawing.Rectangle]::new(1240, -60, 820, 820)
+$g.DrawImage($mark, $dest, 0, 0, $mark.Width, $mark.Height, [System.Drawing.GraphicsUnit]::Pixel, $alpha)
+$alpha.Dispose()
 Save-Bitmap $bmp $g 'hero.png' | Out-Null
 
 # Portrait 600x900
@@ -104,7 +115,31 @@ $bmp = $pair[0]; $g = $pair[1]
 Draw-Icon $g 0 0 256
 Save-Bitmap $bmp $g 'icon.png' | Out-Null
 
+# Logo 1280x340, transparent. Steam layers this over the hero, so it carries
+# only the logomark and the wordmark. Keeping the canvas tight vertically lets
+# Steam show the lockup at a readable size.
+$pair = New-TransparentBitmap 1280 340
+$bmp = $pair[0]; $g = $pair[1]
+$g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
+$glyph = 300
+$gap = 36
+$font = [System.Drawing.Font]::new('Segoe UI', 150, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
+$format = [System.Drawing.StringFormat]::new()
+$format.Alignment = [System.Drawing.StringAlignment]::Near
+$format.LineAlignment = [System.Drawing.StringAlignment]::Center
+$textW = $g.MeasureString('MODSYNC', $font, 1000, $format).Width
+$totalW = $glyph + $gap + $textW
+$left = (1280 - $totalW) / 2
+$top = (340 - $glyph) / 2
+$g.DrawImage($mark, [int]$left, [int]$top, $glyph, $glyph)
+$brush = [System.Drawing.SolidBrush]::new($white)
+$rect = [System.Drawing.RectangleF]::new([float]($left + $glyph + $gap), [float]$top, [float]($textW + 24), [float]$glyph)
+$g.DrawString('MODSYNC', $font, $brush, $rect, $format)
+$format.Dispose(); $brush.Dispose(); $font.Dispose()
+Save-Bitmap $bmp $g 'logo.png' | Out-Null
+
 $icon.Dispose()
+$mark.Dispose()
 
 # Copies used by the TV dashboard and the bootstrap register call.
 Copy-Item (Join-Path $outDir 'hero.png') (Join-Path $webDir 'modsync-hero.png') -Force

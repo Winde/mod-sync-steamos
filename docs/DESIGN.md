@@ -97,6 +97,10 @@ A pack never contains the base game or saves.
 }
 ```
 
+Steam layers `logo` over `hero` on the library details page. Keep `hero` free
+of the mod name, and make `logo` a transparent wordmark; otherwise the name is
+drawn twice.
+
 `files.json`:
 
 ```json
