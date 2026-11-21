@@ -89,20 +89,17 @@ No SSH. No port forwarding. LAN only.
 
 ## Rollback
 
-Every installed version and its loader profile stay on disk (me3 for ELDEN
-RING, modsettings for BG3). The launcher reads
-`mods/<mod>/current.txt`, so rollback is a pointer switch:
+Every installed version stays on disk, with the loader artifacts for that
+version (me3 profile, BG3 modsettings, and so on). The active version is just a
+pointer at `mods/<mod>/current.txt`.
 
-1. Build 0.2.5 and install it on the TV:
-   ```powershell
-   node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.5
-   ```
-2. Build 0.2.7 and install/update:
-   ```powershell
-   node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.7
-   ```
-3. The dashboard now shows **Roll back** (home and Details). It switches
-   `current.txt` to 0.2.5; 0.2.7 stays installed.
+To roll back, open ModSync and press **Roll back**. The app switches to the
+previous installed version. Nothing is downloaded, and the newer version stays
+installed, so you can move forward again with a normal update.
+
+**Roll back** appears only when a previous version exists. You create rollback
+targets by installing a newer version normally; the previous version is kept
+automatically. The exact loader differs by game, but the app handles it.
 
 Rollback does **not** roll back saves. Saves are out of v1; the TV save stays
 where it is. If you need the save from before an update, copy it manually while

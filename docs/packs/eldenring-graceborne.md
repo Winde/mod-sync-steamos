@@ -34,12 +34,16 @@ loads the profile.
 
 ## Rollback
 
-Build and install 0.2.5 before 0.2.7 if you want a rollback target:
+Open ModSync and press **Roll back**. It switches `current.txt` back to the
+previous installed version; the newer version stays installed. Saves are not
+rolled back.
+
+### Maintainer: creating a rollback target
+
+To have 0.2.5 available as a rollback target, build and install it before
+0.2.7. This is a PC pack-builder step, not part of the TV rollback flow:
 
 ```powershell
 node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.5
 node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.7
 ```
-
-The dashboard switches `current.txt` back to the older version; the save is
-not rolled back.
