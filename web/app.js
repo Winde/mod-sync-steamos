@@ -141,11 +141,35 @@
   }
 
   function packState(p) {
-    if (!p) return { label: "No pack", primary: null };
-    if (p.status === "up-to-date") return { label: `Installed ${p.installedVersion} · up to date`, primary: { action: "launch", label: "Play" } };
-    if (p.staging) return { label: p.installed ? `Update ${p.mod.version} paused` : "Download paused", primary: { action: "download", label: "Resume install" } };
-    if (p.status === "update-available") return { label: `Installed ${p.installedVersion} · update ${p.mod.version} available`, primary: { action: "download", label: "Update" } };
-    return { label: "Ready to install", primary: { action: "download", label: "Install" } };
+    if (!p) return { title: "No pack", detail: "", primary: null };
+    const state = p.status !== "up-to-date" && p.staging ? "staging" : p.status;
+    switch (state) {
+      case "up-to-date":
+        return {
+          title: `Installed ${p.installedVersion}`,
+          detail: "up to date",
+          primary: { action: "launch", label: "Play" },
+        };
+      case "staging":
+        return {
+          title: p.installed ? `Installed ${p.installedVersion}` : "Download paused",
+          detail: p.installed ? `update ${p.mod.version} paused` : "",
+          primary: { action: "download", label: "Resume install" },
+        };
+      case "update-available":
+        return {
+          title: `Installed ${p.installedVersion}`,
+          detail: `update ${p.mod.version} available`,
+          primary: { action: "download", label: "Update" },
+        };
+      case "not-installed":
+      default:
+        return {
+          title: "Ready to install",
+          detail: "",
+          primary: { action: "download", label: "Install" },
+        };
+    }
   }
 
   function art(p, key) {
@@ -332,7 +356,7 @@
       ? null
       : offline
         ? "PC offline · can't check for updates"
-        : st.label.replace(/^Installed [^·]+· /, "");
+        : st.detail;
     const primaryHtml = primary
       ? `<button class="btn primary" data-action="${primary.action}" data-pack="${esc(p.id)}" ${canAct ? "" : "disabled"} data-autofocus data-focusable data-key="primary">${primary.label}</button>`
       : "";
@@ -351,7 +375,7 @@
         <div class="info">
           <div class="kicker">${esc(p.game.title)} · ${esc(p.name)}</div>
           <h1>${esc(p.name)}</h1>
-          <div class="bigstatus">${installed ? `Installed ${esc(p.installedVersion)}` : "Ready to install"}</div>
+          <div class="bigstatus">${esc(st.title)}</div>
           <div class="meta">${stateText ? `${esc(stateText)} · ` : ""}${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</div>
           ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? ` (+${p.preconditions.failedRequired.length - 1} more)` : ""}</div>` : ""}
           <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${refreshHtml}</div>
