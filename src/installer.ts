@@ -77,12 +77,37 @@ export function writeLauncher({
     STEAM_APP_ID: pack.launch.steamAppId,
     GAME_PROCESS: target.gameProcess,
     EXE: target.exe,
-    SAVE_FILE: pack.launch.saveFile,
+    SAVE_FILE: pack.loader?.saveFile || "",
     LOADER: target.loader ? path.join(packRoot, target.loader) : "",
     LOADER_SUPPORT: target.loaderSupport ? path.join(packRoot, target.loaderSupport) : "",
+    LOADER_REL: target.loader,
+    LOADER_SUPPORT_REL: target.loaderSupport,
   });
   writeText(launcher, launcherText, 0o755);
   return launcher;
+}
+
+function snapshotLoaderFiles({
+  packRoot,
+  pack,
+  version,
+  files,
+}: {
+  packRoot: string;
+  pack: Pack;
+  version: string;
+  files: PackFile[];
+}): void {
+  const versionDir = versionStore.versionDir(packRoot, pack.mod.id, version);
+  for (const file of files) {
+    if (!file.target.startsWith("tools/")) continue;
+    const source = safeJoin(packRoot, file.target);
+    if (!fs.existsSync(source)) continue;
+    const target = safeJoin(versionDir, file.target);
+    ensureDir(path.dirname(target));
+    fs.copyFileSync(source, target);
+    if (file.mode) fs.chmodSync(target, Number.parseInt(file.mode, 8));
+  }
 }
 
 function abortError(): Error {
@@ -279,6 +304,7 @@ export async function installPack({
   }
   fs.renameSync(staging, versionDir);
   versionStore.writeCurrent(packRoot, pack.mod.id, version);
+  snapshotLoaderFiles({ packRoot, pack, version, files });
 
   const adapter = installers.forPack(pack);
   if (adapter && adapter.apply) {

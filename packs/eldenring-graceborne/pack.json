@@ -35,7 +35,8 @@
   },
   "loader": {
     "type": "me3",
-    "profile": "profiles/graceborne-0.2.7.me3"
+    "profile": "profiles/graceborne-0.2.7.me3",
+    "saveFile": "ER0000.graceborne.sl2"
   },
   "profilePattern": "profiles/{mod}-{version}.me3",
   "launch": {
@@ -44,9 +45,7 @@
     "defaultExe": "Game/eldenring.exe",
     "exe": "Game/eldenring.exe",
     "gameProcess": "eldenring.exe",
-    "steamAppId": 1245620,
-    "profile": "profiles/graceborne-0.2.7.me3",
-    "saveFile": "ER0000.graceborne.sl2"
+    "steamAppId": 1245620
   },
   "art": {
     "grid": "art/graceborne/grid.png",

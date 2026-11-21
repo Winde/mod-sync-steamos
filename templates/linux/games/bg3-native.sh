@@ -2,6 +2,7 @@
 set -uo pipefail
 
 ROOT="{{ROOT}}"
+MOD="{{MOD}}"
 GAME="{{GAME}}"
 BG3LE="{{DATA_HOME}}/bg3le"
 STEAM_APP_ID="{{STEAM_APP_ID}}"
@@ -10,6 +11,9 @@ GAME_PROCESS="{{GAME_PROCESS}}"
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/launch-bg3-native-$(date +%Y%m%d-%H%M%S).log"
+VER="$(cat "$ROOT/mods/$MOD/current.txt" 2>/dev/null || true)"
+BG3LE_SRC="$ROOT/mods/$MOD/versions/$VER/tools/bg3le"
+[ -d "$BG3LE_SRC" ] || BG3LE_SRC="$ROOT/tools/bg3le"
 
 if pgrep -x "$GAME_PROCESS" >/dev/null 2>&1 || pgrep -x bg3 >/dev/null 2>&1; then
   echo "Baldur's Gate 3 is already running." >>"$LOG"
@@ -18,9 +22,9 @@ fi
 
 # Steam updates replace bin/bg3. Repair the wrapper before every launch from
 # the modded entry so the next launch still preloads BG3LE.
-if [ ! -f "$BG3LE/build/libbg3le.so" ] && [ -d "$ROOT/tools/bg3le" ]; then
+if [ ! -f "$BG3LE/build/libbg3le.so" ] && [ -d "$BG3LE_SRC" ]; then
   mkdir -p "$BG3LE"
-  cp -a "$ROOT/tools/bg3le/." "$BG3LE/"
+  cp -a "$BG3LE_SRC/." "$BG3LE/"
 fi
 
 BG3="$GAME/bin/bg3"

@@ -12,7 +12,6 @@ import os from "node:os";
 import path from "node:path";
 import { errorMessage } from "./util";
 import type {
-  InstallInfo,
   LaunchInfo,
   PackFile,
   PlatformProfile,
@@ -41,7 +40,6 @@ const PATH_KEYS: ReadonlySet<"dataDir" | "saveDir"> = new Set(["dataDir", "saveD
 interface PackPaths {
   platforms?: Platforms;
   launch?: Partial<LaunchInfo>;
-  install?: Partial<InstallInfo>;
 }
 
 export interface PathContext {
@@ -150,16 +148,6 @@ export function supports(pack: PackPaths | null | undefined, variant: Variant): 
   return variant !== "linux-native";
 }
 
-function legacyDataDir(pack: PackPaths | null | undefined, ctx: PathContext): string {
-  const raw = (pack && pack.install && pack.install.dataDir)
-    || (pack && pack.launch && pack.launch.dataDir)
-    || "";
-  if (!raw) return "";
-  if (path.isAbsolute(raw) || raw.startsWith("~") || raw.includes("%")) return raw;
-  if (ctx.prefix) return path.join(ctx.prefix, raw);
-  return "";
-}
-
 /**
  * Resolve everything the installer needs for the current machine.
  * Missing tokens are reported on `error` instead of throwing, so the
@@ -192,9 +180,8 @@ export function resolve(
   };
   result.processes = [result.gameProcess, result.gameProcessAlt].filter(Boolean) as string[];
 
-  const dataDirSpec = profile.dataDir || legacyDataDir(pack, ctx);
   for (const key of PATH_KEYS) {
-    const spec = key === "dataDir" ? dataDirSpec : profile[key];
+    const spec = profile[key];
     if (!spec) continue;
     try {
       result[key] = expand(spec, ctx);

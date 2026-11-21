@@ -1,4 +1,9 @@
-"use strict";
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { projectRoot } from "../root";
+import { modeFor as defaultModeFor } from "../util";
 
 /**
  * Fetch the pinned BG3LE release used by the native Baldur's Gate 3 pack.
@@ -7,17 +12,23 @@
  * verified against the published GitHub release checksum before it is used.
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import crypto from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { projectRoot } from "./root";
-
 export const VERSION = "0.4.6";
 const ASSET = `bg3le-v${VERSION}-linux-x86_64.zip`;
 const URL = `https://github.com/lenonk/bg3le/releases/download/v${VERSION}/${ASSET}`;
 const SHA256 = "22d97ff3e9c5f07f8e55c9c8c792f6061097889556b1f20cb08c562dc056647b";
-export const CACHE = path.join(projectRoot, "state", "bg3le", `bg3le-v${VERSION}-linux-x86_64`);
+const EXECUTABLES = new Set([
+  "tools/bg3le/install.py",
+  "tools/bg3le/installer/bg3le-launch",
+  "tools/bg3le/client/bg3lua",
+]);
+
+export function modeForTarget(targetRel: string): string {
+  return EXECUTABLES.has(targetRel) ? "755" : defaultModeFor(targetRel);
+}
+
+function stateDir(): string {
+  return path.resolve(process.env.MODSYNC_STATE_DIR || path.join(projectRoot, "state"));
+}
 
 function sha256File(file: string): string {
   const hash = crypto.createHash("sha256");
@@ -45,10 +56,11 @@ export async function ensureBg3le(): Promise<string> {
     if (fs.existsSync(path.join(local, "build", "libbg3le.so"))) return local;
     throw new Error(`BG3LE_DIR does not contain build/libbg3le.so: ${local}`);
   }
-  const lib = path.join(CACHE, "build", "libbg3le.so");
-  if (fs.existsSync(lib)) return CACHE;
+  const cache = path.join(stateDir(), "bg3le", `bg3le-v${VERSION}-linux-x86_64`);
+  const lib = path.join(cache, "build", "libbg3le.so");
+  if (fs.existsSync(lib)) return cache;
 
-  const tmp = path.join(projectRoot, "state", "bg3le", ".download");
+  const tmp = path.join(stateDir(), "bg3le", ".download");
   fs.rmSync(tmp, { recursive: true, force: true });
   fs.mkdirSync(tmp, { recursive: true });
   const zip = path.join(tmp, ASSET);
@@ -68,9 +80,9 @@ export async function ensureBg3le(): Promise<string> {
   if (!fs.existsSync(path.join(root, "build", "libbg3le.so"))) {
     throw new Error(`BG3LE archive did not contain build/libbg3le.so: ${root}`);
   }
-  fs.rmSync(CACHE, { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(CACHE), { recursive: true });
-  fs.cpSync(root, CACHE, { recursive: true });
+  fs.rmSync(cache, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(cache), { recursive: true });
+  fs.cpSync(root, cache, { recursive: true });
   fs.rmSync(tmp, { recursive: true, force: true });
-  return CACHE;
+  return cache;
 }

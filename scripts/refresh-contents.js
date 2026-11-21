@@ -12,7 +12,6 @@ const path = require("node:path");
 const { parseArgs } = require("node:util");
 const { loadRecipe } = require("../dist/src/recipes");
 const { driverFor } = require("../dist/src/drivers");
-const bg3 = require("../dist/src/drivers/bg3");
 
 const repoRoot = path.resolve(__dirname, "..");
 
@@ -39,9 +38,11 @@ function main() {
     }
     const driver = driverFor(pack.game.id);
     const source = values.source || driver.defaultSource();
-    const contents = pack.game.id === "bg3"
-      ? bg3.discover(source)
-      : driver.contentsFor(recipe, source, pack.mod.version);
+    const contents = driver.contentsFor({
+      recipe,
+      source,
+      version: pack.mod.version,
+    });
     pack.contents = contents;
     fs.writeFileSync(packFile, JSON.stringify(pack, null, 2) + "\n");
     changed++;

@@ -107,29 +107,26 @@ export interface PreconditionsResult {
 
 export interface LaunchInfo {
   type: string;
-  profile: string;
-  saveFile: string;
   exe?: string;
   defaultExe?: string;
   gameProcess?: string;
   gameProcessAlt?: string;
   steamAppId?: number;
   mode?: "default" | "alternate-exe" | "loader";
-  dataDir?: string;
   allowOverlay?: boolean;
 }
 
 export interface LoaderInfo {
   type?: string;
   profile?: string;
+  saveFile?: string;
+  options?: Record<string, unknown>;
 }
 
 export interface InstallInfo {
   type: string;
   label?: string;
-  dataDir?: string;
-  bg3se?: boolean;
-  bg3le?: { version?: string; path?: string };
+  options?: Record<string, unknown>;
 }
 
 export interface ArtInfo {
@@ -309,32 +306,51 @@ export interface ClearResult {
   packId?: string;
 }
 
+export interface AdapterPlan {
+  ok: boolean;
+  actions: string[];
+  errors: string[];
+  warnings: string[];
+}
+
 export interface PackAdapter {
-  plan?: (options: { pack: Pack | null; root: string }) => ClearPlan;
-  revert?: (options: { pack: Pack | null; root: string; log: (message: string) => void }) => void;
+  plan?: (options: { pack: Pack; root: string }) => AdapterPlan;
+  revert?: (options: {
+    pack: Pack;
+    root: string;
+    log: (message: string) => void;
+    dryRun?: boolean;
+  }) => unknown;
   apply?: (options: {
     pack: Pack;
     root: string;
-    game: SteamGame | null;
+    game: SteamGame | null | undefined;
     version: string;
+    platform?: NodeJS.Platform;
     log: (message: string) => void;
-  }) => void;
+  }) => unknown;
   rollback?: (options: {
     pack: Pack;
     root: string;
     version: string;
     log: (message: string) => void;
-  }) => void;
+  }) => unknown;
+}
+
+export interface ContentsInput {
+  recipe: Recipe;
+  source: string;
+  version: string;
 }
 
 export interface BuildPackOptions {
-  recipe?: Recipe;
+  recipe: Recipe;
   source: string;
   out: string;
   link?: boolean;
   version?: string;
   gameRoot?: string;
-  bg3leRoot?: string;
+  driverOptions?: Record<string, unknown>;
   log?: (message: string) => void;
 }
 

@@ -12,7 +12,7 @@ import * as bg3 from "./bg3";
 import type { Pack, PackAdapter } from "../types";
 
 const adapters: Record<string, PackAdapter> = {
-  bg3: bg3 as unknown as PackAdapter,
+  bg3,
 };
 
 export function forPack(pack: Pack | null | undefined): PackAdapter | null {

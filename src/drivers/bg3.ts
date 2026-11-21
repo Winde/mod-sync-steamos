@@ -3,35 +3,27 @@ import os from "node:os";
 import path from "node:path";
 import {
   ensureDir, writeJson, writeText, walkFiles, materialize,
-  sha256File, modeFor, formatBytes,
+  sha256File, formatBytes,
 } from "../util";
 import * as steam from "../steam";
 import * as paths from "../paths";
 import { projectRoot } from "../root";
-import { ensureBg3le, VERSION as BG3LE_VERSION } from "../bg3le";
+import * as bg3le from "../loaders/bg3le";
 import type {
   BuildPackOptions,
   BuildPackResult,
+  ContentsInput,
   ContentsSummary,
   GameInfo,
   Note,
   Pack,
   PackFile,
   Platforms,
-  PreconditionConfig,
-  Recipe,
   SteamGame,
   Variant,
 } from "../types";
 
-const PACK_ID = "bg3-modded";
-const MOD_ID = "bg3";
 const WINDOWS_EXTENDER_PLATFORMS: Variant[] = ["windows", "linux-proton"];
-const BG3LE_EXECUTABLES = new Set([
-  "tools/bg3le/install.py",
-  "tools/bg3le/installer/bg3le-launch",
-  "tools/bg3le/client/bg3lua",
-]);
 const GAME: GameInfo = {
   id: "bg3",
   title: "Baldur's Gate 3",
@@ -135,7 +127,7 @@ function matchPak(mod: Bg3Mod, paks: string[], used: Set<string>): string | null
   }) || null;
 }
 
-export function contentsFor(source: string, paks: string[]): ContentsSummary {
+function contentsFrom(source: string, paks: string[]): ContentsSummary {
   const xml = fs.readFileSync(path.join(source, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8");
   const mods = parseModSettings(xml);
   const used = new Set<string>();
@@ -159,12 +151,12 @@ export function contentsFor(source: string, paks: string[]): ContentsSummary {
   };
 }
 
-export function discover(source: string): ContentsSummary {
+export function contentsFor({ source }: ContentsInput): ContentsSummary {
   const modsDir = path.join(source, "Mods");
   const paks = fs.existsSync(modsDir)
     ? fs.readdirSync(modsDir).filter((name) => name.toLowerCase().endsWith(".pak")).sort()
     : [];
-  return contentsFor(source, paks);
+  return contentsFrom(source, paks);
 }
 
 function requireDir(p: string, label: string): void {
@@ -182,17 +174,15 @@ export async function buildPack({
   link = true,
   version: requestedVersion,
   gameRoot: requestedGameRoot,
-  bg3leRoot: requestedBg3le,
+  driverOptions,
   log = () => {},
 }: BuildPackOptions): Promise<BuildPackResult> {
-  if (recipe && recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for Baldur's Gate 3`);
-  const packId = recipe && recipe.id ? recipe.id : PACK_ID;
-  const modId = recipe && recipe.modId ? recipe.modId : MOD_ID;
-  const packName = recipe && recipe.name ? recipe.name : "BG3 Modded";
-  const packDescription = recipe && recipe.description
-    ? recipe.description
-    : "Baldur's Gate 3 mod snapshot with modsettings and Script Extender";
-  const src = path.resolve(source || defaultSource());
+  if (recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for Baldur's Gate 3`);
+  const packId = recipe.id;
+  const modId = recipe.modId;
+  const packName = recipe.name;
+  const packDescription = recipe.description || "";
+  const src = path.resolve(source);
   const dst = path.resolve(out);
   const version = String(requestedVersion || defaultVersion());
   const modsDir = path.join(src, "Mods");
@@ -200,6 +190,7 @@ export async function buildPack({
   const scriptExtender = path.join(src, "Script Extender");
   const game: SteamGame | null = steam.findGame(GAME) || null;
   const gameRoot = requestedGameRoot ? path.resolve(requestedGameRoot) : (game ? game.root : "");
+  const requestedBg3le = typeof driverOptions?.bg3leRoot === "string" ? driverOptions.bg3leRoot : "";
 
   requireDir(modsDir, "BG3 Mods folder");
   requireDir(path.dirname(modsettings), "BG3 profile folder");
@@ -211,7 +202,7 @@ export async function buildPack({
     .sort((a, b) => a.localeCompare(b));
   if (!paks.length) throw new Error(`No .pak files in ${modsDir}`);
 
-  const platforms = paths.mergePlatforms(DEFAULT_PLATFORMS, recipe && recipe.platforms);
+  const platforms = paths.mergePlatforms(DEFAULT_PLATFORMS, recipe.platforms);
   paths.validatePlatforms(platforms, "pack.platforms");
 
   log(`Packing BG3 mods ${version} from ${src}`);
@@ -220,8 +211,8 @@ export async function buildPack({
   ensureDir(path.join(payload, "Mods"));
   ensureDir(path.join(payload, "bg3se"));
 
-  const bg3leRoot = requestedBg3le ? path.resolve(requestedBg3le) : await ensureBg3le();
-  log(`Including BG3LE ${BG3LE_VERSION} for native Linux`);
+  const bg3leRoot = requestedBg3le ? path.resolve(requestedBg3le) : await bg3le.ensureBg3le();
+  log(`Including BG3LE ${bg3le.VERSION} for native Linux`);
   copyTree(bg3leRoot, path.join(dst, "tools", "bg3le"));
 
   let copied = 0;
@@ -259,7 +250,7 @@ export async function buildPack({
   log(`BG3SE files: ${bg3seFiles}${gameRoot ? "" : " (game root not found)"}`);
 
   const artSrc = path.join(projectRoot, "web");
-  const artDst = path.join(dst, "art", MOD_ID);
+  const artDst = path.join(dst, "art", modId);
   ensureDir(artDst);
   for (const [from, to] of [
     ["modsync-grid.png", "grid.png"],
@@ -284,7 +275,7 @@ export async function buildPack({
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
-    const mode = BG3LE_EXECUTABLES.has(targetRel) ? "755" : modeFor(targetRel);
+    const mode = bg3le.modeForTarget(targetRel);
     const entry: PackFile = { source: sourceRel, target: targetRel, size, sha256, mode };
     if (platformList) entry.platforms = [...platformList];
     const shared = byHash.get(sha256);
@@ -319,7 +310,7 @@ export async function buildPack({
   }
 
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
-  const notes: Note[] = [...(recipe && Array.isArray(recipe.notes) ? recipe.notes : [])];
+  const notes: Note[] = [...(recipe.notes || [])];
   notes.push({
     title: "Script Extender",
     body: bg3seFiles
@@ -327,17 +318,8 @@ export async function buildPack({
       : "This pack has no BG3 Script Extender files. Install BG3SE (Windows/Proton) or BG3LE (native Linux) before using Script Extender mods.",
     tone: bg3seFiles ? "info" : "warning",
   });
-  const contents = contentsFor(src, paks);
-  const preconditions: PreconditionConfig[] = recipe && Array.isArray(recipe.preconditions)
-    ? recipe.preconditions
-    : [
-      { id: "game-installed", type: "game-installed", required: true, title: "Baldur's Gate 3 is installed" },
-      { id: "game-build", type: "game-build", required: true, build: GAME.build, title: `Game is build ${GAME.build} (${GAME.version})` },
-      { id: "proton-prefix", type: "proton-prefix", required: true, title: "Game data location is ready", hint: "Launch the vanilla game once from Steam." },
-      { id: "game-closed", type: "game-not-running", required: true, title: "Game is closed" },
-      { id: "disk-free", type: "disk-free", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough space for the pack" },
-      { id: "disk-free-game", type: "disk-free", scope: "game", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough space to apply the pack" },
-    ];
+  const contents = contentsFrom(src, paks);
+  const preconditions = recipe.preconditions || [];
 
   const pack: Pack = {
     schema: 1,
@@ -355,16 +337,14 @@ export async function buildPack({
       exe: "bin/bg3.exe",
       gameProcess: "bg3.exe",
       steamAppId: GAME.appId,
-      profile: `mods/${modId}/versions/${version}/modsettings.lsx`,
-      saveFile: "PlayerProfiles/Public",
-      dataDir: "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
     },
     install: {
       type: "bg3",
-      dataDir: "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
-      bg3se: bg3seFiles > 0,
-      bg3le: { version: BG3LE_VERSION, path: "tools/bg3le" },
       label: "modsettings + script extender",
+      options: {
+        bg3se: bg3seFiles > 0,
+        bg3le: { version: bg3le.VERSION, path: "tools/bg3le" },
+      },
     },
     art: {
       grid: `art/${modId}/grid.png`,
@@ -388,4 +368,4 @@ export async function buildPack({
   return { packRoot: dst, pack, files: files.length, totalBytes };
 }
 
-export { PACK_ID, MOD_ID, GAME };
+export { GAME };

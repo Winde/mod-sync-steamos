@@ -10,11 +10,22 @@ STEAM_APP_ID="{{STEAM_APP_ID}}"
 SAVE_FILE="{{SAVE_FILE}}"
 ME3="{{LOADER}}"
 WIN64="{{LOADER_SUPPORT}}"
+LOADER_REL="{{LOADER_REL}}"
+LOADER_SUPPORT_REL="{{LOADER_SUPPORT_REL}}"
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
 VER="$(cat "$ROOT/mods/$MOD/current.txt" 2>/dev/null || true)"
 PROFILE="$ROOT/profiles/$MOD-$VER.me3"
+
+# Prefer the loader snapshot that belongs to the selected version. Packs
+# installed before snapshots existed fall back to the shared root runtime.
+if [ -n "$LOADER_REL" ] && [ -x "$ROOT/mods/$MOD/versions/$VER/$LOADER_REL" ]; then
+  ME3="$ROOT/mods/$MOD/versions/$VER/$LOADER_REL"
+fi
+if [ -n "$LOADER_SUPPORT_REL" ] && [ -d "$ROOT/mods/$MOD/versions/$VER/$LOADER_SUPPORT_REL" ]; then
+  WIN64="$ROOT/mods/$MOD/versions/$VER/$LOADER_SUPPORT_REL"
+fi
 LOG="$LOG_DIR/launch-$MOD-$(date +%Y%m%d-%H%M%S).log"
 
 echo "Steam launch env: LD_PRELOAD=${LD_PRELOAD:-<unset>} SteamAppId=${SteamAppId:-<unset>} SteamGameId=${SteamGameId:-<unset>}" >>"$LOG"

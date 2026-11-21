@@ -136,11 +136,11 @@ test("BG3 uninstall preflight blocks when a backup is missing", (t) => {
   write(path.join(packRoot, "applied.json"), JSON.stringify({
     packId: pack.id,
     version: "1.0.0",
-    dataDir: path.join(base, "data"),
-    gameRoot: path.join(base, "game"),
-    data: ["Mods/a.pak"],
-    game: [],
+    platform: "windows",
+    roots: { data: path.join(base, "data"), game: path.join(base, "game") },
+    files: [{ scope: "data", rel: "Mods/a.pak" }],
     backups: [{ scope: "data", rel: "PlayerProfiles/Public/modsettings.lsx" }],
+    skipped: [],
   }));
 
   const result = plan({ pack, root });

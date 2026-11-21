@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  ensureDir, materialize, readJson, writeJson, safeJoin, walkFiles, isGameRunning,
-} from "../util";
+import { ensureDir, safeJoin, walkFiles } from "../util";
+import * as overlay from "./overlay";
 import * as paths from "../paths";
 import * as steam from "../steam";
-import type { Pack, SteamGame, Variant } from "../types";
+import type { Pack, SteamGame } from "../types";
+import type { OverlayState } from "./overlay";
 
 export function dataDirFor(
   pack: Pack,
@@ -53,11 +53,6 @@ function writeBg3leWrapper(file: string, lib: string): void {
   fs.chmodSync(file, 0o755);
 }
 
-interface AppliedBackup {
-  scope: "data" | "game";
-  rel: string;
-}
-
 export interface AppliedNativeLoader {
   dir: string;
   created: boolean;
@@ -66,29 +61,25 @@ export interface AppliedNativeLoader {
   lib: string;
 }
 
-export interface AppliedState {
-  packId: string;
-  version: string;
-  platform: Variant;
-  dataDir?: string;
-  gameRoot?: string;
-  data: string[];
-  game: string[];
-  backups: AppliedBackup[];
-  skipped: string[];
+export interface AppliedState extends OverlayState {
   nativeLoader?: AppliedNativeLoader;
 }
 
 function installNativeLoader({
   packRoot,
+  pack,
+  version,
   gameRoot,
   platform = process.platform,
 }: {
   packRoot: string;
+  pack: Pack;
+  version: string;
   gameRoot: string;
   platform?: NodeJS.Platform;
 }): AppliedNativeLoader {
-  const source = path.join(packRoot, "tools", "bg3le");
+  const versioned = path.join(packRoot, "mods", pack.mod.id, "versions", version, "tools", "bg3le");
+  const source = fs.existsSync(versioned) ? versioned : path.join(packRoot, "tools", "bg3le");
   const libSource = path.join(source, "build", "libbg3le.so");
   if (!fs.existsSync(libSource)) {
     throw new Error(`Bundled BG3LE is missing: ${libSource}`);
@@ -124,9 +115,10 @@ function installNativeLoader({
 
 function removeNativeLoader(applied: AppliedState): void {
   const loader = applied.nativeLoader;
-  if (!loader || !applied.gameRoot) return;
-  const bg3 = safeJoin(applied.gameRoot, loader.wrapper);
-  const real = safeJoin(applied.gameRoot, loader.real);
+  const gameRoot = applied.roots.game;
+  if (!loader || !gameRoot) return;
+  const bg3 = safeJoin(gameRoot, loader.wrapper);
+  const real = safeJoin(gameRoot, loader.real);
   if (fs.existsSync(bg3) && isBg3leWrapper(bg3)) {
     if (!fs.existsSync(real)) {
       throw new Error(`Cannot restore ${bg3}: ${real} is missing. Reinstall the game files, then retry uninstall.`);
@@ -142,53 +134,8 @@ function removeNativeLoader(applied: AppliedState): void {
   }
 }
 
-function appliedFile(packRoot: string): string {
-  return path.join(packRoot, "applied.json");
-}
-
 export function readApplied(packRoot: string): AppliedState | null {
-  try { return readJson<AppliedState>(appliedFile(packRoot)); } catch { return null; }
-}
-
-function backupPath(packRoot: string, scope: string, rel: string): string {
-  return path.join(packRoot, "backups", scope, rel);
-}
-
-function backupFile(packRoot: string, scope: string, base: string, rel: string): boolean {
-  const target = safeJoin(base, rel);
-  const backup = backupPath(packRoot, scope, rel);
-  if (!fs.existsSync(target)) return fs.existsSync(backup);
-  if (!fs.existsSync(backup)) {
-    ensureDir(path.dirname(backup));
-    fs.copyFileSync(target, backup);
-  }
-  return true;
-}
-
-function restoreBackups(packRoot: string, applied: AppliedState): void {
-  for (const entry of applied.backups || []) {
-    const backup = backupPath(packRoot, entry.scope, entry.rel);
-    if (!fs.existsSync(backup)) continue;
-    const base = entry.scope === "game" ? applied.gameRoot : applied.dataDir;
-    if (!base) continue;
-    const target = safeJoin(base, entry.rel);
-    ensureDir(path.dirname(target));
-    fs.copyFileSync(backup, target);
-  }
-}
-
-function removeApplied(packRoot: string, applied: AppliedState): void {
-  removeNativeLoader(applied);
-  if (applied.dataDir) {
-    for (const rel of applied.data || []) {
-      try { fs.rmSync(safeJoin(applied.dataDir, rel), { force: true }); } catch { /* already gone */ }
-    }
-  }
-  if (applied.gameRoot) {
-    for (const rel of applied.game || []) {
-      try { fs.rmSync(safeJoin(applied.gameRoot, rel), { force: true }); } catch { /* already gone */ }
-    }
-  }
+  return overlay.readState(packRoot) as AppliedState | null;
 }
 
 export function applyBg3({
@@ -218,47 +165,41 @@ export function applyBg3({
   const previous = readApplied(packRoot);
   if (previous) {
     log(`Removing applied files for ${previous.version}...`);
-    removeApplied(packRoot, previous);
-    restoreBackups(packRoot, previous);
+    removeNativeLoader(previous);
+    overlay.clearState(packRoot, previous);
   }
 
-  const applied: AppliedState = {
+  const applied = overlay.createState({
     packId: pack.id,
     version,
     platform: target.variant,
-    dataDir,
-    gameRoot,
-    data: [],
-    game: [],
-    backups: [],
-    skipped: [],
-  };
+    roots: { data: dataDir, game: gameRoot },
+  }) as AppliedState;
 
   const modsSrc = path.join(src, "Mods");
-  const modsDst = path.join(dataDir, "Mods");
-  ensureDir(modsDst);
   const paks = fs.existsSync(modsSrc)
     ? fs.readdirSync(modsSrc).filter((name) => name.toLowerCase().endsWith(".pak"))
     : [];
   for (const name of paks) {
-    const rel = `Mods/${name}`;
-    if (backupFile(packRoot, "data", dataDir, rel)) {
-      applied.backups.push({ scope: "data", rel });
-    }
-    materialize(path.join(modsSrc, name), path.join(modsDst, name), true);
-    applied.data.push(rel);
+    overlay.applyFile({
+      packRoot,
+      state: applied,
+      scope: "data",
+      rel: `Mods/${name}`,
+      source: path.join(modsSrc, name),
+      link: true,
+    });
   }
 
   const profileSrc = path.join(src, "modsettings.lsx");
   if (fs.existsSync(profileSrc)) {
-    const rel = "PlayerProfiles/Public/modsettings.lsx";
-    if (backupFile(packRoot, "data", dataDir, rel)) {
-      applied.backups.push({ scope: "data", rel });
-    }
-    const target = safeJoin(dataDir, rel);
-    ensureDir(path.dirname(target));
-    fs.copyFileSync(profileSrc, target);
-    applied.data.push(rel);
+    overlay.applyFile({
+      packRoot,
+      state: applied,
+      scope: "data",
+      rel: "PlayerProfiles/Public/modsettings.lsx",
+      source: profileSrc,
+    });
   }
 
   if (native) {
@@ -271,37 +212,37 @@ export function applyBg3({
     ]) {
       const source = path.join(src, "bg3se", name);
       if (!fs.existsSync(source)) continue;
-      if (backupFile(packRoot, "game", gameRoot, rel)) {
-        applied.backups.push({ scope: "game", rel });
-      }
-      const file = safeJoin(gameRoot, rel);
-      ensureDir(path.dirname(file));
-      fs.copyFileSync(source, file);
-      applied.game.push(rel);
+      overlay.applyFile({
+        packRoot,
+        state: applied,
+        scope: "game",
+        rel,
+        source,
+      });
     }
   }
 
   const extSrc = path.join(src, "Script Extender");
   if (fs.existsSync(extSrc)) {
     for (const file of walkFiles(extSrc)) {
-      const rel = `Script Extender/${file.rel}`;
-      if (backupFile(packRoot, "data", dataDir, rel)) {
-        applied.backups.push({ scope: "data", rel });
-      }
-      const target = safeJoin(dataDir, rel);
-      ensureDir(path.dirname(target));
-      fs.copyFileSync(file.abs, target);
-      applied.data.push(rel);
+      overlay.applyFile({
+        packRoot,
+        state: applied,
+        scope: "data",
+        rel: `Script Extender/${file.rel}`,
+        source: file.abs,
+      });
     }
   }
 
   if (native) {
-    applied.nativeLoader = installNativeLoader({ packRoot, gameRoot, platform });
+    applied.nativeLoader = installNativeLoader({ packRoot, pack, version, gameRoot, platform });
     log(`Native loader: ${applied.nativeLoader.wrapper} preloads ${applied.nativeLoader.lib}`);
   }
 
-  writeJson(appliedFile(packRoot), applied);
-  log(`Applied BG3 ${version} for ${target.variant}: ${paks.length} mods, ${applied.game.length} loader files.`);
+  overlay.writeState(packRoot, applied);
+  const gameFiles = applied.files.filter((entry) => entry.scope === "game").length;
+  log(`Applied BG3 ${version} for ${target.variant}: ${paks.length} mods, ${gameFiles} loader files.`);
   return applied;
 }
 
@@ -329,42 +270,20 @@ export function planRevert({ pack, root }: { pack: Pack; root: string }): Revert
     };
   }
 
-  if (isGameRunning(["bg3", "bg3.bg3le-real"])) {
-    errors.push("Baldur's Gate 3 is running. Close it before uninstalling.");
-  }
-
-  const roots: Array<["data" | "game", string | undefined]> = [
-    ["data", applied.dataDir],
-    ["game", applied.gameRoot],
-  ];
-  for (const [scope, base] of roots) {
-    const list = scope === "data" ? applied.data : applied.game;
-    if (list.length && !base) errors.push(`The ${scope} install path is missing.`);
-    if (base && list.length) {
-      try { fs.accessSync(base, fs.constants.W_OK); } catch { errors.push(`No write access to ${base}.`); }
-    }
-  }
-
-  for (const entry of applied.backups || []) {
-    const backup = backupPath(packRoot, entry.scope, entry.rel);
-    if (!fs.existsSync(backup)) errors.push(`Missing backup for ${entry.scope}/${entry.rel}; refusing to uninstall.`);
-    const base = entry.scope === "game" ? applied.gameRoot : applied.dataDir;
-    if (!base) errors.push(`No ${entry.scope} install path for ${entry.rel}.`);
-  }
-
-  if (applied.data && applied.data.length) {
-    actions.push(`Remove ${applied.data.length} pack file(s) from the game data folder`);
-  }
-  if (applied.game && applied.game.length) {
-    actions.push(`Remove ${applied.game.length} game file(s) from the game folder`);
-  }
-  if (applied.backups && applied.backups.length) {
-    actions.push(`Restore ${applied.backups.length} original file(s) from backup`);
-  }
+  const plan = overlay.planState({
+    packRoot,
+    state: applied,
+    processNames: ["bg3", "bg3.bg3le-real"],
+    processLabel: "Baldur's Gate 3",
+  });
+  errors.push(...plan.errors);
+  warnings.push(...plan.warnings);
+  actions.push(...plan.actions);
 
   if (applied.nativeLoader) {
-    const bg3 = applied.gameRoot ? path.join(applied.gameRoot, "bin", "bg3") : "";
-    const real = applied.gameRoot ? path.join(applied.gameRoot, "bin", "bg3.bg3le-real") : "";
+    const gameRoot = applied.roots.game;
+    const bg3 = gameRoot ? path.join(gameRoot, "bin", "bg3") : "";
+    const real = gameRoot ? path.join(gameRoot, "bin", "bg3.bg3le-real") : "";
     if (bg3 && isBg3leWrapper(bg3)) {
       if (!fs.existsSync(real)) {
         errors.push(`Cannot restore the original game binary: ${real} is missing.`);
@@ -406,9 +325,8 @@ export function revertBg3({
   const applied = plan.applied;
   if (!applied) return { reverted: false };
   const packRoot = path.join(root, "packs", pack.id);
-  removeApplied(packRoot, applied);
-  restoreBackups(packRoot, applied);
-  fs.rmSync(appliedFile(packRoot), { force: true });
+  removeNativeLoader(applied);
+  overlay.clearState(packRoot, applied);
   log(`Reverted BG3 files for ${applied.version}.`);
   return { reverted: true, version: applied.version };
 }

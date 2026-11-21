@@ -58,8 +58,11 @@ test("BG3 pack CLI produces a complete multi-platform pack contract", { timeout:
   // The install adapter and native template are pack data, not a game check.
   assert.equal(pack.install.type, "bg3");
   assert.equal(pack.install.label, "modsettings + script extender");
-  assert.equal(pack.install.bg3le.version, "0.4.6");
-  assert.equal(pack.install.bg3le.path, "tools/bg3le");
+  assert.equal(pack.install.options.bg3le.version, "0.4.6");
+  assert.equal(pack.install.options.bg3le.path, "tools/bg3le");
+  assert.equal(pack.install.dataDir, undefined);
+  assert.equal(pack.launch.profile, undefined);
+  assert.equal(pack.launch.saveFile, undefined);
   assert.equal(pack.launch.type, "steam");
   assert.equal(pack.launch.mode, "default");
   assert.equal(pack.platforms["linux-native"].exe, "bin/bg3");

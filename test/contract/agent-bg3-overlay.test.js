@@ -164,7 +164,7 @@ test("BG3 install, update, rollback, and pack removal are reversible", { timeout
   assert.equal(state.version, "1.0.0");
   assert.ok(state.backups.some((entry) => entry.rel === "Mods/TestMod_uuid.pak"));
   assert.ok(state.backups.some((entry) => entry.rel === "bin/DWrite.dll"));
-  assert.ok(state.data.includes("Mods/Extra.pak"));
+  assert.ok(state.files.some((entry) => entry.scope === "data" && entry.rel === "Mods/Extra.pak"));
 
   // Publish v2 and update. Files owned by v1 are removed, v2 is applied, and
   // the vanilla files are backed up again.

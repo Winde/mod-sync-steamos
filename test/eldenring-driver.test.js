@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildPack } = require("../dist/src/drivers/eldenring");
+const { buildPack, contentsFor } = require("../dist/src/drivers/eldenring");
 const { loadRecipe } = require("../dist/src/recipes");
 const { loadPack } = require("../dist/src/manifest");
 
@@ -62,10 +62,21 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     assert.equal(grace.pack.id, "eldenring-graceborne");
     assert.equal(grace.pack.name, "Graceborne");
     assert.equal(grace.pack.mod.id, "graceborne");
-    assert.equal(grace.pack.launch.saveFile, "ER0000.graceborne.sl2");
+    assert.equal(grace.pack.loader.saveFile, "ER0000.graceborne.sl2");
+    assert.equal(grace.pack.launch.profile, undefined);
+    assert.equal(grace.pack.launch.saveFile, undefined);
     assert.equal(grace.pack.contents.kind, "packages");
     assert.equal(grace.pack.contents.count, 1);
     assert.match(grace.pack.contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
+
+    const contents = contentsFor({
+      recipe: loadRecipe("eldenring-graceborne"),
+      source: src,
+      version: "1.0.0",
+    });
+    assert.equal(contents.kind, "packages");
+    assert.equal(contents.count, 1);
+    assert.match(contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
     assert.equal(grace.pack.platforms.windows.loader, "tools/me3-win/bin/me3.exe");
     assert.equal(grace.pack.platforms["linux-proton"].loaderSupport, "tools/me3-win/bin");
     assert.equal(grace.pack.platforms["linux-proton"].template, "loaders/me3.sh");
@@ -83,7 +94,7 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     assert.equal(convergence.pack.id, "eldenring-convergence");
     assert.equal(convergence.pack.name, "The Convergence");
     assert.equal(convergence.pack.mod.id, "convergence");
-    assert.equal(convergence.pack.launch.saveFile, "ER0000.convergence.sl2");
+    assert.equal(convergence.pack.loader.saveFile, "ER0000.convergence.sl2");
     assert.ok(convergence.pack.preconditions.some((p) => p.id === "sote" && p.type === "manual"));
     assert.ok(convergence.pack.notes.some((n) => n.title.includes("Shadow of the Erdtree")));
 

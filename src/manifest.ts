@@ -77,8 +77,6 @@ export function validatePack(pack: unknown): Pack {
   if (!p.launch || typeof p.launch !== "object" || Array.isArray(p.launch)) throw new Error("pack.json: missing launch");
   const launch = p.launch as Record<string, unknown>;
   requireString(launch, "type", "pack.json.launch");
-  requireString(launch, "profile", "pack.json.launch");
-  requireString(launch, "saveFile", "pack.json.launch");
   if (p.profilePattern != null) {
     if (typeof p.profilePattern !== "string" || !p.profilePattern.includes("{version}")) {
       throw new Error("pack.json.profilePattern must be a string containing {version}");

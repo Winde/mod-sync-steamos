@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildPack } = require("../dist/src/drivers/bg3");
+const { buildPack, contentsFor } = require("../dist/src/drivers/bg3");
 const { loadRecipe } = require("../dist/src/recipes");
 const { loadPack } = require("../dist/src/manifest");
 
@@ -51,7 +51,7 @@ test("the BG3 driver records the active module list in the pack", async () => {
       out,
       version: "2026.11.21",
       gameRoot,
-      bg3leRoot: bg3le,
+      driverOptions: { bg3leRoot: bg3le },
     });
 
     assert.equal(result.pack.id, "bg3-modded");
@@ -70,7 +70,19 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.equal(result.pack.platforms["linux-native"].template, "games/bg3-native.sh");
     assert.equal(result.pack.platforms["linux-proton"].gameProcess, "bg3.exe");
     assert.match(result.pack.platforms["linux-proton"].dataDir, /^%PREFIX%/);
-    assert.equal(result.pack.install.bg3le.version, "0.4.6");
+    assert.equal(result.pack.install.options.bg3le.version, "0.4.6");
+    assert.equal(result.pack.install.options.bg3se, true);
+    assert.equal(result.pack.launch.profile, undefined);
+    assert.equal(result.pack.launch.saveFile, undefined);
+
+    const contents = contentsFor({
+      recipe: loadRecipe("bg3-modded"),
+      source,
+      version: "2026.11.21",
+    });
+    assert.equal(contents.kind, "mods");
+    assert.equal(contents.count, 1);
+    assert.deepEqual(contents.inactivePaks, ["extra.pak"]);
 
     const loaded = loadPack(out);
     assert.equal(loaded.pack.contents.count, 1);

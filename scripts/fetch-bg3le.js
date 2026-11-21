@@ -6,7 +6,7 @@
  * The implementation lives in src/; this stays a thin CLI for npm scripts.
  */
 
-const { ensureBg3le } = require("../dist/src/bg3le");
+const { ensureBg3le } = require("../dist/src/loaders/bg3le");
 
 ensureBg3le().then((dir) => console.log(dir)).catch((err) => {
   console.error(err.message);

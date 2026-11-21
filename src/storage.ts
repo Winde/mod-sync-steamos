@@ -8,7 +8,6 @@ import type {
   ClearPlan,
   ClearResult,
   Pack,
-  PackAdapter,
   PackStorage,
   StorageReport,
   StorageVersion,
@@ -122,10 +121,6 @@ function removeDesktopShortcuts(modId: string): void {
   }
 }
 
-function adapterFor(pack: Pack | null): PackAdapter | null {
-  return installers.forPack(pack) as unknown as PackAdapter | null;
-}
-
 export function planClear(root: string, { packId, scope }: { packId?: string; scope: string }): ClearPlan {
   if (scope === "logs") {
     return { ok: true, scope, actions: ["Clear the log files"], errors: [], warnings: [] };
@@ -137,8 +132,8 @@ export function planClear(root: string, { packId, scope }: { packId?: string; sc
   try { pack = readJson<Pack>(versionStore.packFile(packRoot)); } catch { /* use the folder name */ }
 
   if (scope === "pack") {
-    const adapter = adapterFor(pack);
-    if (adapter && adapter.plan) {
+    const adapter = pack ? installers.forPack(pack) : null;
+    if (pack && adapter && adapter.plan) {
       const plan = adapter.plan({ pack, root });
       return { ...plan, scope, packId };
     }
@@ -208,8 +203,8 @@ export function clearStorage(root: string, { packId, scope }: { packId?: string;
   } else if (scope === "pack") {
     const plan = planClear(root, { packId, scope });
     if (!plan.ok) throw new Error(`Uninstall preflight failed: ${plan.errors.join("; ")}`);
-    const adapter = adapterFor(pack);
-    if (adapter && adapter.revert) {
+    const adapter = pack ? installers.forPack(pack) : null;
+    if (pack && adapter && adapter.revert) {
       // If the game-side revert fails, keep the pack root and its backups so
       // the user can retry instead of losing the only record of applied files.
       adapter.revert({ pack, root, log: () => { } });

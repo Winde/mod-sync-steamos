@@ -99,6 +99,19 @@ test("native BG3 install wraps the game and reverts cleanly", { skip, timeout: 1
   assert.equal(applied.nativeLoader.wrapper, "bin/bg3");
   assert.equal(applied.nativeLoader.real, "bin/bg3.bg3le-real");
 
+  const loaderSnapshot = path.join(
+    installedRoot,
+    "mods",
+    MOD_ID,
+    "versions",
+    "1.0.0",
+    "tools",
+    "bg3le",
+    "build",
+    "libbg3le.so",
+  );
+  assert.equal(fs.readFileSync(loaderSnapshot, "utf8"), "bg3le-0.4.6");
+
   assert.equal(fs.readFileSync(path.join(dataDir, "Mods/TestMod_uuid.pak"), "utf8"), "pak-1.0.0");
   assert.match(
     fs.readFileSync(path.join(dataDir, "PlayerProfiles/Public/modsettings.lsx"), "utf8"),
@@ -124,6 +137,7 @@ test("native BG3 install wraps the game and reverts cleanly", { skip, timeout: 1
   );
   assert.match(launcher, /ModSync BG3LE wrapper/);
   assert.match(launcher, /bg3\.bg3le-real/);
+  assert.match(launcher, /mods\/\$MOD\/versions\/\$VER\/tools\/bg3le/);
 
   // Removing the pack restores the original binary and vanilla data files.
   const cleared = await request(agent.base, "/api/storage/clear", {
