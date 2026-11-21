@@ -41,6 +41,16 @@ test("the Linux launcher carries the profile pattern and all game processes", ()
     assert.match(text, /PROFILE_PATTERN="profiles\/\{mod\}-\{version\}\.me3"/);
     assert.match(text, /SAVE_FILE="save\.sav"/);
     assert.match(text, /LOADER_REL="tools\/me3-/);
+
+    // Game Mode focus: the shortcut's SteamAppId is kept before the launcher
+    // replaces it for the game, and the game window is stamped with it.
+    const capture = text.indexOf('SHORTCUT_APP_ID="${SteamAppId:-}"');
+    const override = text.indexOf('export SteamAppId="$STEAM_APP_ID"');
+    assert.ok(capture > -1, "the launcher captures the shortcut app id");
+    assert.ok(capture < override, "the shortcut app id is read before the override");
+    assert.match(text, /xprop -display "\$display" -id "\$window" -f STEAM_GAME 32c/);
+    assert.match(text, /stamp_game_windows/);
+    assert.doesNotMatch(text, /\{\{[A-Z_]+\}\}/);
   } finally {
     remove(root);
   }
