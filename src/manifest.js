@@ -25,6 +25,12 @@ function validatePack(pack) {
   requireString(pack.launch, "gameProcess", "pack.json.launch");
   requireString(pack.launch, "profile", "pack.json.launch");
   requireString(pack.launch, "saveFile", "pack.json.launch");
+  if (pack.launch.mode != null && !["default", "alternate-exe", "loader"].includes(pack.launch.mode)) {
+    throw new Error("pack.json.launch: mode must be default, alternate-exe, or loader");
+  }
+  if (pack.launch.defaultExe != null && typeof pack.launch.defaultExe !== "string") {
+    throw new Error("pack.json.launch: defaultExe must be a string");
+  }
   requireString(pack, "files", "pack.json");
   if (!pack.art || typeof pack.art !== "object") throw new Error("pack.json: missing art");
   for (const key of ["grid", "hero", "logo", "icon"]) {

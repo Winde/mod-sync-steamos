@@ -63,7 +63,9 @@ A pack never contains the base game or saves.
   "loader": { "type": "me3", "profile": "profiles/graceborne-0.2.7.me3" },
   "launch": {
     "type": "me3",
+    "mode": "loader",
     "exe": "Game/eldenring.exe",
+    "defaultExe": "Game/eldenring.exe",
     "gameProcess": "eldenring.exe",
     "steamAppId": 1245620,
     "profile": "profiles/graceborne-0.2.7.me3",
@@ -167,6 +169,23 @@ an install cannot start from a stale or bypassed dashboard. The same
 The agent writes files whose target starts with
 `mods/<mod>/versions/<version>/` into a staging directory, then swaps it in.
 Profiles/tools/art are written directly under the pack install root.
+
+### Launch modes
+
+`launch.mode` tells the TV whether the normal Steam link is enough or a tuned
+shortcut is required:
+
+| `mode` | Meaning | Steam shortcut |
+|---|---|---|
+| `default` | The pack uses the game's normal exe; mods are already in place (BG3) | Use the regular Steam game link; no non-Steam shortcut is added |
+| `alternate-exe` | The pack must start a different exe (BG2 `InfinityLoader.exe`) | A non-Steam shortcut/wrapper is required |
+| `loader` | The pack starts through a loader (me3) | A non-Steam shortcut launches the loader |
+
+`game.exe` is the vanilla/default exe used for discovery. `launch.exe` is what
+the pack actually starts; `launch.defaultExe` records the vanilla target when
+they differ. This prevents a default-exe pack from silently getting a duplicate
+shortcut, and prevents an alternate-exe pack from being launched through the
+wrong Steam entry.
 
 ## Restrictions
 

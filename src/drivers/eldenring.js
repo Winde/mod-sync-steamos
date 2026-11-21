@@ -171,6 +171,8 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     loader: { type: "me3", profile: `profiles/${modId}-${version}.me3` },
     launch: {
       type: "me3",
+      mode: "loader",
+      defaultExe: "Game/eldenring.exe",
       exe: "Game/eldenring.exe",
       gameProcess: "eldenring.exe",
       steamAppId: GAME.appId,

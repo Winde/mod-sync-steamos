@@ -250,6 +250,8 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     loader: { type: "bg3se", profile: `mods/${modId}/versions/${version}/modsettings.lsx` },
     launch: {
       type: "steam",
+      mode: "default",
+      defaultExe: "bin/bg3.exe",
       exe: "bin/bg3.exe",
       gameProcess: "bg3.exe",
       steamAppId: GAME.appId,

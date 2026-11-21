@@ -226,7 +226,11 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   const icon = path.join(packRoot, pack.art.icon);
   let desktopFile = null;
   if (process.platform === "linux") {
-    const desktopText = `[Desktop Entry]
+    log(`Launcher: ${launcher}`);
+    if (pack.launch.mode === "default") {
+      log(`Default exe: use the regular Steam link for ${pack.game.title}. No non-Steam shortcut was added.`);
+    } else {
+      const desktopText = `[Desktop Entry]
 Type=Application
 Name=${pack.name}
 Comment=${pack.description || "Modded " + pack.game.title}
@@ -236,31 +240,31 @@ Icon=${icon}
 Terminal=false
 Categories=Game;
 `;
-    const apps = path.join(os.homedir(), ".local", "share", "applications");
-    desktopFile = path.join(apps, `${pack.mod.id}.desktop`);
-    writeText(desktopFile, desktopText);
-    const userDesktop = path.join(os.homedir(), "Desktop", `${pack.mod.id}.desktop`);
-    try { writeText(userDesktop, desktopText); } catch { /* Desktop may not exist */ }
+      const apps = path.join(os.homedir(), ".local", "share", "applications");
+      desktopFile = path.join(apps, `${pack.mod.id}.desktop`);
+      writeText(desktopFile, desktopText);
+      const userDesktop = path.join(os.homedir(), "Desktop", `${pack.mod.id}.desktop`);
+      try { writeText(userDesktop, desktopText); } catch { /* Desktop may not exist */ }
 
-    log(`Launcher: ${launcher}`);
-    log(`Shortcut: ${desktopFile}`);
-    try {
-      const shortcut = await steam.registerShortcut({
-        exePath: launcher,
-        name: pack.name,
-        icon,
-        art: {
-          grid: path.join(packRoot, pack.art.grid),
-          hero: path.join(packRoot, pack.art.hero),
-          logo: path.join(packRoot, pack.art.logo),
-          header: pack.art.header ? path.join(packRoot, pack.art.header) : "",
-          portrait: pack.art.portrait ? path.join(packRoot, pack.art.portrait) : "",
+      log(`Shortcut: ${desktopFile}`);
+      try {
+        const shortcut = await steam.registerShortcut({
+          exePath: launcher,
+          name: pack.name,
           icon,
-        },
-      });
-      log(`Steam shortcut ${shortcut.action}: app ${shortcut.appId}. Restart Steam if it is not visible.`);
-    } catch (err) {
-      log(`Steam shortcut was not added automatically: ${err.message}`);
+          art: {
+            grid: path.join(packRoot, pack.art.grid),
+            hero: path.join(packRoot, pack.art.hero),
+            logo: path.join(packRoot, pack.art.logo),
+            header: pack.art.header ? path.join(packRoot, pack.art.header) : "",
+            portrait: pack.art.portrait ? path.join(packRoot, pack.art.portrait) : "",
+            icon,
+          },
+        });
+        log(`Steam shortcut ${shortcut.action}: app ${shortcut.appId}. Restart Steam if it is not visible.`);
+      } catch (err) {
+        log(`Steam shortcut was not added automatically: ${err.message}`);
+      }
     }
   } else {
     log(`Launcher: ${launcher} (Linux integration skipped on ${process.platform}.)`);

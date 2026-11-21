@@ -42,6 +42,17 @@ test("validatePack accepts notes and preconditions", () => {
   assert.equal(validatePack(pack).preconditions.length, 2);
 });
 
+test("launch modes are explicit and validated", () => {
+  const pack = basePack([], []);
+  pack.launch.mode = "default";
+  pack.launch.defaultExe = "bin/game.exe";
+  assert.equal(validatePack(pack).launch.mode, "default");
+  pack.launch.mode = "alternate-exe";
+  assert.equal(validatePack(pack).launch.mode, "alternate-exe");
+  pack.launch.mode = "nope";
+  assert.throws(() => validatePack(pack), /mode/);
+});
+
 test("required failures block, optional failures do not", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-pre-"));
   const game = { root, build: "41", prefixReady: true, library: root };

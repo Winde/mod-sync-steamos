@@ -48,8 +48,8 @@ custom install steps (e.g. WeiDU).
 |---|---|---|---|---|
 | ELDEN RING | Overlay | `eldenring` | me3 | v1; build 25827938 / 1.17; recipes for Graceborne and Convergence |
 | Skyrim SE | Overlay/profile | `skyrim-se` | SKSE + MO2/Vortex | save paths/MO2 profile later |
-| Baldur's Gate 3 | Profile | `bg3` | BG3SE + modsettings | implemented; applies to the Proton prefix |
-| Baldur's Gate 2 EE | In-place recipe | `bg2-weidu` | WeiDU | needs clean game backup + install order |
+| Baldur's Gate 3 | Profile | `bg3` | BG3SE + modsettings | implemented; default exe + Proton prefix apply |
+| Baldur's Gate 2 EE | In-place recipe | `bg2-weidu` | WeiDU + InfinityLoader | alternate exe, clean game backup, install order |
 
 ## Adding a game
 

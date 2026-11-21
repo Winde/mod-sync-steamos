@@ -621,6 +621,14 @@
     render();
   }
 
+  function launchLabel(p) {
+    const launch = p.launch || {};
+    if (launch.mode === "default") return labels.launchDefault;
+    if (launch.mode === "alternate-exe") return labels.launchAlternate(launch.exe || labels.unknown);
+    if (launch.mode === "loader") return labels.launchLoader((p.loader && p.loader.type) || launch.type || "loader");
+    return launch.exe || labels.unknown;
+  }
+
   function renderDetails() {
     const p = selectedPack();
     if (!p) return;
@@ -638,10 +646,11 @@
       <div class="row"><span>${labels.availableRow}</span><b>${esc(p.mod.version)}</b></div>
       <div class="row"><span>${labels.versionsKept}</span><b>${esc(versions)}</b></div>
       <div class="row"><span>${labels.gameRow}</span><b>${esc(p.game.title)} ${esc(p.game.version || "")} · ${labels.buildLabel} ${esc(p.game.build || "")}</b></div>
+      <div class="row"><span>${labels.launchRow}</span><b>${esc(launchLabel(p))}</b></div>
       <div class="row"><span>${labels.packRow}</span><b>${labels.stats(gb(p.totalBytes), p.files)}</b></div>
       ${p.contents ? `<div class="row"><span>${labels.contentsRow}</span><b>${contentsCount(p.contents)} ${labels.contentsSource(p.contents.source)}</b></div>` : ""}
       <div class="row"><span>${labels.launcherRow}</span><b>${esc(p.launcher || labels.notInstalled)}</b></div>
-      <div class="row"><span>${labels.shortcutRow}</span><b>${esc(p.desktopFile || labels.addDesktop)}</b></div>
+      <div class="row"><span>${labels.shortcutRow}</span><b>${p.launch && p.launch.mode === "default" ? labels.steamGameLink : esc(p.desktopFile || labels.addDesktop)}</b></div>
       <div class="row"><span>${labels.savesRow}</span><b>${labels.savesValue}</b></div>
       ${noteList(p).length ? `<p style="margin-top:2vh"><b>${labels.beforeInstall}</b></p>${renderNotes(p)}` : ""}
       ${p.contents ? `<p style="margin-top:2vh"><b>${p.contents.kind === "mods" ? labels.includedMods : labels.includedPackages}</b> <span class="meta">${labels.contentsSource(p.contents.source)}${p.contents.inactivePaks && p.contents.inactivePaks.length ? ` · ${labels.inactivePaks(p.contents.inactivePaks.length)}` : ""}</span></p><div class="modlist">${contentsNames(p.contents).map((name) => esc(name)).join(" · ")}</div>` : ""}

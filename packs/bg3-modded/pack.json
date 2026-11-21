@@ -29,7 +29,9 @@
     "steamAppId": 1086940,
     "profile": "mods/bg3/versions/2026.11.21/modsettings.lsx",
     "saveFile": "PlayerProfiles/Public",
-    "dataDir": "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3"
+    "dataDir": "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
+    "mode": "default",
+    "defaultExe": "bin/bg3.exe"
   },
   "install": {
     "type": "bg3",
