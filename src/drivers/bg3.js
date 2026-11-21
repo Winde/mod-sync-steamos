@@ -15,6 +15,7 @@ const GAME = {
   store: "steam",
   appId: 1086940,
   installDir: "Baldurs Gate 3",
+  exe: "bin/bg3.exe",
   build: "25605617",
   version: "Patch 8",
   prefix: true,
@@ -33,6 +34,75 @@ function defaultSource() {
 
 function defaultVersion() {
   return new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+}
+
+const BUILTIN_MODULES = new Set(["GustavX", "HonourX"]);
+
+function parseModSettings(xml) {
+  const mods = [];
+  for (const match of String(xml).matchAll(/<node id="ModuleShortDesc">([\s\S]*?)<\/node>/g)) {
+    const attrs = {};
+    for (const attr of match[1].matchAll(/<attribute id="([^"]+)"[^>]*value="([^"]*)"/g)) {
+      attrs[attr[1]] = attr[2];
+    }
+    if (!attrs.Name) continue;
+    const folder = attrs.Folder || "";
+    mods.push({
+      name: attrs.Name,
+      id: attrs.UUID || folder || attrs.Name,
+      folder,
+      version64: attrs.Version64 || "",
+      md5: attrs.MD5 || "",
+      publishHandle: attrs.PublishHandle || "",
+      builtin: BUILTIN_MODULES.has(folder) || BUILTIN_MODULES.has(attrs.Name),
+    });
+  }
+  return mods;
+}
+
+function matchPak(mod, paks, used) {
+  const folder = String(mod.folder || "").toLowerCase();
+  const short = folder.split("_")[0];
+  const id = String(mod.id || "").toLowerCase();
+  return paks.find((name) => {
+    if (used.has(name)) return false;
+    const lower = name.toLowerCase();
+    return (folder && lower.startsWith(folder))
+      || (short && lower.startsWith(short))
+      || (id && lower.includes(id));
+  }) || null;
+}
+
+function contentsFor(source, paks) {
+  const xml = fs.readFileSync(path.join(source, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8");
+  const mods = parseModSettings(xml);
+  const used = new Set();
+  for (const mod of mods) {
+    if (mod.builtin) continue;
+    const file = matchPak(mod, paks, used);
+    if (file) {
+      mod.file = `Mods/${file}`;
+      used.add(file);
+    }
+  }
+  return {
+    kind: "mods",
+    source: "modsettings.lsx",
+    generatedAt: new Date().toISOString(),
+    count: mods.filter((mod) => !mod.builtin).length,
+    modules: mods.length,
+    paks: paks.length,
+    inactivePaks: paks.filter((name) => !used.has(name)),
+    mods,
+  };
+}
+
+function discover(source) {
+  const modsDir = path.join(source, "Mods");
+  const paks = fs.existsSync(modsDir)
+    ? fs.readdirSync(modsDir).filter((name) => name.toLowerCase().endsWith(".pak")).sort()
+    : [];
+  return contentsFor(source, paks);
 }
 
 function requireDir(p, label) {
@@ -158,6 +228,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
       : "This pack has no BG3 Script Extender files. Install BG3SE in the game before using Script Extender mods.",
     tone: bg3seFiles ? "info" : "warning",
   });
+  const contents = contentsFor(src, paks);
   const preconditions = recipe && Array.isArray(recipe.preconditions)
     ? recipe.preconditions
     : [
@@ -201,6 +272,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     },
     notes,
     preconditions,
+    contents,
     files: "files.json",
     save: { transfer: "out-of-scope" },
   };
@@ -212,4 +284,4 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   return { packRoot: dst, pack, files: files.length, totalBytes };
 }
 
-module.exports = { buildPack, defaultSource, PACK_ID, MOD_ID, GAME };
+module.exports = { buildPack, defaultSource, discover, contentsFor, parseModSettings, PACK_ID, MOD_ID, GAME };

@@ -11,6 +11,7 @@ const GAME = {
   store: "steam",
   appId: 1245620,
   installDir: "ELDEN RING",
+  exe: "Game/eldenring.exe",
   build: "25827938",
   version: "1.17",
   prefix: true,
@@ -18,6 +19,64 @@ const GAME = {
 
 function defaultSource() {
   return "D:\\EldenRingMods";
+}
+
+function parseMe3Profile(text) {
+  const packages = [];
+  const natives = [];
+  let block = null;
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const section = /^\[\[(.+)\]\]$/.exec(line);
+    if (section) {
+      block = { type: section[1] };
+      if (section[1] === "packages") packages.push(block);
+      else if (section[1] === "natives") natives.push(block);
+      else block = null;
+      continue;
+    }
+    if (line.startsWith("[")) { block = null; continue; }
+    if (!block) continue;
+    const kv = /^([A-Za-z_]+)\s*=\s*(.+)$/.exec(line);
+    if (!kv) continue;
+    let value = kv[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    } else if (value === "true") value = true;
+    else if (value === "false") value = false;
+    else if (value.startsWith("[") && value.endsWith("]")) {
+      value = value.slice(1, -1).split(",").map((v) => v.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+    }
+    block[kv[1]] = value;
+  }
+  return { packages, natives };
+}
+
+function contentsFor(recipe, source, version) {
+  const profile = path.join(source, "profiles", `${recipe.modId}-${version}.me3`);
+  const parsed = parseMe3Profile(fs.readFileSync(profile, "utf8"));
+  const packages = parsed.packages.map((entry, index) => ({
+    path: entry.path || "",
+    label: index === 0 ? recipe.name : (String(entry.path || "").split("/").filter(Boolean).pop() || ""),
+    enabled: entry.enabled !== false,
+    loadAfter: entry.load_after || [],
+    loadBefore: entry.load_before || [],
+  }));
+  const natives = parsed.natives.map((entry) => ({
+    path: entry.path || "",
+    label: String(entry.path || "").split("/").filter(Boolean).pop() || "",
+    enabled: entry.enabled !== false,
+    optional: entry.optional === true,
+  }));
+  return {
+    kind: "packages",
+    source: "me3 profile",
+    generatedAt: new Date().toISOString(),
+    count: packages.length,
+    packages,
+    natives,
+  };
 }
 
 function requirePath(p, label) {
@@ -101,6 +160,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   }
 
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
+  const contents = contentsFor(recipe, src, version);
   const pack = {
     schema: 1,
     id: recipe.id,
@@ -127,6 +187,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     },
     notes: recipe.notes || [],
     preconditions: recipe.preconditions || [],
+    contents,
     files: "files.json",
     save: { transfer: "out-of-scope" },
   };
@@ -142,4 +203,4 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   return { packRoot: dst, pack, files: files.length, totalBytes };
 }
 
-module.exports = { buildPack, defaultSource, GAME };
+module.exports = { buildPack, defaultSource, contentsFor, parseMe3Profile, GAME };

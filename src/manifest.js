@@ -74,6 +74,7 @@ function packSummary(packRoot) {
     launch: pack.launch,
     loader: pack.loader || null,
     install: pack.install || null,
+    contents: pack.contents || null,
     art: pack.art,
     notes: pack.notes || [],
     preconditions: pack.preconditions || [],

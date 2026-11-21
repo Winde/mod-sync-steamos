@@ -17,7 +17,21 @@ function fixture() {
   for (const [mod, version] of [["graceborne", "1.0.0"], ["convergence", "2.0.0"]]) {
     write(path.join(src, "mods", mod, "versions", version, "mod", "file.bin"), `${mod}-${version}`);
     write(path.join(src, "mods", mod, "current.txt"), `${version}\n`);
-    write(path.join(src, "profiles", `${mod}-${version}.me3`), `profile ${mod}\n`);
+    write(path.join(src, "profiles", `${mod}-${version}.me3`), `profileVersion = "v1"
+savefile = "ER0000.${mod}.sl2"
+start_online = false
+
+[[natives]]
+path = '../mods/${mod}/versions/${version}/mod/loader.dll'
+optional = false
+enabled = true
+
+[[packages]]
+enabled = true
+path = '../mods/${mod}/versions/${version}/mod'
+load_after = []
+load_before = []
+`);
     for (const art of ["grid", "hero", "logo", "icon"]) {
       write(path.join(src, "art", mod, `${art}.png`), `art-${mod}-${art}`);
     }
@@ -47,6 +61,9 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     assert.equal(grace.pack.name, "Graceborne");
     assert.equal(grace.pack.mod.id, "graceborne");
     assert.equal(grace.pack.launch.saveFile, "ER0000.graceborne.sl2");
+    assert.equal(grace.pack.contents.kind, "packages");
+    assert.equal(grace.pack.contents.count, 1);
+    assert.match(grace.pack.contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
     const graceDoc = loadPack(path.join(outRoot, "grace")).files;
     assert.ok(graceDoc.files.some((f) => f.target.startsWith("mods/graceborne/")));
 

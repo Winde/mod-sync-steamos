@@ -9,6 +9,7 @@
     "store": "steam",
     "appId": 1245620,
     "installDir": "ELDEN RING",
+    "exe": "Game/eldenring.exe",
     "build": "25827938",
     "version": "1.17",
     "prefix": true
@@ -94,6 +95,29 @@
       "title": "Enough free space"
     }
   ],
+  "contents": {
+    "kind": "packages",
+    "source": "me3 profile",
+    "generatedAt": "2026-11-21T10:30:21.028Z",
+    "count": 1,
+    "packages": [
+      {
+        "path": "../mods/graceborne/versions/0.2.7/mod",
+        "label": "Graceborne",
+        "enabled": true,
+        "loadAfter": [],
+        "loadBefore": []
+      }
+    ],
+    "natives": [
+      {
+        "path": "../mods/graceborne/versions/0.2.7/mod/Scripts-Data-Exposer-FS.dll",
+        "label": "Scripts-Data-Exposer-FS.dll",
+        "enabled": true,
+        "optional": false
+      }
+    ]
+  },
   "files": "files.json",
   "save": {
     "transfer": "out-of-scope"

@@ -198,7 +198,6 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
 
   progress({ phase: "launcher" });
   const templates = path.join(__dirname, "..", "templates", "linux");
-  const gameExe = game && game.exe ? game.exe : path.join(packRoot, "..", "..", "Game", "eldenring.exe");
   const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
   const isSteam = pack.launch.type === "steam";
   const launcherText = isSteam

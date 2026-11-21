@@ -205,6 +205,11 @@ h1 { margin: 0; font-size: clamp(38px, 4.7vw, 100px); line-height: .96; font-wei
 .srow.muted { color: #8b96a8; }
 .storagecard .actions { margin-top: .8vh; }
 pre.log { margin: 0; font-family: ui-monospace, monospace; }
+.modlist {
+  max-height: 18vh; overflow: auto; font-size: clamp(10px, .9vw, 17px);
+  color: #9aa6bb; line-height: 1.5; border-top: 1px solid rgba(255,255,255,.06);
+  padding-top: .6vh;
+}
 @media (max-width: 900px) {
   .app { padding: 2.4vh 5vw; }
   .content { grid-template-columns: 1fr; }

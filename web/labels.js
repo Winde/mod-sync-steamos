@@ -56,7 +56,7 @@
     noLogYet: "No log yet.",
 
     filesCount: (n) => `${n} file${n === 1 ? "" : "s"}`,
-    stats: (gb, n) => `${gb} · ${n} files`,
+    stats: (gb, n) => `${gb} GB · ${n} file${n === 1 ? "" : "s"}`,
     me3Included: "me3 profile included",
     bg3seIncluded: "modsettings + BG3SE included",
     modsettingsIncluded: "modsettings included",
@@ -100,6 +100,13 @@
     kept: "Kept",
     keptValue: "Previous version and saves stay on this TV",
     unknown: "unknown",
+    contentsRow: "Contents",
+    modsCount: (n) => `${n} mod${n === 1 ? "" : "s"}`,
+    packagesCount: (n) => `${n} package${n === 1 ? "" : "s"}`,
+    includedMods: "Included mods",
+    includedPackages: "Included packages",
+    inactivePaks: (n) => `${n} unmatched pak${n === 1 ? "" : "s"}`,
+    contentsSource: (s) => `from ${s}`,
     notEnoughSpace: (gb) => `Not enough space: this pack needs about ${gb} GB free.`,
     startDownloadHint: "Large pack: you can cancel anytime and resume later. The TV stays awake during the download.",
 

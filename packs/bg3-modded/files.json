@@ -4,6 +4,20 @@
   "version": "2026.11.21",
   "files": [
     {
+      "source": "payload/versions/2026.11.21/bg3se/DWrite.dll",
+      "target": "mods/bg3/versions/2026.11.21/bg3se/DWrite.dll",
+      "size": 5837824,
+      "sha256": "25151fb060cdad69fc322bb338edbf822d77291ef75661958a72df186d1a2fcb",
+      "mode": "644"
+    },
+    {
+      "source": "payload/versions/2026.11.21/bg3se/ScriptExtenderSettings.json",
+      "target": "mods/bg3/versions/2026.11.21/bg3se/ScriptExtenderSettings.json",
+      "size": 29,
+      "sha256": "1812b2ce1d947da079b0e33f2ae9e676666b056a655e701bb6851d24685cb951",
+      "mode": "644"
+    },
+    {
       "source": "payload/versions/2026.11.21/Mods/aberrantmind_e79f6d0c-d430-fdf-9r6e.pak",
       "target": "mods/bg3/versions/2026.11.21/Mods/aberrantmind_e79f6d0c-d430-fdf-9r6e.pak",
       "size": 15454342,

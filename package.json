@@ -15,6 +15,7 @@
     "build:linux": "electron-builder --linux AppImage",
     "build:dir": "electron-builder --dir",
     "test": "node --test",
+    "contents": "node scripts/refresh-contents.js",
     "e2e": "node scripts/e2e-factory.js",
     "verify-install": "node scripts/e2e-factory.js --verify-only"
   },

@@ -64,8 +64,8 @@ function findGame(game) {
   if (!game || !game.appId) return null;
   for (const lib of libraries()) {
     const gameRoot = path.join(lib, "steamapps", "common", game.installDir);
-    const exe = path.join(gameRoot, game.exe || "Game/eldenring.exe");
-    if (!fs.existsSync(exe)) continue;
+    const exe = game.exe ? path.join(gameRoot, game.exe) : null;
+    if (exe ? !fs.existsSync(exe) : !fs.existsSync(gameRoot)) continue;
     const prefix = process.platform === "win32"
       ? null
       : path.join(lib, "steamapps", "compatdata", String(game.appId), "pfx");

@@ -216,13 +216,26 @@
       </div>`).join("")}</div>`;
   }
 
+  function contentsCount(contents) {
+    if (!contents) return "";
+    return contents.kind === "mods" ? labels.modsCount(contents.count) : labels.packagesCount(contents.count);
+  }
+
+  function contentsNames(contents) {
+    if (!contents) return [];
+    if (Array.isArray(contents.mods)) return contents.mods.filter((m) => !m.builtin).map((m) => m.name).filter(Boolean);
+    if (Array.isArray(contents.packages)) return contents.packages.map((p) => p.label || p.path).filter(Boolean);
+    return [];
+  }
+
   function packContents(p) {
     const base = labels.stats(gb(p.totalBytes), p.files);
-    if (p.loader && p.loader.type === "me3") return `${base} · ${labels.me3Included}`;
+    const contents = p.contents ? ` · ${contentsCount(p.contents)}` : "";
+    if (p.loader && p.loader.type === "me3") return `${base}${contents} · ${labels.me3Included}`;
     if (p.loader && p.loader.type === "bg3se") {
-      return `${base} · ${p.install && p.install.bg3se ? labels.bg3seIncluded : labels.modsettingsIncluded}`;
+      return `${base}${contents} · ${p.install && p.install.bg3se ? labels.bg3seIncluded : labels.modsettingsIncluded}`;
     }
-    return p.loader && p.loader.type ? `${base} · ${labels.loaderIncluded(p.loader.type)}` : base;
+    return p.loader && p.loader.type ? `${base}${contents} · ${labels.loaderIncluded(p.loader.type)}` : `${base}${contents}`;
   }
 
   function renderUpdateButton() {
@@ -467,6 +480,7 @@
       <h2>${esc(p.name)}</h2>
       <p>${esc(p.description || "")}</p>
       <div class="row"><span>${labels.downloadSheet}</span><b>${labels.stats(gb(p.totalBytes), p.files)}</b></div>
+      ${p.contents ? `<div class="row"><span>${labels.contentsRow}</span><b>${contentsCount(p.contents)}</b></div>` : ""}
       <div class="row"><span>${labels.version}</span><b>${esc(p.mod.version)}</b></div>
       ${update ? `<div class="row"><span>${labels.current}</span><b>${esc(p.installedVersion)}</b></div>` : ""}
       <div class="row"><span>${labels.freeOnTv}</span><b>${free == null ? labels.unknown : gb(free) + " GB"}</b></div>
@@ -625,10 +639,12 @@
       <div class="row"><span>${labels.versionsKept}</span><b>${esc(versions)}</b></div>
       <div class="row"><span>${labels.gameRow}</span><b>${esc(p.game.title)} ${esc(p.game.version || "")} · ${labels.buildLabel} ${esc(p.game.build || "")}</b></div>
       <div class="row"><span>${labels.packRow}</span><b>${labels.stats(gb(p.totalBytes), p.files)}</b></div>
+      ${p.contents ? `<div class="row"><span>${labels.contentsRow}</span><b>${contentsCount(p.contents)} ${labels.contentsSource(p.contents.source)}</b></div>` : ""}
       <div class="row"><span>${labels.launcherRow}</span><b>${esc(p.launcher || labels.notInstalled)}</b></div>
       <div class="row"><span>${labels.shortcutRow}</span><b>${esc(p.desktopFile || labels.addDesktop)}</b></div>
       <div class="row"><span>${labels.savesRow}</span><b>${labels.savesValue}</b></div>
       ${noteList(p).length ? `<p style="margin-top:2vh"><b>${labels.beforeInstall}</b></p>${renderNotes(p)}` : ""}
+      ${p.contents ? `<p style="margin-top:2vh"><b>${p.contents.kind === "mods" ? labels.includedMods : labels.includedPackages}</b> <span class="meta">${labels.contentsSource(p.contents.source)}${p.contents.inactivePaks && p.contents.inactivePaks.length ? ` · ${labels.inactivePaks(p.contents.inactivePaks.length)}` : ""}</span></p><div class="modlist">${contentsNames(p.contents).map((name) => esc(name)).join(" · ")}</div>` : ""}
       ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>${labels.checks}</b></p>${renderChecks(p, true)}` : ""}
       <p style="margin-top:2vh"><b>${labels.recentLog}</b></p>
       <pre class="log" style="white-space:pre-wrap;font-size:.9vw;color:#8b96a8;max-height:18vh;overflow:auto">${esc(logs || labels.noLogYet)}</pre>
