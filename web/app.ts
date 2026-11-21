@@ -1,6 +1,10 @@
 (() => {
-  const $ = (sel, root = document) => root.querySelector(sel);
-  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+  const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document): T => {
+    const el = root.querySelector<T>(sel);
+    if (!el) throw new Error(`Missing element: ${sel}`);
+    return el;
+  };
+  const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document): T[] => [...root.querySelectorAll<T>(sel)];
   const app = $("#app");
   const main = $("#main");
   const library = $("#library");
@@ -9,10 +13,10 @@
   const storageBtn = $("#storage-btn");
   const updateBtn = $("#update-btn");
   const content = $(".content");
-  const desktop = typeof window !== "undefined" ? window.modsyncDesktop : null;
-  const labels = window.MODSYNC_LABELS;
+  const desktop: ModsyncDesktop | null = typeof window !== "undefined" ? window.modsyncDesktop || null : null;
+  const labels: BrowserLabels = window.MODSYNC_LABELS;
 
-  const S = {
+  const S: AppState = {
     data: null,
     selected: null,
     selectedGame: null,
@@ -33,18 +37,19 @@
     lastRefresh: 0,
   };
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const pct = (a, b) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
-  const gb = (n) => (n / 1024 / 1024 / 1024).toFixed(2);
-  const fmtBytes = (n) => {
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  const messageOf = (err: unknown): string => err instanceof Error ? messageOf(err) : String(err);
+  const esc = (s: unknown): string => String(s == null ? "" : s).replace(/[&<>"']/g, (c: string) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
+  const pct = (a: number, b: number): number => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
+  const gb = (n: number | null | undefined): string => ((n || 0) / 1024 / 1024 / 1024).toFixed(2);
+  const fmtBytes = (n: unknown): string => {
     let v = Number(n) || 0;
-    const units = labels.bytesUnits;
+    const units = labels.bytesUnits as string[];
     let i = 0;
     while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
     return `${v.toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
   };
-  const fmtDuration = (sec) => {
+  const fmtDuration = (sec: number | null | undefined): string => {
     if (sec == null || !Number.isFinite(sec)) return labels.durationDash;
     const s = Math.max(0, Math.round(sec));
     const h = Math.floor(s / 3600);
@@ -52,18 +57,18 @@
     return h ? labels.durationHours(h, m) : m ? labels.durationMinutes(m) : labels.durationSeconds(s);
   };
 
-  async function api(path, options = {}) {
+  async function api<T extends object = Record<string, unknown>>(path: string, options: RequestInit = {}): Promise<T> {
     const res = await fetch(path, { headers: { "content-type": "application/json" }, ...options });
     const text = await res.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    let data: { error?: string; raw?: string } = {};
+    try { data = text ? JSON.parse(text) as typeof data : {}; } catch { data = { raw: text }; }
     if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
-    return data;
+    return data as T;
   }
 
   async function refresh() {
     try {
-      S.data = await api("/api/state");
+      S.data = await api<AgentStateView>("/api/state");
       S.offline = false;
       S.error = null;
       const packs = S.data.packs || [];
@@ -87,21 +92,21 @@
           ? labels.storageWithFree(gb(S.data.diskFreeBytes))
           : labels.storage;
       }
-      if (S.data.job && S.data.job.status === "running") S.job = await api(`/api/jobs/${S.data.job.id}`);
+      if (S.data.job && S.data.job.status === "running") S.job = await api<JobView>(`/api/jobs/${S.data.job.id}`);
       else if (!S.polling && S.job && S.job.status === "running") S.job = S.data.job || null;
     } catch (err) {
-      S.error = err.message;
+      S.error = messageOf(err);
       S.offline = true;
     }
     render();
   }
 
-  function selectedPack() {
+  function selectedPack(): PackView | null {
     return (S.data?.packs || []).find((p) => p.id === S.selected) || null;
   }
 
-  function groupGames(packs) {
-    const map = new Map();
+  function groupGames(packs: PackView[]): GameGroup[] {
+    const map = new Map<string, GameGroup>();
     for (const p of packs) {
       const id = p.game?.id || p.id;
       if (!map.has(id)) {
@@ -113,20 +118,20 @@
           packs: [],
         });
       }
-      map.get(id).packs.push(p);
+      map.get(id)!.packs.push(p);
     }
     return [...map.values()];
   }
 
-  function games() {
+  function games(): GameGroup[] {
     return groupGames(S.data?.packs || []);
   }
 
-  function currentGame() {
+  function currentGame(): GameGroup | null {
     return games().find((g) => g.id === S.selectedGame) || games()[0] || null;
   }
 
-  function openGame(gameId) {
+  function openGame(gameId: string): void {
     const game = games().find((g) => g.id === gameId);
     if (!game) return;
     S.selectedGame = game.id;
@@ -136,7 +141,7 @@
     render();
   }
 
-  function selectPack(packId) {
+  function selectPack(packId: string): void {
     const p = (S.data?.packs || []).find((x) => x.id === packId);
     if (!p) return;
     S.selected = p.id;
@@ -145,25 +150,25 @@
     render();
   }
 
-  function packState(p) {
+  function packState(p: PackView | null): { title: string; detail: string; primary: { action: string; label: string } | null } {
     if (!p) return { title: labels.noPack, detail: "", primary: null };
     const state = p.status !== "up-to-date" && p.staging ? "staging" : p.status;
     switch (state) {
       case "up-to-date":
         return {
-          title: labels.installed(p.installedVersion),
+          title: labels.installed(p.installedVersion ?? null),
           detail: labels.upToDate,
           primary: { action: "launch", label: labels.play },
         };
       case "staging":
         return {
-          title: p.installed ? labels.installed(p.installedVersion) : labels.downloadPaused,
+          title: p.installed ? labels.installed(p.installedVersion ?? null) : labels.downloadPaused,
           detail: p.installed ? labels.updatePaused(p.mod.version) : "",
           primary: { action: "download", label: labels.resumeInstall },
         };
       case "update-available":
         return {
-          title: labels.installed(p.installedVersion),
+          title: labels.installed(p.installedVersion ?? null),
           detail: labels.updateAvailable(p.mod.version),
           primary: { action: "download", label: labels.update },
         };
@@ -177,23 +182,23 @@
     }
   }
 
-  function art(p, key) {
+  function art(p: PackView, key: string): string {
     return `/api/art/${encodeURIComponent(p.id)}/${key}`;
   }
 
-  function noteList(p) {
-    return (p.notes || []).map((n) => typeof n === "string" ? { body: n, tone: "info", title: "" } : n).filter((n) => n && n.body);
+  function noteList(p: PackView): Array<{ title: string; body: string; tone: string }> {
+    return (p.notes || []).map((n) => typeof n === "string" ? { body: n, tone: "info", title: "" } : { body: n.body, tone: n.tone || "info", title: n.title || "" }).filter((n) => n && n.body);
   }
 
-  function preconditionChecks(p) {
+  function preconditionChecks(p: PackView): CheckView[] {
     return (p.preconditions && p.preconditions.checks) || [];
   }
 
-  function firstBlocker(p) {
+  function firstBlocker(p: PackView): CheckView | null {
     return preconditionChecks(p).find((c) => c.blocked) || null;
   }
 
-  function renderNotes(p) {
+  function renderNotes(p: PackView): string {
     const notes = noteList(p);
     if (!notes.length) return "";
     return `<div class="notes">${notes.map((n) => `
@@ -203,7 +208,7 @@
       </div>`).join("")}</div>`;
   }
 
-  function renderChecks(p, allowConfirm) {
+  function renderChecks(p: PackView, allowConfirm: boolean): string {
     const checks = preconditionChecks(p);
     if (!checks.length) return "";
     return `<div class="checks">${checks.map((c) => `
@@ -220,19 +225,19 @@
       </div>`).join("")}</div>`;
   }
 
-  function contentsCount(contents) {
+  function contentsCount(contents: ContentsView | null | undefined): string {
     if (!contents) return "";
     return contents.kind === "mods" ? labels.modsCount(contents.count) : labels.packagesCount(contents.count);
   }
 
-  function contentsNames(contents) {
+  function contentsNames(contents: ContentsView | null | undefined): string[] {
     if (!contents) return [];
-    if (Array.isArray(contents.mods)) return contents.mods.filter((m) => !m.builtin).map((m) => m.name).filter(Boolean);
-    if (Array.isArray(contents.packages)) return contents.packages.map((p) => p.label || p.path).filter(Boolean);
+    if (Array.isArray(contents.mods)) return contents.mods.map((m) => m.name).filter((name): name is string => !!name);
+    if (Array.isArray(contents.packages)) return contents.packages.map((p) => p.label || p.path).filter((name): name is string => !!name);
     return [];
   }
 
-  function packContents(p) {
+  function packContents(p: PackView): string {
     const base = labels.stats(gb(p.totalBytes), p.files);
     const contents = p.contents ? ` · ${contentsCount(p.contents)}` : "";
     const installed = p.install && p.install.label
@@ -296,7 +301,7 @@
       };
       render();
     } catch (err) {
-      S.confirm = { title: labels.updateFailed, message: err.message, simple: true };
+      S.confirm = { title: labels.updateFailed, message: messageOf(err), simple: true };
       render();
     }
   }
@@ -410,7 +415,7 @@
           <h1>${esc(p.name)}</h1>
           <div class="bigstatus">${esc(packStatus.title)}</div>
           <div class="meta">${stateText ? `${esc(stateText)} · ` : ""}${esc(p.game.title)} ${esc(p.game.version || "")} · ${labels.buildLabel} ${esc(p.game.build || "")}</div>
-          ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? labels.moreChecks(p.preconditions.failedRequired.length - 1) : ""}</div>` : ""}
+          ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${(p.preconditions?.failedRequired?.length || 0) > 1 ? labels.moreChecks((p.preconditions?.failedRequired?.length || 0) - 1) : ""}</div>` : ""}
           <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${uninstallHtml}${refreshHtml}</div>
           <div class="hint">${installed ? labels.savesHintVanilla : packContents(p)}</div>
         </div>
@@ -418,7 +423,7 @@
     renderLibrary();
   }
 
-  function rateInfo(job) {
+  function rateInfo(job: JobView): { speed: number; eta: number | null } {
     const now = Date.now();
     const bytes = job.bytesDone || 0;
     S.rate.push({ t: now, b: bytes });
@@ -443,11 +448,11 @@
     S.wakeLock = null;
   }
 
-  function renderProgress(job, pack) {
+  function renderProgress(job: JobView, pack?: PackView | null): void {
     const p = pack || selectedPack();
     const failed = job.status === "error";
     const verifying = job.phase === "verify";
-    const percent = job.bytesTotal ? pct(job.bytesDone, job.bytesTotal) : pct(job.done, job.total);
+    const percent = job.bytesTotal ? pct(job.bytesDone || 0, job.bytesTotal) : pct(job.done || 0, job.total || 0);
     const rate = failed || verifying ? { speed: 0, eta: null } : rateInfo(job);
     const line = verifying
       ? labels.checkingFiles
@@ -483,8 +488,9 @@
     library.innerHTML = "";
   }
 
-  function renderDownloadSheet() {
-    const p = (S.data?.packs || []).find((x) => x.id === S.download.packId) || selectedPack();
+  function renderDownloadSheet(): void {
+    const download = S.download;
+    const p = (S.data?.packs || []).find((x) => x.id === download?.packId) || selectedPack();
     if (!p) { S.download = null; return renderHome(); }
     const free = S.data?.diskFreeBytes;
     const resume = !!p.staging;
@@ -516,7 +522,7 @@
     </div>`;
   }
 
-  function storagePack(packId) {
+  function storagePack(packId: string): StoragePackView | null {
     return (S.storage?.packs || []).find((p) => p.id === packId) || null;
   }
 
@@ -588,7 +594,7 @@
     </section>`;
   }
 
-  async function requestStorageClear(packId, scope, bytes) {
+  async function requestStorageClear(packId: string, scope: string, bytes: number | string): Promise<void> {
     const p = storagePack(packId) || selectedPack();
     const amount = fmtBytes(Number(bytes) || 0);
     let title;
@@ -610,7 +616,7 @@
     if (scope === "pack") {
       showConfirm({ title: labels.checkingUninstallTitle, message: labels.checkingUninstallMessage, busy: true });
       try {
-        const plan = await api("/api/storage/clear", {
+        const plan = await api<{ ok: boolean; errors: string[]; actions: string[]; warnings: string[] }>("/api/storage/clear", {
           method: "POST",
           body: JSON.stringify({ packId, scope, dryRun: true }),
         });
@@ -633,7 +639,7 @@
           storage: { packId, scope },
         });
       } catch (err) {
-        showConfirm({ title: labels.uninstallBlocked, message: err.message, simple: true });
+        showConfirm({ title: labels.uninstallBlocked, message: messageOf(err), simple: true });
       }
       return;
     }
@@ -641,7 +647,7 @@
     showConfirm({ title, message, storage: { packId, scope } });
   }
 
-  async function clearStorageData({ packId, scope }) {
+  async function clearStorageData({ packId, scope }: { packId?: string; scope: string }): Promise<void> {
     const fromDetails = S.view === "details";
     showConfirm({
       title: scope === "pack" ? labels.uninstallingTitle : labels.clearingTitle,
@@ -649,7 +655,7 @@
       busy: true,
     });
     try {
-      const out = await api("/api/storage/clear", {
+      const out = await api<{ storage?: StorageView; freedBytes?: number }>("/api/storage/clear", {
         method: "POST",
         body: JSON.stringify({ packId, scope }),
       });
@@ -661,12 +667,12 @@
       await refresh();
       showConfirm({ title: labels.clearedTitle, message: labels.freedMessage(fmtBytes(out.freedBytes)), simple: true }, 3000);
     } catch (err) {
-      showConfirm({ title: labels.couldNotClear, message: err.message, simple: true });
+      showConfirm({ title: labels.couldNotClear, message: messageOf(err), simple: true });
     }
   }
 
-  let confirmTimer = null;
-  function showConfirm(confirm, timeout = 0) {
+  let confirmTimer: ReturnType<typeof setTimeout> | null = null;
+  function showConfirm(confirm: ConfirmView, timeout = 0): void {
     if (confirmTimer) clearTimeout(confirmTimer);
     confirmTimer = null;
     S.confirm = confirm;
@@ -695,12 +701,12 @@
     try {
       S.storage = await api("/api/storage");
     } catch (err) {
-      S.storage = { error: err.message };
+      S.storage = { error: messageOf(err) };
     }
     render();
   }
 
-  function launchLabel(p) {
+  function launchLabel(p: PackView): string {
     const launch = p.launch || {};
     if (launch.mode === "default") return labels.launchDefault;
     if (launch.mode === "alternate-exe") return labels.launchAlternate(launch.exe || labels.unknown);
@@ -708,7 +714,7 @@
     return launch.exe || labels.unknown;
   }
 
-  function renderDetails() {
+  function renderDetails(): void {
     const p = selectedPack();
     if (!p) return;
     const d = S.details || {};
@@ -746,45 +752,48 @@
     </div>`;
   }
 
-  function renderConfirm() {
+  function renderConfirm(): void {
+    const confirm = S.confirm;
+    if (!confirm) return;
     overlay.classList.remove("hidden");
-    if (S.confirm.busy) {
+    if (confirm.busy) {
       overlay.innerHTML = `<div class="panel" style="width:min(60vw,680px)" aria-busy="true">
-        <h2>${esc(S.confirm.title)}</h2>
-        <p class="busy" role="status"><span class="spinner" aria-hidden="true"></span><span>${esc(S.confirm.message)}</span></p>
+        <h2>${esc(confirm.title)}</h2>
+        <p class="busy" role="status"><span class="spinner" aria-hidden="true"></span><span>${esc(confirm.message)}</span></p>
       </div>`;
       return;
     }
-    const buttons = S.confirm.simple
+    const buttons = confirm.simple
       ? `<button class="btn primary" data-action="confirm-no" data-autofocus data-focusable data-key="ok">${labels.ok}</button>`
       : `<button class="btn primary" data-action="confirm-yes" data-autofocus data-focusable data-key="yes">${labels.confirm}</button><button class="btn ghost" data-action="confirm-no" data-focusable data-key="no">${labels.cancel}</button>`;
-    const details = Array.isArray(S.confirm.details) && S.confirm.details.length
-      ? `<p class="plantitle">${esc(S.confirm.detailsTitle || labels.uninstallPlan)}</p><ul class="plan">${S.confirm.details.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
+    const details = Array.isArray(confirm.details) && confirm.details.length
+      ? `<p class="plantitle">${esc(confirm.detailsTitle || labels.uninstallPlan)}</p><ul class="plan">${confirm.details.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
       : "";
-    const warnings = Array.isArray(S.confirm.warnings) && S.confirm.warnings.length
-      ? `<p class="plantitle">${labels.uninstallWarnings}</p><ul class="plan warning">${S.confirm.warnings.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
+    const warnings = Array.isArray(confirm.warnings) && confirm.warnings.length
+      ? `<p class="plantitle">${labels.uninstallWarnings}</p><ul class="plan warning">${confirm.warnings.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
       : "";
     overlay.innerHTML = `<div class="panel" style="width:min(60vw,680px)">
-      <h2>${esc(S.confirm.title)}</h2>
-      <p>${esc(S.confirm.message)}</p>
+      <h2>${esc(confirm.title)}</h2>
+      <p>${esc(confirm.message)}</p>
       ${details}
       ${warnings}
       <div class="actions">${buttons}</div>
     </div>`;
   }
 
-  function focusView() {
+  function focusView(): void {
     const scope = overlay.classList.contains("hidden") ? main : overlay;
-    const target = scope.querySelector("[data-autofocus]") || scope.querySelector("[data-focusable]");
+    const target = scope.querySelector<HTMLElement>("[data-autofocus]") || scope.querySelector<HTMLElement>("[data-focusable]");
     if (target) target.focus();
   }
 
-  function render() {
+  function render(): void {
     const active = document.activeElement;
     const activeKey = active && active.closest("#main, #overlay") ? active.getAttribute("data-key") : null;
     if (activeKey) S.focusKey = activeKey;
     pc.classList.toggle("online", !!S.data?.pc?.online);
-    pc.querySelector("span:last-child").textContent = S.data?.pc?.online ? labels.pcOnline : labels.pcOffline;
+    const pcLabel = pc.querySelector("span:last-child");
+    if (pcLabel) pcLabel.textContent = S.data?.pc?.online ? labels.pcOnline : labels.pcOffline;
     content.classList.toggle("wide", S.view === "storage");
     renderUpdateButton();
     if (S.confirm) { renderConfirm(); return focusView(); }
@@ -797,44 +806,44 @@
     if (!packs.length) return renderNoPacks();
     renderHome();
     const key = S.focusKey;
-    const target = key ? document.querySelector(`[data-key="${CSS.escape(key)}"]`) : null;
+    const target = key ? document.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`) : null;
     if (target) target.focus();
-    else document.querySelector("[data-autofocus]")?.focus() || document.querySelector("[data-focusable]")?.focus();
+    else document.querySelector<HTMLElement>("[data-autofocus]")?.focus() || document.querySelector<HTMLElement>("[data-focusable]")?.focus();
   }
 
-  function requestDownload(packId) {
+  function requestDownload(packId: string): void {
     S.download = { packId };
     S.view = "home";
     render();
   }
 
-  async function startInstall(packId) {
+  async function startInstall(packId: string): Promise<void> {
     S.download = null;
     S.rate = [];
     try {
-      const out = await api("/api/install", { method: "POST", body: JSON.stringify({ packId }) });
+      const out = await api<{ jobId: string }>("/api/install", { method: "POST", body: JSON.stringify({ packId }) });
       S.job = { id: out.jobId, packId, status: "running", phase: "preparing", done: 0, total: 0, bytesDone: 0, bytesTotal: 0, log: [] };
       S.view = "home";
       await acquireWakeLock();
       render();
       await pollJob(out.jobId);
     } catch (err) {
-      S.job = { packId, status: "error", error: err.message, done: 0, total: 0, bytesDone: 0, bytesTotal: 0, log: [err.message] };
+      S.job = { packId, status: "error", error: messageOf(err), done: 0, total: 0, bytesDone: 0, bytesTotal: 0, log: [messageOf(err)] };
       render();
     }
   }
 
-  async function cancelDownload() {
-    if (!S.job || S.job.status !== "running") return;
+  async function cancelDownload(): Promise<void> {
+    if (!S.job || S.job.status !== "running" || !S.job.id) return;
     try {
       await api(`/api/jobs/${encodeURIComponent(S.job.id)}/cancel`, { method: "POST", body: "{}" });
     } catch (err) {
-      S.confirm = { title: labels.couldNotCancel, message: err.message, simple: true };
+      S.confirm = { title: labels.couldNotCancel, message: messageOf(err), simple: true };
       render();
     }
   }
 
-  async function pollJob(id) {
+  async function pollJob(id: string): Promise<void> {
     const pack = selectedPack();
     const packName = pack?.name || labels.packTitle;
     const packVersion = pack?.mod?.version || "";
@@ -869,7 +878,7 @@
           }
           render();
         } catch (err) {
-          S.error = err.message;
+          S.error = messageOf(err);
           render();
           return;
         }
@@ -880,7 +889,7 @@
     }
   }
 
-  async function launch(packId) {
+  async function launch(packId: string): Promise<void> {
     S.download = null;
     S.view = "home";
     try {
@@ -889,12 +898,12 @@
       render();
       setTimeout(() => { S.confirm = null; refresh(); }, 4000);
     } catch (err) {
-      S.confirm = { title: labels.couldNotLaunch, message: err.message, simple: true };
+      S.confirm = { title: labels.couldNotLaunch, message: messageOf(err), simple: true };
       render();
     }
   }
 
-  async function openDetails(packId) {
+  async function openDetails(packId: string): Promise<void> {
     const p = (S.data?.packs || []).find((x) => x.id === packId);
     if (p) {
       S.selected = p.id;
@@ -910,19 +919,19 @@
     } catch { }
   }
 
-  async function rollback(packId) {
+  async function rollback(packId: string): Promise<void> {
     showConfirm({ title: labels.rollingBackTitle, message: labels.rollingBackMessage, busy: true });
     try {
-      const out = await api("/api/rollback", { method: "POST", body: JSON.stringify({ packId }) });
+      const out = await api<{ previous: string }>("/api/rollback", { method: "POST", body: JSON.stringify({ packId }) });
       S.view = "home";
       await refresh();
       showConfirm({ title: labels.rolledBackTitle, message: labels.rolledBackMessage(out.previous), simple: true }, 3000);
     } catch (err) {
-      showConfirm({ title: labels.rollbackFailed, message: err.message, simple: true });
+      showConfirm({ title: labels.rollbackFailed, message: messageOf(err), simple: true });
     }
   }
 
-  async function confirmCheck(packId, checkId) {
+  async function confirmCheck(packId: string, checkId: string): Promise<void> {
     try {
       await api("/api/preconditions/confirm", {
         method: "POST",
@@ -930,20 +939,21 @@
       });
       await refresh();
     } catch (err) {
-      S.confirm = { title: labels.couldNotConfirm, message: err.message, simple: true };
+      S.confirm = { title: labels.couldNotConfirm, message: messageOf(err), simple: true };
       render();
     }
   }
 
-  app.addEventListener("click", (event) => {
-    const gameTile = event.target.closest("[data-game]");
-    if (gameTile) { openGame(gameTile.getAttribute("data-game")); return; }
-    const tile = event.target.closest("[data-select]");
-    if (tile) { selectPack(tile.getAttribute("data-select")); return; }
-    const el = event.target.closest("[data-action]");
+  app.addEventListener("click", (event: MouseEvent) => {
+    const target = event.target as Element | null;
+    const gameTile = target?.closest("[data-game]");
+    if (gameTile) { openGame(gameTile.getAttribute("data-game") || ""); return; }
+    const tile = target?.closest("[data-select]");
+    if (tile) { selectPack(tile.getAttribute("data-select") || ""); return; }
+    const el = target?.closest("[data-action]");
     if (!el) return;
     const action = el.getAttribute("data-action");
-    const packId = el.getAttribute("data-pack") || S.selected;
+    const packId = el.getAttribute("data-pack") || S.selected || "";
     if (action === "all-games") { S.libraryView = "games"; render(); }
     else if (action === "download") requestDownload(packId);
     else if (action === "start-download") startInstall(packId);
@@ -953,7 +963,7 @@
     else if (action === "storage") openStorage();
     else if (action === "update-app") requestAppUpdate();
     else if (action === "close-storage") { S.view = "home"; render(); }
-    else if (action === "storage-clear") requestStorageClear(packId, el.getAttribute("data-scope"), Number(el.getAttribute("data-bytes") || 0));
+    else if (action === "storage-clear") requestStorageClear(packId, el.getAttribute("data-scope") || "", Number(el.getAttribute("data-bytes") || 0));
     else if (action === "launch") launch(packId);
     else if (action === "details") openDetails(packId);
     else if (action === "retry" || action === "refresh") refresh();
@@ -961,41 +971,42 @@
     else if (action === "open-logs") openDetails(packId);
     else if (action === "rollback") {
       const p = selectedPack();
-      const prev = p?.versions?.[p.versions.length - 2];
+      const prev = p?.versions?.[(p.versions.length || 0) - 2];
       showConfirm({ title: "Roll back?", message: `Switch to ${prev || "the previous version"}? The current version stays on disk.`, packId });
     }
     else if (action === "uninstall") {
       const p = selectedPack();
-      if (p) requestStorageClear(p.id, "pack", p.totalBytes);
+      if (p) requestStorageClear(p.id, "pack", p.totalBytes || 0);
     }
-    else if (action === "confirm-check") confirmCheck(packId, el.getAttribute("data-check"));
+    else if (action === "confirm-check") confirmCheck(packId, el.getAttribute("data-check") || "");
     else if (action === "confirm-yes") {
-      const c = S.confirm;
-      if (c.appUpdate) { installAppUpdate(); return; }
+      const confirm = S.confirm;
+      if (!confirm) return;
+      if (confirm.appUpdate) { installAppUpdate(); return; }
       dismissConfirm();
-      if (c.storage) clearStorageData(c.storage);
-      else if (c.packId) rollback(c.packId);
+      if (confirm.storage) clearStorageData(confirm.storage);
+      else if (confirm.packId) rollback(confirm.packId);
     }
     else if (action === "confirm-no") { if (S.confirm?.busy) return; dismissConfirm(); }
   });
 
-  function focusables() {
-    return $$("[data-focusable]").filter((el) => !el.disabled && el.offsetParent !== null);
+  function focusables(): HTMLElement[] {
+    return $$<HTMLElement>("[data-focusable]").filter((el) => !(el as HTMLButtonElement).disabled && el.offsetParent !== null);
   }
 
-  function moveFocus(direction) {
+  function moveFocus(direction: number): void {
     const list = focusables();
     if (!list.length) return;
     const active = document.activeElement;
-    let i = list.indexOf(active);
+    let i = list.indexOf(active as HTMLElement);
     if (i < 0) i = 0;
     else i = (i + direction + list.length) % list.length;
     list[i].focus();
     list[i].scrollIntoView({ block: "nearest" });
   }
 
-  function activate() {
-    const active = document.activeElement;
+  function activate(): void {
+    const active = document.activeElement as HTMLElement | null;
     if (active && active.matches("[data-focusable]")) active.click();
   }
 
@@ -1007,7 +1018,7 @@
     if (S.libraryView === "packs") { S.libraryView = "games"; render(); return; }
   }
 
-  window.addEventListener("keydown", (event) => {
+  window.addEventListener("keydown", (event: KeyboardEvent) => {
     // Installing and closing are not cancellable: nothing behind or on the
     // overlay may take a press while the download runs or the app quits.
     if (S.confirm && S.confirm.busy) { event.preventDefault(); return; }
@@ -1021,15 +1032,15 @@
   });
 
   // Controller-first: D-pad/left stick moves focus, A activates, B backs, X details, Y refreshes.
-  const pad = { held: {}, lastMove: 0 };
-  function pollPad() {
+  const pad: { held: Record<string, boolean>; lastMove: number } = { held: {}, lastMove: 0 };
+  function pollPad(): void {
     if (S.confirm && S.confirm.busy) return;
     const gps = navigator.getGamepads ? navigator.getGamepads() : [];
     const gp = gps && gps[0];
     if (!gp) return;
     const now = Date.now();
-    const btn = (i) => gp.buttons[i] && gp.buttons[i].pressed;
-    const pressed = { up: btn(12), down: btn(13), left: btn(14), right: btn(15), a: btn(0), b: btn(1), x: btn(2), y: btn(3), start: btn(9) };
+    const btn = (i: number) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    const pressed: Record<string, boolean> = { up: btn(12), down: btn(13), left: btn(14), right: btn(15), a: btn(0), b: btn(1), x: btn(2), y: btn(3), start: btn(9) };
     const ax = gp.axes[0] || 0;
     const ay = gp.axes[1] || 0;
     if (!pressed.up && ay < -0.65) pressed.up = true;

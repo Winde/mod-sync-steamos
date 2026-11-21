@@ -10,7 +10,7 @@ const {
   checksumFor,
   compareVersions,
   parseRelease,
-} = require("../electron/updater");
+} = require("../dist/electron/updater");
 
 const REPO = "Winde/mod-sync-steamos";
 const DOWNLOAD = `https://github.com/${REPO}/releases/download`;

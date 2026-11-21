@@ -1,12 +1,17 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const {
+import fs from "node:fs";
+import path from "node:path";
+import {
   ensureDir, materialize, readJson, writeJson, safeJoin, walkFiles, isGameRunning,
-} = require("../util");
-const paths = require("../paths");
-const steam = require("../steam");
+} from "../util";
+import * as paths from "../paths";
+import * as steam from "../steam";
+import type { Pack, SteamGame, Variant } from "../types";
 
-function dataDirFor(pack, game, platform = process.platform) {
+export function dataDirFor(
+  pack: Pack,
+  game: SteamGame | null | undefined,
+  platform: NodeJS.Platform = process.platform,
+): string {
   const target = paths.resolve(pack, game, platform);
   if (!target.dataDir) {
     throw new Error(target.error || `Baldur's Gate 3 data directory is not configured for ${target.variant}.`);
@@ -16,7 +21,7 @@ function dataDirFor(pack, game, platform = process.platform) {
 
 const WRAPPER_MARKER = "# ModSync BG3LE wrapper";
 
-function isBg3leWrapper(file) {
+function isBg3leWrapper(file: string): boolean {
   try {
     return fs.readFileSync(file, "utf8").split(/\r?\n/, 4).includes(WRAPPER_MARKER);
   } catch {
@@ -24,11 +29,11 @@ function isBg3leWrapper(file) {
   }
 }
 
-function bg3leDirFor(platform = process.platform) {
+function bg3leDirFor(platform: NodeJS.Platform = process.platform): string {
   return path.join(paths.contextFor(null, platform).dataHome, "bg3le");
 }
 
-function writeBg3leWrapper(file, lib) {
+function writeBg3leWrapper(file: string, lib: string): void {
   const body = [
     "#!/bin/sh",
     WRAPPER_MARKER,
@@ -48,7 +53,41 @@ function writeBg3leWrapper(file, lib) {
   fs.chmodSync(file, 0o755);
 }
 
-function installNativeLoader({ packRoot, gameRoot, platform = process.platform }) {
+interface AppliedBackup {
+  scope: "data" | "game";
+  rel: string;
+}
+
+export interface AppliedNativeLoader {
+  dir: string;
+  created: boolean;
+  wrapper: string;
+  real: string;
+  lib: string;
+}
+
+export interface AppliedState {
+  packId: string;
+  version: string;
+  platform: Variant;
+  dataDir?: string;
+  gameRoot?: string;
+  data: string[];
+  game: string[];
+  backups: AppliedBackup[];
+  skipped: string[];
+  nativeLoader?: AppliedNativeLoader;
+}
+
+function installNativeLoader({
+  packRoot,
+  gameRoot,
+  platform = process.platform,
+}: {
+  packRoot: string;
+  gameRoot: string;
+  platform?: NodeJS.Platform;
+}): AppliedNativeLoader {
   const source = path.join(packRoot, "tools", "bg3le");
   const libSource = path.join(source, "build", "libbg3le.so");
   if (!fs.existsSync(libSource)) {
@@ -83,7 +122,7 @@ function installNativeLoader({ packRoot, gameRoot, platform = process.platform }
   };
 }
 
-function removeNativeLoader(applied) {
+function removeNativeLoader(applied: AppliedState): void {
   const loader = applied.nativeLoader;
   if (!loader || !applied.gameRoot) return;
   const bg3 = safeJoin(applied.gameRoot, loader.wrapper);
@@ -103,19 +142,19 @@ function removeNativeLoader(applied) {
   }
 }
 
-function appliedFile(packRoot) {
+function appliedFile(packRoot: string): string {
   return path.join(packRoot, "applied.json");
 }
 
-function readApplied(packRoot) {
-  try { return readJson(appliedFile(packRoot)); } catch { return null; }
+export function readApplied(packRoot: string): AppliedState | null {
+  try { return readJson<AppliedState>(appliedFile(packRoot)); } catch { return null; }
 }
 
-function backupPath(packRoot, scope, rel) {
+function backupPath(packRoot: string, scope: string, rel: string): string {
   return path.join(packRoot, "backups", scope, rel);
 }
 
-function backupFile(packRoot, scope, base, rel) {
+function backupFile(packRoot: string, scope: string, base: string, rel: string): boolean {
   const target = safeJoin(base, rel);
   const backup = backupPath(packRoot, scope, rel);
   if (!fs.existsSync(target)) return fs.existsSync(backup);
@@ -126,7 +165,7 @@ function backupFile(packRoot, scope, base, rel) {
   return true;
 }
 
-function restoreBackups(packRoot, applied) {
+function restoreBackups(packRoot: string, applied: AppliedState): void {
   for (const entry of applied.backups || []) {
     const backup = backupPath(packRoot, entry.scope, entry.rel);
     if (!fs.existsSync(backup)) continue;
@@ -138,21 +177,35 @@ function restoreBackups(packRoot, applied) {
   }
 }
 
-function removeApplied(packRoot, applied) {
+function removeApplied(packRoot: string, applied: AppliedState): void {
   removeNativeLoader(applied);
   if (applied.dataDir) {
     for (const rel of applied.data || []) {
-      try { fs.rmSync(safeJoin(applied.dataDir, rel), { force: true }); } catch { }
+      try { fs.rmSync(safeJoin(applied.dataDir, rel), { force: true }); } catch { /* already gone */ }
     }
   }
   if (applied.gameRoot) {
     for (const rel of applied.game || []) {
-      try { fs.rmSync(safeJoin(applied.gameRoot, rel), { force: true }); } catch { }
+      try { fs.rmSync(safeJoin(applied.gameRoot, rel), { force: true }); } catch { /* already gone */ }
     }
   }
 }
 
-function applyBg3({ pack, root, game, version, platform = process.platform, log = () => {} }) {
+export function applyBg3({
+  pack,
+  root,
+  game,
+  version,
+  platform = process.platform,
+  log = () => {},
+}: {
+  pack: Pack;
+  root: string;
+  game: SteamGame | null | undefined;
+  version: string;
+  platform?: NodeJS.Platform;
+  log?: (message: string) => void;
+}): AppliedState {
   const packRoot = path.join(root, "packs", pack.id);
   const src = path.join(packRoot, "mods", pack.mod.id, "versions", version);
   if (!fs.existsSync(src)) throw new Error(`BG3 version payload is missing: ${src}`);
@@ -169,7 +222,7 @@ function applyBg3({ pack, root, game, version, platform = process.platform, log 
     restoreBackups(packRoot, previous);
   }
 
-  const applied = {
+  const applied: AppliedState = {
     packId: pack.id,
     version,
     platform: target.variant,
@@ -252,12 +305,20 @@ function applyBg3({ pack, root, game, version, platform = process.platform, log 
   return applied;
 }
 
-function planRevert({ pack, root }) {
+export interface RevertPlan {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  actions: string[];
+  applied: AppliedState | null;
+}
+
+export function planRevert({ pack, root }: { pack: Pack; root: string }): RevertPlan {
   const packRoot = path.join(root, "packs", pack.id);
   const applied = readApplied(packRoot);
-  const errors = [];
-  const warnings = [];
-  const actions = [];
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const actions: string[] = [];
   if (!applied) {
     return {
       ok: true,
@@ -272,9 +333,12 @@ function planRevert({ pack, root }) {
     errors.push("Baldur's Gate 3 is running. Close it before uninstalling.");
   }
 
-  const roots = { data: applied.dataDir, game: applied.gameRoot };
-  for (const [scope, base] of Object.entries(roots)) {
-    const list = applied[scope] || [];
+  const roots: Array<["data" | "game", string | undefined]> = [
+    ["data", applied.dataDir],
+    ["game", applied.gameRoot],
+  ];
+  for (const [scope, base] of roots) {
+    const list = scope === "data" ? applied.data : applied.game;
     if (list.length && !base) errors.push(`The ${scope} install path is missing.`);
     if (base && list.length) {
       try { fs.accessSync(base, fs.constants.W_OK); } catch { errors.push(`No write access to ${base}.`); }
@@ -284,7 +348,8 @@ function planRevert({ pack, root }) {
   for (const entry of applied.backups || []) {
     const backup = backupPath(packRoot, entry.scope, entry.rel);
     if (!fs.existsSync(backup)) errors.push(`Missing backup for ${entry.scope}/${entry.rel}; refusing to uninstall.`);
-    if (!roots[entry.scope]) errors.push(`No ${entry.scope} install path for ${entry.rel}.`);
+    const base = entry.scope === "game" ? applied.gameRoot : applied.dataDir;
+    if (!base) errors.push(`No ${entry.scope} install path for ${entry.rel}.`);
   }
 
   if (applied.data && applied.data.length) {
@@ -324,7 +389,17 @@ function planRevert({ pack, root }) {
   return { ok: errors.length === 0, errors, warnings, actions, applied };
 }
 
-function revertBg3({ pack, root, log = () => {}, dryRun = false }) {
+export function revertBg3({
+  pack,
+  root,
+  log = () => {},
+  dryRun = false,
+}: {
+  pack: Pack;
+  root: string;
+  log?: (message: string) => void;
+  dryRun?: boolean;
+}): { reverted: boolean; version?: string; dryRun?: boolean; [key: string]: unknown } {
   const plan = planRevert({ pack, root });
   if (!plan.ok) throw new Error(`Uninstall preflight failed: ${plan.errors.join("; ")}`);
   if (dryRun) return { ...plan, reverted: false, dryRun: true };
@@ -338,19 +413,24 @@ function revertBg3({ pack, root, log = () => {}, dryRun = false }) {
   return { reverted: true, version: applied.version };
 }
 
-function rollback({ pack, root, version, log = () => {} }) {
-  const game = steam.findGame(pack.game);
+export function rollback({
+  pack,
+  root,
+  version,
+  log = () => {},
+}: {
+  pack: Pack;
+  root: string;
+  version: string;
+  log?: (message: string) => void;
+}): AppliedState {
+  const game: SteamGame | null = steam.findGame(pack.game) || null;
   if (!game) throw new Error(`${pack.game.title} was not found in the Steam libraries.`);
   return applyBg3({ pack, root, game, version, log });
 }
 
-module.exports = {
-  apply: applyBg3,
-  revert: revertBg3,
-  applyBg3,
-  revertBg3,
-  plan: planRevert,
-  rollback,
-  dataDirFor,
-  readApplied,
+export {
+  applyBg3 as apply,
+  revertBg3 as revert,
+  planRevert as plan,
 };

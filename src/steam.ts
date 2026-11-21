@@ -1,24 +1,25 @@
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const zlib = require("node:zlib");
-const { execFileSync } = require("node:child_process");
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import zlib from "node:zlib";
+import { execFileSync } from "node:child_process";
+import type { GameInfo, SteamGame } from "./types";
 
-let registryRoots = null;
-let extraLibraries = [];
+let registryRoots: string[] | null = null;
+let extraLibraries: string[] = [];
 
-function setExtraLibraries(list) {
-  extraLibraries = Array.isArray(list) ? list.filter((p) => typeof p === "string" && p) : [];
+export function setExtraLibraries(list: unknown): void {
+  extraLibraries = Array.isArray(list) ? list.filter((p): p is string => typeof p === "string" && !!p) : [];
 }
 
-function addRoot(roots, value) {
+function addRoot(roots: string[], value: string | null | undefined): void {
   if (value) roots.push(value);
 }
 
-function windowsRegistryRoots() {
+function windowsRegistryRoots(): string[] {
   if (registryRoots) return registryRoots;
-  const found = [];
-  const queries = [
+  const found: string[] = [];
+  const queries: Array<[string, string]> = [
     ["HKCU\\Software\\Valve\\Steam", "SteamPath"],
     ["HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam", "InstallPath"],
     ["HKLM\\SOFTWARE\\Valve\\Steam", "InstallPath"],
@@ -28,14 +29,14 @@ function windowsRegistryRoots() {
       const out = execFileSync("reg", ["query", key, "/v", value], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
       const match = new RegExp(`${value}\\s+REG_SZ\\s+(.+)`, "i").exec(out);
       if (match) found.push(match[1].trim());
-    } catch { }
+    } catch { /* registry key missing */ }
   }
   registryRoots = found;
   return found;
 }
 
-function steamRoots() {
-  const roots = [];
+export function steamRoots(): string[] {
+  const roots: string[] = [];
   if (process.platform === "win32") {
     addRoot(roots, process.env.STEAM_ROOT);
     const pf = process.env["ProgramFiles(x86)"] || process.env.ProgramFiles;
@@ -53,8 +54,8 @@ function steamRoots() {
   return [...new Set(roots)].filter((p) => fs.existsSync(p));
 }
 
-function libraries() {
-  const libs = new Set();
+export function libraries(): string[] {
+  const libs = new Set<string>();
   for (const root of steamRoots()) {
     libs.add(root);
     const vdf = path.join(root, "steamapps", "libraryfolders.vdf");
@@ -70,7 +71,13 @@ function libraries() {
   return [...libs].filter((p) => fs.existsSync(p));
 }
 
-function readManifest(library, appId) {
+interface Manifest {
+  file: string;
+  installDir: string;
+  build: string;
+}
+
+export function readManifest(library: string, appId: number): Manifest | null {
   const file = path.join(library, "steamapps", `appmanifest_${appId}.acf`);
   if (!fs.existsSync(file)) return null;
   const txt = fs.readFileSync(file, "utf8");
@@ -80,12 +87,12 @@ function readManifest(library, appId) {
   return { file, installDir, build };
 }
 
-function readBuild(library, appId) {
+export function readBuild(library: string, appId: number): string | null {
   const manifest = readManifest(library, appId);
   return manifest ? manifest.build || null : null;
 }
 
-function findAppManifest(appId) {
+export function findAppManifest(appId: number): string | null {
   for (const lib of libraries()) {
     const manifest = path.join(lib, "steamapps", `appmanifest_${appId}.acf`);
     if (fs.existsSync(manifest)) return manifest;
@@ -93,7 +100,7 @@ function findAppManifest(appId) {
   return null;
 }
 
-function readInstalledDepots(library, appId) {
+export function readInstalledDepots(library: string, appId: number): number[] | null {
   const manifest = path.join(library, "steamapps", `appmanifest_${appId}.acf`);
   if (!fs.existsSync(manifest)) return null;
   const txt = fs.readFileSync(manifest, "utf8");
@@ -102,7 +109,7 @@ function readInstalledDepots(library, appId) {
   return [...block[1].matchAll(/"(\d+)"\s*\{/g)].map((m) => Number(m[1]));
 }
 
-function findGame(game) {
+export function findGame(game: GameInfo | null | undefined): SteamGame | null {
   if (!game || !game.appId) return null;
   const libs = libraries();
   for (const lib of libs) {
@@ -121,7 +128,7 @@ function findGame(game) {
     const expectedPrefix = process.platform === "win32"
       ? null
       : path.join(lib, "steamapps", "compatdata", String(game.appId), "pfx");
-    let prefix = null;
+    let prefix: string | null = null;
     if (process.platform !== "win32" && mode !== "native") {
       for (const candidate of libs) {
         const p = path.join(candidate, "steamapps", "compatdata", String(game.appId), "pfx");
@@ -131,6 +138,7 @@ function findGame(game) {
     }
     return {
       library: lib,
+      appId: game.appId,
       root: gameRoot,
       installDir,
       exe: exeReady ? exe : (nativeExeReady ? nativeExe : null),
@@ -145,7 +153,13 @@ function findGame(game) {
   return null;
 }
 
-function findUserData() {
+export interface SteamUserData {
+  root: string;
+  userId: string;
+  configDir: string;
+}
+
+export function findUserData(): SteamUserData | null {
   for (const root of steamRoots()) {
     const ud = path.join(root, "userdata");
     if (!fs.existsSync(ud)) continue;
@@ -158,16 +172,38 @@ function findUserData() {
   return null;
 }
 
-function shortcutId(str) {
+export function shortcutId(str: string): { unsigned: number; signed: number } {
   const u = (zlib.crc32(Buffer.from(str, "utf8")) | 0x80000000) >>> 0;
   return { unsigned: u, signed: u | 0 };
 }
 
-function unquote(value) {
+function unquote(value: unknown): string {
   return String(value || "").replace(/^"|"$/g, "");
 }
 
-function sameShortcut(a, b) {
+interface ShortcutEntry {
+  appid?: number;
+  appname?: string;
+  Exe?: string;
+  StartDir?: string;
+  icon?: string;
+  ShortcutPath?: string;
+  LaunchOptions?: string;
+  IsHidden?: boolean;
+  AllowDesktopConfig?: boolean;
+  AllowOverlay?: boolean;
+  OpenVR?: boolean;
+  Devkit?: boolean;
+  DevkitGameID?: string;
+  DevkitOverrideAppID?: boolean;
+  LastPlayTime?: number;
+  FlatpakAppID?: string;
+  sortas?: string;
+  tags?: string[];
+  [key: string]: unknown;
+}
+
+function sameShortcut(a: ShortcutEntry, b: ShortcutEntry): boolean {
   const nameA = String(a.appname || a.AppName || "").trim().toLowerCase();
   const nameB = String(b.appname || b.AppName || "").trim().toLowerCase();
   if (nameA && nameA === nameB) return true;
@@ -176,9 +212,12 @@ function sameShortcut(a, b) {
   return !!exeA && exeA === exeB;
 }
 
-function mergeShortcut(list, entry) {
-  const out = [];
-  let match = null;
+export function mergeShortcut<T extends ShortcutEntry>(
+  list: T[],
+  entry: T,
+): { list: T[]; action: "added" | "updated"; deduped: number } {
+  const out: T[] = [];
+  let match: T | null = null;
   let deduped = 0;
   for (const item of list) {
     if (!match && sameShortcut(item, entry)) {
@@ -197,25 +236,37 @@ function mergeShortcut(list, entry) {
   return { list: out, action: "updated", deduped };
 }
 
-function shortcutList(parsed) {
-  return Array.isArray(parsed.shortcuts) ? parsed.shortcuts : Object.values(parsed.shortcuts || {});
+interface ShortcutEditor {
+  parseFile(
+    file: string,
+    options: Record<string, unknown>,
+    callback: (err: Error | null, parsed: unknown) => void,
+  ): void;
+  writeFile(file: string, data: unknown, callback: (err: Error | null) => void): void;
 }
 
-function entryAppId(entry) {
+function shortcutList(parsed: unknown): ShortcutEntry[] {
+  const value = (parsed && typeof parsed === "object" ? parsed : {}) as {
+    shortcuts?: ShortcutEntry[] | Record<string, ShortcutEntry>;
+  };
+  return Array.isArray(value.shortcuts) ? value.shortcuts : Object.values(value.shortcuts || {});
+}
+
+function entryAppId(entry: ShortcutEntry): number {
   const stored = Number(entry.appid);
   if (Number.isFinite(stored)) return stored >>> 0;
   return shortcutId(`${entry.Exe || entry.exe || ""}${entry.appname || entry.AppName || ""}`).unsigned;
 }
 
-function removeGridArt(configDir, id) {
+function removeGridArt(configDir: string, id: number): void {
   const grid = path.join(configDir, "grid");
   for (const suffix of [".png", "p.png", "_grid.png", "_hero.png", "_logo.png", "_icon.png"]) {
     fs.rmSync(path.join(grid, `${id}${suffix}`), { force: true });
   }
 }
 
-async function readShortcuts(file) {
-  const shortcut = require("steam-shortcut-editor");
+async function readShortcuts(file: string): Promise<unknown> {
+  const shortcut = require("steam-shortcut-editor") as ShortcutEditor;
   return new Promise((resolve, reject) => {
     shortcut.parseFile(file, { autoConvertArrays: true, autoConvertBooleans: true, dateProperties: ["LastPlayTime"] }, (err, parsed) => {
       if (err) reject(err); else resolve(parsed);
@@ -223,22 +274,22 @@ async function readShortcuts(file) {
   });
 }
 
-async function writeShortcuts(file, list) {
-  const shortcut = require("steam-shortcut-editor");
-  await new Promise((resolve, reject) => {
+async function writeShortcuts(file: string, list: ShortcutEntry[]): Promise<void> {
+  const shortcut = require("steam-shortcut-editor") as ShortcutEditor;
+  await new Promise<void>((resolve, reject) => {
     shortcut.writeFile(file, { shortcuts: list }, (err) => err ? reject(err) : resolve());
   });
 }
 
-async function removeShortcut({ exePath }) {
+export async function removeShortcut({ exePath }: { exePath: string }): Promise<{ removed: number }> {
   const ud = findUserData();
   if (!ud) return { removed: 0 };
   const file = path.join(ud.configDir, "shortcuts.vdf");
   if (!fs.existsSync(file)) return { removed: 0 };
   const parsed = await readShortcuts(file);
   const target = unquote(exePath).replace(/\//g, "\\").toLowerCase();
-  const removed = [];
-  const keep = [];
+  const removed: ShortcutEntry[] = [];
+  const keep: ShortcutEntry[] = [];
   for (const item of shortcutList(parsed)) {
     const exe = unquote(item.Exe || item.exe).replace(/\//g, "\\").toLowerCase();
     if (target && exe === target) removed.push(item); else keep.push(item);
@@ -254,7 +305,7 @@ async function removeShortcut({ exePath }) {
  * Remove shortcuts whose executable lives under this ModSync root but no
  * longer exists. Used at startup to clean up after a pack was removed.
  */
-async function pruneMissingShortcuts({ prefix }) {
+export async function pruneMissingShortcuts({ prefix }: { prefix: string }): Promise<{ removed: number }> {
   const ud = findUserData();
   if (!ud) return { removed: 0 };
   const file = path.join(ud.configDir, "shortcuts.vdf");
@@ -262,8 +313,8 @@ async function pruneMissingShortcuts({ prefix }) {
   const parsed = await readShortcuts(file);
   const wanted = unquote(prefix).replace(/\//g, "\\").toLowerCase();
   const base = wanted.endsWith("\\") ? wanted : `${wanted}\\`;
-  const removed = [];
-  const keep = [];
+  const removed: ShortcutEntry[] = [];
+  const keep: ShortcutEntry[] = [];
   for (const item of shortcutList(parsed)) {
     const raw = unquote(item.Exe || item.exe);
     const exe = raw.replace(/\//g, "\\").toLowerCase();
@@ -277,8 +328,36 @@ async function pruneMissingShortcuts({ prefix }) {
   return { removed: removed.length };
 }
 
-async function registerShortcut({ exePath, name, icon, art, allowOverlay = true }) {
-  const shortcut = require("steam-shortcut-editor");
+export interface ShortcutArt {
+  grid?: string;
+  hero?: string;
+  logo?: string;
+  icon?: string;
+  header?: string;
+  portrait?: string;
+}
+
+export async function registerShortcut({
+  exePath,
+  name,
+  icon,
+  art,
+  allowOverlay = true,
+}: {
+  exePath: string;
+  name: string;
+  icon?: string;
+  art?: ShortcutArt;
+  allowOverlay?: boolean;
+}): Promise<{
+  appId: number;
+  configDir: string;
+  userId: string;
+  file: string;
+  action: "added" | "updated";
+  deduped: number;
+}> {
+  const shortcut = require("steam-shortcut-editor") as ShortcutEditor;
   const ud = findUserData();
   if (!ud) throw new Error("Steam userdata/config not found. Add the shortcut manually.");
   const file = path.join(ud.configDir, "shortcuts.vdf");
@@ -286,16 +365,16 @@ async function registerShortcut({ exePath, name, icon, art, allowOverlay = true 
   const id = shortcutId(quotedExe + name);
   const startDir = `"${path.dirname(exePath)}${path.sep}"`;
 
-  let obj = { shortcuts: [] };
+  let obj: { shortcuts: ShortcutEntry[] | Record<string, ShortcutEntry> } = { shortcuts: [] };
   if (fs.existsSync(file)) {
     obj = await new Promise((resolve, reject) => {
       shortcut.parseFile(file, { autoConvertArrays: true, autoConvertBooleans: true, dateProperties: ["LastPlayTime"] }, (err, parsed) => {
-        if (err) reject(err); else resolve(parsed);
+        if (err) reject(err); else resolve(parsed as { shortcuts: ShortcutEntry[] | Record<string, ShortcutEntry> });
       });
     });
   }
-  const list = Array.isArray(obj.shortcuts) ? obj.shortcuts : Object.values(obj.shortcuts || {});
-  const entry = {
+  const list: ShortcutEntry[] = Array.isArray(obj.shortcuts) ? obj.shortcuts : Object.values(obj.shortcuts || {});
+  const entry: ShortcutEntry = {
     appid: id.signed,
     appname: name,
     Exe: quotedExe,
@@ -320,14 +399,14 @@ async function registerShortcut({ exePath, name, icon, art, allowOverlay = true 
   if (fs.existsSync(file)) {
     fs.copyFileSync(file, `${file}.modsync-${Date.now()}.bak`);
   }
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     shortcut.writeFile(file, { shortcuts: merged.list }, (err) => err ? reject(err) : resolve());
   });
 
   const grid = path.join(ud.configDir, "grid");
   fs.mkdirSync(grid, { recursive: true });
   const src = art || {};
-  const pairs = [
+  const pairs: Array<[string | undefined, string]> = [
     [src.header, `${id.unsigned}.png`],
     [src.portrait || src.grid, `${id.unsigned}p.png`],
     [src.grid, `${id.unsigned}_grid.png`],
@@ -347,9 +426,3 @@ async function registerShortcut({ exePath, name, icon, art, allowOverlay = true 
     deduped: merged.deduped,
   };
 }
-
-module.exports = {
-  steamRoots, libraries, findGame, findUserData, findAppManifest, readManifest,
-  readInstalledDepots, registerShortcut, removeShortcut, pruneMissingShortcuts,
-  shortcutId, mergeShortcut, setExtraLibraries,
-};

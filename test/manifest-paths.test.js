@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { validateFiles } = require("../src/manifest");
+const { validateFiles } = require("../dist/src/manifest");
 
 function pack() {
   return {

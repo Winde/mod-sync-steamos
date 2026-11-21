@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const paths = require("../src/paths");
+const paths = require("../dist/src/paths");
 
 const ctx = {
   variant: "linux-proton",

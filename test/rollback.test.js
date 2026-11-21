@@ -3,8 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { rollback } = require("../src/installer");
-const { listVersions } = require("../src/version-store");
+const { rollback } = require("../dist/src/installer");
+const { listVersions } = require("../dist/src/version-store");
 
 test("rollback switches current.txt to the previous installed version", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-rollback-"));

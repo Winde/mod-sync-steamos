@@ -1,9 +1,22 @@
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const util = require("./util");
-const steam = require("./steam");
-const paths = require("./paths");
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import * as util from "./util";
+import * as steam from "./steam";
+import * as paths from "./paths";
+import type {
+  CheckResult,
+  CheckStatus,
+  Confirmations,
+  NormalizedNote,
+  Note,
+  NoteTone,
+  Pack,
+  PreconditionConfig,
+  PreconditionsResult,
+  ResolvedTarget,
+  SteamGame,
+} from "./types";
 
 const CHECK_TYPES = new Set([
   "game-installed",
@@ -16,27 +29,30 @@ const CHECK_TYPES = new Set([
   "manual",
 ]);
 
-const NOTE_TONES = new Set(["info", "warning", "error", "success"]);
+const NOTE_TONES = new Set<NoteTone>(["info", "warning", "error", "success"]);
 
-function normalizeNotes(notes) {
+export function normalizeNotes(notes: readonly Note[] | null | undefined): NormalizedNote[] {
   if (!Array.isArray(notes)) return [];
   return notes.map((n) => {
-    if (typeof n === "string") return { title: "", body: n, tone: "info" };
+    if (typeof n === "string") return { title: "", body: n, tone: "info" as const };
     return { title: n.title || "", body: n.body || "", tone: n.tone || "info" };
   }).filter((n) => n.body);
 }
 
-function validatePreconditions(list) {
+export function validatePreconditions(list: unknown): PreconditionConfig[] {
   if (list == null) return [];
   if (!Array.isArray(list)) throw new Error("pack.json.preconditions: must be an array");
-  const seen = new Set();
-  for (const check of list) {
-    if (!check || typeof check !== "object") throw new Error("pack.json.preconditions: check must be an object");
+  const seen = new Set<string>();
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      throw new Error("pack.json.preconditions: check must be an object");
+    }
+    const check = raw as Record<string, unknown>;
     if (typeof check.id !== "string" || !check.id) throw new Error("pack.json.preconditions: missing id");
     if (seen.has(check.id)) throw new Error(`pack.json.preconditions: duplicate id ${check.id}`);
     seen.add(check.id);
     if (typeof check.type !== "string" || !CHECK_TYPES.has(check.type)) {
-      throw new Error(`pack.json.preconditions: ${check.id} has unknown type ${check.type}`);
+      throw new Error(`pack.json.preconditions: ${check.id} has unknown type ${String(check.type)}`);
     }
     if (check.required != null && typeof check.required !== "boolean") {
       throw new Error(`pack.json.preconditions: ${check.id} required must be a boolean`);
@@ -52,12 +68,12 @@ function validatePreconditions(list) {
         throw new Error(`pack.json.preconditions: ${check.id} platforms must be a non-empty array`);
       }
       for (const variant of check.platforms) {
-        if (!paths.VARIANTS.includes(variant)) {
-          throw new Error(`pack.json.preconditions: ${check.id} unknown platform ${variant}`);
+        if (typeof variant !== "string" || !(paths.VARIANTS as readonly string[]).includes(variant)) {
+          throw new Error(`pack.json.preconditions: ${check.id} unknown platform ${String(variant)}`);
         }
       }
     }
-    if (check.type === "path-exists" && check.scope != null && !["home", "game", "tv", "target"].includes(check.scope)) {
+    if (check.type === "path-exists" && check.scope != null && !["home", "game", "tv", "target"].includes(String(check.scope))) {
       throw new Error(`pack.json.preconditions: ${check.id} scope must be home, game, tv, or target`);
     }
     if (check.type === "game-build" && check.build != null && typeof check.build !== "string") {
@@ -66,12 +82,14 @@ function validatePreconditions(list) {
     if (check.type === "disk-free" && check.bytes != null && !Number.isFinite(check.bytes)) {
       throw new Error(`pack.json.preconditions: ${check.id} bytes must be a number`);
     }
-    if (check.type === "disk-free" && check.scope != null && !["tv", "game", "target"].includes(check.scope)) {
+    if (check.type === "disk-free" && check.scope != null && !["tv", "game", "target"].includes(String(check.scope))) {
       throw new Error(`pack.json.preconditions: ${check.id} scope must be tv, game, or target`);
     }
     if (check.type === "path-exists") {
-      const paths = check.paths || (check.path ? [check.path] : []);
-      if (!Array.isArray(paths) || !paths.length) throw new Error(`pack.json.preconditions: ${check.id} needs path or paths`);
+      const candidates = check.paths || (check.path ? [check.path] : []);
+      if (!Array.isArray(candidates) || !candidates.length) {
+        throw new Error(`pack.json.preconditions: ${check.id} needs path or paths`);
+      }
     }
     if (check.type === "dlc-installed") {
       if (check.depotIds != null && (!Array.isArray(check.depotIds) || check.depotIds.some((n) => !Number.isInteger(n)))) {
@@ -82,34 +100,45 @@ function validatePreconditions(list) {
       }
     }
   }
-  return list;
+  return list as PreconditionConfig[];
 }
 
-function validateNotes(notes) {
+export function validateNotes(notes: unknown): Note[] {
   if (notes == null) return [];
   if (!Array.isArray(notes)) throw new Error("pack.json.notes: must be an array");
-  for (const note of notes) {
-    if (typeof note === "string") continue;
-    if (!note || typeof note !== "object") throw new Error("pack.json.notes: note must be a string or object");
+  for (const raw of notes) {
+    if (typeof raw === "string") continue;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("pack.json.notes: note must be a string or object");
+    const note = raw as Record<string, unknown>;
     if (typeof note.body !== "string" || !note.body) throw new Error("pack.json.notes: note body is required");
     if (note.title != null && typeof note.title !== "string") throw new Error("pack.json.notes: note title must be a string");
-    if (note.tone != null && !NOTE_TONES.has(note.tone)) throw new Error(`pack.json.notes: unknown tone ${note.tone}`);
+    if (note.tone != null && (typeof note.tone !== "string" || !NOTE_TONES.has(note.tone as NoteTone))) {
+      throw new Error(`pack.json.notes: unknown tone ${String(note.tone)}`);
+    }
   }
-  return notes;
+  return notes as Note[];
 }
 
-function pass(detail) { return { status: "pass", detail }; }
-function fail(detail) { return { status: "fail", detail }; }
-function unknown(detail) { return { status: "unknown", detail }; }
+interface CheckOutcome {
+  status: CheckStatus;
+  detail: string;
+}
 
-function installedDepots(game) {
+function pass(detail: string): CheckOutcome { return { status: "pass", detail }; }
+function fail(detail: string): CheckOutcome { return { status: "fail", detail }; }
+function unknown(detail: string): CheckOutcome { return { status: "unknown", detail }; }
+
+function installedDepots(game: SteamGame | null | undefined): number[] | null {
   if (!game || !game.library) return null;
   return steam.readInstalledDepots(game.library, game.appId);
 }
 
-function checkDlc(check, { pack, game }) {
-  const found = [];
-  const tried = [];
+function checkDlc(
+  check: PreconditionConfig,
+  { pack, game }: { pack: Pack; game: SteamGame | null | undefined },
+): CheckOutcome {
+  const found: string[] = [];
+  const tried: string[] = [];
 
   if (check.dlcAppId) {
     tried.push(`app ${check.dlcAppId}`);
@@ -138,7 +167,15 @@ function checkDlc(check, { pack, game }) {
   return fail(`Not detected (${tried.join("; ")}).`);
 }
 
-function checkOne(check, { pack, game, root, totalBytes, target }) {
+interface CheckContext {
+  pack: Pack;
+  game: SteamGame | null | undefined;
+  root: string;
+  totalBytes: number;
+  target: ResolvedTarget;
+}
+
+function checkOne(check: PreconditionConfig, { pack, game, root, totalBytes, target }: CheckContext): CheckOutcome {
   switch (check.type) {
     case "game-installed":
       return game
@@ -170,8 +207,12 @@ function checkOne(check, { pack, game, root, totalBytes, target }) {
         return fail(`Proton prefix is missing${checked.length ? ` (checked ${checked.join(", ")})` : ""}.`);
       }
     case "disk-free": {
-      const reserve = Number.isFinite(check.reserveBytes) ? check.reserveBytes : 1024 * 1024 * 1024;
-      const need = Number.isFinite(check.bytes) ? check.bytes : (totalBytes || 0) + reserve;
+      const reserve = typeof check.reserveBytes === "number" && Number.isFinite(check.reserveBytes)
+        ? check.reserveBytes
+        : 1024 * 1024 * 1024;
+      const need = typeof check.bytes === "number" && Number.isFinite(check.bytes)
+        ? check.bytes
+        : (totalBytes || 0) + reserve;
       const base = check.scope === "game"
         ? (game && game.root)
         : check.scope === "target" ? target.dataDir : root;
@@ -183,7 +224,7 @@ function checkOne(check, { pack, game, root, totalBytes, target }) {
         : fail(`${util.formatBytes(free)} free at ${base}; need ${util.formatBytes(need)}.`);
     }
     case "path-exists": {
-      const candidates = check.paths || [check.path];
+      const candidates = check.paths || (check.path ? [check.path] : []);
       const base = check.scope === "tv"
         ? root
         : check.scope === "home" ? os.homedir()
@@ -206,13 +247,25 @@ function checkOne(check, { pack, game, root, totalBytes, target }) {
   }
 }
 
-function evaluatePreconditions({ pack, game, root, totalBytes, confirmed = {} }) {
+export function evaluatePreconditions({
+  pack,
+  game,
+  root,
+  totalBytes,
+  confirmed = {},
+}: {
+  pack: Pack;
+  game: SteamGame | null | undefined;
+  root: string;
+  totalBytes?: number;
+  confirmed?: Confirmations[string];
+}): PreconditionsResult {
   const checks = Array.isArray(pack.preconditions) ? pack.preconditions : [];
   const target = paths.resolve(pack, game);
-  const results = checks.map((check) => {
-    let result = Array.isArray(check.platforms) && !check.platforms.includes(target.variant)
+  const results: CheckResult[] = checks.map((check) => {
+    let result: CheckOutcome = Array.isArray(check.platforms) && !check.platforms.includes(target.variant)
       ? pass(`Not needed for ${target.variant}.`)
-      : checkOne(check, { pack, game, root, totalBytes, target });
+      : checkOne(check, { pack, game, root, totalBytes: totalBytes || 0, target });
     const confirmable = check.type === "manual" || check.confirmable === true;
     if (result.status !== "pass" && confirmable && confirmed[check.id]) {
       result = pass("Confirmed on this TV.");
@@ -239,7 +292,7 @@ function evaluatePreconditions({ pack, game, root, totalBytes, confirmed = {} })
   };
 }
 
-function defaultTitle(check, pack) {
+function defaultTitle(check: PreconditionConfig, pack: Pack): string {
   switch (check.type) {
     case "game-installed": return `${pack.game.title} is installed`;
     case "game-build": return `${pack.game.title} build ${check.build || pack.game.build}`;
@@ -256,17 +309,12 @@ function defaultTitle(check, pack) {
   }
 }
 
-function firstBlocker(preconditions) {
+export function firstBlocker(preconditions: PreconditionsResult | null | undefined): CheckResult | null {
   if (!preconditions || !preconditions.checks) return null;
   return preconditions.checks.find((c) => c.blocked) || preconditions.checks.find((c) => c.status === "fail") || null;
 }
 
-module.exports = {
+export {
   CHECK_TYPES,
   NOTE_TONES,
-  normalizeNotes,
-  validateNotes,
-  validatePreconditions,
-  evaluatePreconditions,
-  firstBlocker,
 };

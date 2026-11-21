@@ -8,8 +8,7 @@ directories:
   output: release
 
 files:
-  - electron/**
-  - src/**
+  - dist/**
   - web/**
   - templates/**
   - package.json

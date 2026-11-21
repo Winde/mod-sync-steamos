@@ -66,6 +66,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Compile TypeScript
+        run: npm run build
       - name: Build the AppImage
         run: npx electron-builder --linux AppImage --publish never
 

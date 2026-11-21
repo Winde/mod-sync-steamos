@@ -1,12 +1,13 @@
-const http = require("node:http");
-const fs = require("node:fs");
-const path = require("node:path");
-const { URL } = require("node:url");
-const { loadPack, packSummary } = require("./manifest");
-const labels = require("./labels");
-const { safeJoin } = require("./util");
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { URL } from "node:url";
+import { loadPack, packSummary } from "./manifest";
+import labels from "./labels";
+import { errorMessage, safeJoin } from "./util";
+import type { ArtInfo, PackSummary } from "./types";
 
-function contentType(p) {
+export function contentType(p: string): string {
   switch (path.extname(p).toLowerCase()) {
     case ".png": return "image/png";
     case ".jpg": case ".jpeg": return "image/jpeg";
@@ -19,23 +20,28 @@ function contentType(p) {
   }
 }
 
-function sendJson(res, code, value) {
+function sendJson(res: http.ServerResponse, code: number, value: unknown): void {
   const body = JSON.stringify(value);
   res.writeHead(code, { "content-type": "application/json", "content-length": Buffer.byteLength(body) });
   res.end(body);
 }
 
-function sendText(res, code, text, type = "text/plain; charset=utf-8") {
+function sendText(res: http.ServerResponse, code: number, text: string, type = "text/plain; charset=utf-8"): void {
   res.writeHead(code, { "content-type": type, "content-length": Buffer.byteLength(text) });
   res.end(text);
 }
 
-function parseRange(header, size) {
+export type RangeResult =
+  | { start: number; end: number }
+  | { invalid: true }
+  | null;
+
+export function parseRange(header: string | null | undefined, size: number): RangeResult {
   if (!header) return null;
   const m = /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
   if (!m) return { invalid: true };
-  let start;
-  let end;
+  let start: number;
+  let end: number;
   if (m[1] === "") {
     const n = Number(m[2]);
     if (!n) return { invalid: true };
@@ -50,11 +56,12 @@ function parseRange(header, size) {
   return { start, end };
 }
 
-function sendFile(req, res, file) {
+function sendFile(req: http.IncomingMessage, res: http.ServerResponse, file: string): boolean {
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return false;
   const stat = fs.statSync(file);
-  const range = parseRange(req && req.headers ? req.headers.range : null, stat.size);
-  if (range && range.invalid) {
+  const header = req && req.headers ? req.headers.range : null;
+  const range = parseRange(header, stat.size);
+  if (range && "invalid" in range) {
     res.writeHead(416, { "content-range": `bytes */${stat.size}`, "accept-ranges": "bytes" });
     res.end();
     return true;
@@ -74,25 +81,43 @@ function sendFile(req, res, file) {
   return true;
 }
 
-function loadPacks(packsDir) {
+export interface PackEntry {
+  root: string;
+  summary: PackSummary;
+}
+
+export function loadPacks(packsDir: string): PackEntry[] {
   if (!fs.existsSync(packsDir)) return [];
-  const out = [];
+  const out: PackEntry[] = [];
   for (const ent of fs.readdirSync(packsDir, { withFileTypes: true })) {
     if (!ent.isDirectory()) continue;
     const root = path.join(packsDir, ent.name);
     if (!fs.existsSync(path.join(root, "pack.json"))) continue;
-    try { out.push({ root, summary: packSummary(root) }); } catch (err) {
-      console.error(`[packs] ${ent.name}: ${err.message}`);
+    try {
+      out.push({ root, summary: packSummary(root) });
+    } catch (err) {
+      console.error(`[packs] ${ent.name}: ${errorMessage(err)}`);
     }
   }
   return out;
 }
 
-function createServer({ packsDir, token, baseUrl }) {
+export function createServer({
+  packsDir,
+  token,
+  baseUrl,
+}: {
+  packsDir: string;
+  token?: string | null;
+  baseUrl?: string;
+}): http.Server {
   const tokens = new Set(String(token || "").split(",").map((value) => value.trim()).filter(Boolean));
   return http.createServer((req, res) => {
-    const url = new URL(req.url, baseUrl || "http://localhost");
-    const given = url.searchParams.get("token") || req.headers["x-modsync-token"] || "";
+    const url = new URL(req.url || "/", baseUrl || "http://localhost");
+    const headerToken = req.headers["x-modsync-token"];
+    const given = url.searchParams.get("token")
+      || (Array.isArray(headerToken) ? headerToken[0] : headerToken)
+      || "";
     const authorized = tokens.has(given);
 
     if (url.pathname === "/api/health") {
@@ -123,7 +148,8 @@ function createServer({ packsDir, token, baseUrl }) {
       }
       if (parts[3] === "art" && parts[4]) {
         const { pack } = loadPack(entry.root);
-        const rel = pack.art[decodeURIComponent(parts[4])];
+        const art = pack.art as ArtInfo & Record<string, string | undefined>;
+        const rel = art[decodeURIComponent(parts[4])];
         if (!rel) return sendJson(res, 404, { error: "art not found" });
         const file = safeJoin(entry.root, rel);
         if (!sendFile(req, res, file)) return sendJson(res, 404, { error: "art missing" });
@@ -143,5 +169,3 @@ function createServer({ packsDir, token, baseUrl }) {
     return sendJson(res, 404, { error: "not found" });
   });
 }
-
-module.exports = { createServer, loadPacks, parseRange };

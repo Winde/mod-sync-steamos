@@ -12,16 +12,23 @@ Skyrim and BG2 are added as drivers/packs later.
 ```powershell
 cd D:\source\mod-sync-steamos
 npm install
+npm run build
 
 # First time only: remember the working install and pack output.
-node bin/modsync.js init
+npm start -- init
 
 # Build a pack from the working install. Hardlinks the 7.3 GB payload.
-node bin/modsync.js pack
+npm start -- pack
 
 # Serve it on the LAN. Prints the TV install one-liner and the current URL.
-node bin/modsync.js serve --lan --packs packs --port 8787
+npm start -- serve --lan --packs packs --port 8787
 ```
+
+Source lives in `src/*.ts`, `electron/*.ts`, and `web/*.ts`. `npm run build`
+compiles the Node/Electron code to `dist/` and the browser code to `web/*.js`;
+the `npm start`/`npm test`/packaging scripts run it for you. `node bin/modsync.js`
+works after a build. `npm run typecheck` checks without emitting, and
+`npm test` builds and runs the full suite.
 
 `init` writes `state/config.json`; after that `pack` needs no arguments. The
 full form is still available: `pack --recipe eldenring-graceborne --source <dir> --out <dir> --version <ver>`.

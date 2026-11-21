@@ -1,12 +1,14 @@
-const { app, BrowserWindow, ipcMain, net, shell } = require("electron");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { createAgent } = require("../src/agent");
-const { readJson } = require("../src/util");
-const {
+import { app, BrowserWindow, ipcMain, net, shell } from "electron";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { createAgent } from "../src/agent";
+import { errorMessage, readJson } from "../src/util";
+import { projectRoot } from "../src/root";
+import {
   RELEASES_PAGE, Updater, currentAppImage, relaunchArgs,
-} = require("./updater");
+} from "./updater";
+import type { AgentConfig } from "../src/agent";
 
 const isSteam = process.env.SteamOS === "1" && process.env.SteamGamepadUI === "1";
 const wantsFullscreen = isSteam || process.argv.includes("--fullscreen");
@@ -21,54 +23,57 @@ const CLOSING_OVERLAY_MS = 2000;
 if (isSteam) app.commandLine.appendSwitch("no-sandbox");
 app.setName("ModSync");
 
-let win = null;
-let agent = null;
+let win: BrowserWindow | null = null;
+let agent: ReturnType<typeof createAgent> | null = null;
 let agentUrl = "";
-let updater = null;
+let updater: Updater | null = null;
 
-function configPath() {
+function configPath(): string {
   const index = process.argv.indexOf("--config");
-  if (index >= 0 && process.argv[index + 1]) return path.resolve(process.argv[index + 1]);
+  const value = process.argv[index + 1];
+  if (index >= 0 && value) return path.resolve(value);
   if (process.env.MODSYNC_CONFIG) return path.resolve(process.env.MODSYNC_CONFIG);
   const local = path.join(os.homedir(), "ModSync", "agent.json");
   return fs.existsSync(local) ? local : "";
 }
 
-function loadConfig() {
+function loadConfig(): AgentConfig {
   const file = configPath();
   if (file && fs.existsSync(file)) {
-    try { return readJson(file); } catch (err) { console.error(`[modsync] ${file}: ${err.message}`); }
+    try { return readJson<AgentConfig>(file); } catch (err) { console.error(`[modsync] ${file}: ${errorMessage(err)}`); }
   }
   return { root: path.join(os.homedir(), "ModSync") };
 }
 
-async function startAgent() {
+async function startAgent(): Promise<string> {
   const config = loadConfig();
-  agent = createAgent({ ...config, port: 0 });
-  await new Promise((resolve, reject) => {
-    agent.server.once("error", reject);
-    agent.server.listen(0, "127.0.0.1", resolve);
+  const instance = createAgent({ ...config, port: 0 });
+  agent = instance;
+  await new Promise<void>((resolve, reject) => {
+    instance.server.once("error", reject);
+    instance.server.listen(0, "127.0.0.1", resolve);
   });
-  const port = agent.server.address().port;
+  const address = instance.server.address();
+  const port = address && typeof address === "object" ? address.port : 0;
   agentUrl = `http://127.0.0.1:${port}`;
   return agentUrl;
 }
 
-function openExternal(rawUrl) {
+function openExternal(rawUrl: string): void {
   try {
     const { protocol } = new URL(rawUrl);
     if (protocol === "https:" || protocol === "http:") void shell.openExternal(rawUrl);
-  } catch { /* ignore */ }
+  } catch { /* ignore malformed URLs */ }
 }
 
-function createWindow(url) {
-  win = new BrowserWindow({
+function createWindow(url: string): void {
+  const window = new BrowserWindow({
     width: 1600,
     height: 900,
     fullscreen: wantsFullscreen,
     frame: !wantsFullscreen,
     backgroundColor: "#05070a",
-    icon: path.join(__dirname, "..", "web", "icon.png"),
+    icon: path.join(projectRoot, "web", "icon.png"),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -80,37 +85,38 @@ function createWindow(url) {
       spellcheck: false,
     },
   });
+  win = window;
 
-  win.setMenuBarVisibility(false);
-  win.once("ready-to-show", () => {
-    if (!wantsFullscreen && !wantsWindowed) win.maximize();
-    win.show();
+  window.setMenuBarVisibility(false);
+  window.once("ready-to-show", () => {
+    if (!wantsFullscreen && !wantsWindowed) window.maximize();
+    window.show();
   });
-  win.webContents.setWindowOpenHandler(({ url: target }) => {
+  window.webContents.setWindowOpenHandler(({ url: target }) => {
     openExternal(target);
     return { action: "deny" };
   });
-  win.webContents.on("will-navigate", (event, target) => {
+  window.webContents.on("will-navigate", (event, target) => {
     if (target.startsWith(url)) return;
     event.preventDefault();
     openExternal(target);
   });
-  win.webContents.on("did-fail-load", (_event, code, description, failedUrl) => {
+  window.webContents.on("did-fail-load", (_event, code, description, failedUrl) => {
     if (code === -3) return;
     console.error(`[modsync] failed to load ${failedUrl}: ${description} (${code})`);
   });
-  win.webContents.on("before-input-event", (event, input) => {
+  window.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
     if (input.control && input.key.toLowerCase() === "q") { event.preventDefault(); app.quit(); }
-    if (input.key === "F11") { event.preventDefault(); win.setFullScreen(!win.isFullScreen()); }
+    if (input.key === "F11") { event.preventDefault(); window.setFullScreen(!window.isFullScreen()); }
   });
-  if (wantsDevtools) win.webContents.openDevTools({ mode: "detach" });
+  if (wantsDevtools) window.webContents.openDevTools({ mode: "detach" });
 
   if (screenshotPath) {
-    win.webContents.once("did-finish-load", () => {
+    window.webContents.once("did-finish-load", () => {
       setTimeout(async () => {
         try {
-          const image = await win.webContents.capturePage();
+          const image = await window.webContents.capturePage();
           fs.writeFileSync(screenshotPath, image.toPNG());
           console.log(`[modsync] screenshot: ${screenshotPath}`);
         } catch (err) {
@@ -122,7 +128,7 @@ function createWindow(url) {
     });
   }
 
-  void win.loadURL(url);
+  void window.loadURL(url);
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -148,22 +154,23 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
-    updater = new Updater({
+    const updateService = new Updater({
       currentVersion: () => app.getVersion(),
       appImage: () => currentAppImage(process.env),
-      fetch: (url, init) => net.fetch(url, init),
+      fetch: (url, init) => net.fetch(url, init) as Promise<Response>,
     });
+    updater = updateService;
 
     ipcMain.handle("modsync:version", () => app.getVersion());
     ipcMain.handle("modsync:update-check", async () => {
       try {
-        return await updater.check();
+        return await updateService.check();
       } catch (err) {
-        return { current: app.getVersion(), latest: null, available: false, canInstall: false, error: err.message };
+        return { current: app.getVersion(), latest: null, available: false, canInstall: false, error: errorMessage(err) };
       }
     });
     ipcMain.handle("modsync:update-install", async () => {
-      const appImage = await updater.install();
+      const appImage = await updateService.install();
       app.relaunch({ execPath: appImage, args: relaunchArgs(process.argv.slice(1)) });
       // The renderer switches to its closing state as soon as this call
       // returns. Hold the window long enough to read it, then quit as before.
@@ -174,7 +181,7 @@ if (!app.requestSingleInstanceLock()) {
     const url = await startAgent();
     createWindow(url);
   }).catch((err) => {
-    console.error(`[modsync] startup failed: ${err.stack || err.message}`);
+    console.error(`[modsync] startup failed: ${err instanceof Error ? err.stack || err.message : String(err)}`);
     app.quit();
   });
 }

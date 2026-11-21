@@ -11,7 +11,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const store = require("../src/version-store");
+const store = require("../dist/src/version-store");
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "modsync-version-store-"));

@@ -1,37 +1,53 @@
-const fs = require("node:fs");
-const fsp = fs.promises;
-const os = require("node:os");
-const path = require("node:path");
-const crypto = require("node:crypto");
-const { execFileSync } = require("node:child_process");
-const { Readable } = require("node:stream");
-const { pipeline } = require("node:stream/promises");
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
-function ensureDir(p) {
+const fsp = fs.promises;
+
+export interface WalkEntry {
+  abs: string;
+  rel: string;
+  size: number;
+}
+
+export interface LanAddress {
+  name: string;
+  address: string;
+}
+
+export function ensureDir(p: string): void {
   fs.mkdirSync(p, { recursive: true });
 }
 
-function readJson(p) {
-  const text = fs.readFileSync(p, "utf8").replace(/^\uFEFF/, "");
-  return JSON.parse(text);
+export function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
-function writeJson(p, value) {
+export function readJson<T = unknown>(p: string): T {
+  const text = fs.readFileSync(p, "utf8").replace(/^\uFEFF/, "");
+  return JSON.parse(text) as T;
+}
+
+export function writeJson(p: string, value: unknown): void {
   ensureDir(path.dirname(p));
   fs.writeFileSync(p, JSON.stringify(value, null, 2) + "\n");
 }
 
-function readText(p, fallback = "") {
+export function readText(p: string, fallback = ""): string {
   try { return fs.readFileSync(p, "utf8"); } catch { return fallback; }
 }
 
-function writeText(p, text, mode) {
+export function writeText(p: string, text: string, mode?: number): void {
   ensureDir(path.dirname(p));
   fs.writeFileSync(p, text, "utf8");
   if (mode != null) fs.chmodSync(p, mode);
 }
 
-function sha256File(p) {
+export function sha256File(p: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const h = crypto.createHash("sha256");
     const s = fs.createReadStream(p);
@@ -41,8 +57,8 @@ function sha256File(p) {
   });
 }
 
-function walkFiles(root, base = root) {
-  const out = [];
+export function walkFiles(root: string, base = root): WalkEntry[] {
+  const out: WalkEntry[] = [];
   if (!fs.existsSync(root)) return out;
   for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
     const abs = path.join(root, ent.name);
@@ -56,7 +72,7 @@ function walkFiles(root, base = root) {
   return out;
 }
 
-function safeJoin(root, rel) {
+export function safeJoin(root: string, rel: string): string {
   if (typeof rel !== "string" || !rel || rel.includes("\0")) throw new Error("invalid path");
   const norm = rel.replace(/\\/g, "/");
   if (path.posix.isAbsolute(norm)) throw new Error("absolute path not allowed");
@@ -66,11 +82,11 @@ function safeJoin(root, rel) {
   return abs;
 }
 
-function relPosix(from, to) {
+export function relPosix(from: string, to: string): string {
   return path.relative(from, to).split(path.sep).join("/");
 }
 
-function formatBytes(n) {
+export function formatBytes(n: number): string {
   if (!Number.isFinite(n)) return "?";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let v = n;
@@ -79,18 +95,18 @@ function formatBytes(n) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function nowStamp() {
+export function nowStamp(): string {
   const d = new Date();
-  const p = (n) => String(n).padStart(2, "0");
+  const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-function randomToken() {
+export function randomToken(): string {
   return crypto.randomBytes(12).toString("hex");
 }
 
-function lanAddresses() {
-  const out = [];
+export function lanAddresses(): LanAddress[] {
+  const out: LanAddress[] = [];
   for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
     for (const a of addrs || []) {
       if (a.family !== "IPv4" || a.internal) continue;
@@ -102,7 +118,7 @@ function lanAddresses() {
   return out;
 }
 
-function detectLanIp() {
+export function detectLanIp(): string {
   const candidates = lanAddresses();
   const preferred = candidates.find((c) => c.address.startsWith("192.168."))
     || candidates.find((c) => c.address.startsWith("192."))
@@ -111,8 +127,8 @@ function detectLanIp() {
   return preferred ? preferred.address : "127.0.0.1";
 }
 
-function isGameRunning(processNames) {
-  const names = (Array.isArray(processNames) ? processNames : [processNames]).filter(Boolean);
+export function isGameRunning(processNames: string | string[] | null | undefined): boolean {
+  const names = (Array.isArray(processNames) ? processNames : [processNames]).filter(Boolean) as string[];
   for (const processName of names) {
     try {
       if (process.platform === "win32") {
@@ -129,8 +145,12 @@ function isGameRunning(processNames) {
   return false;
 }
 
-async function mapLimit(items, limit, fn) {
-  const results = new Array(items.length);
+export async function mapLimit<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R> | R,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
   let next = 0;
   const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
     while (true) {
@@ -143,7 +163,7 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
-function materialize(src, dst, link = true) {
+export function materialize(src: string, dst: string, link = true): "link" | "copy" {
   ensureDir(path.dirname(dst));
   if (fs.existsSync(dst)) fs.rmSync(dst, { force: true });
   if (link) {
@@ -151,33 +171,34 @@ function materialize(src, dst, link = true) {
       fs.linkSync(src, dst);
       return "link";
     } catch (err) {
-      if (!["EXDEV", "EPERM", "EACCES", "ENOTSUP"].includes(err.code)) throw err;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (!code || !["EXDEV", "EPERM", "EACCES", "ENOTSUP"].includes(code)) throw err;
     }
   }
   fs.copyFileSync(src, dst);
   return "copy";
 }
 
-function modeFor(rel) {
+export function modeFor(rel: string): "755" | "644" {
   return rel.replace(/\\/g, "/").endsWith(".sh") ? "755" : "644";
 }
 
-function tailText(text, lines = 200) {
+export function tailText(text: string, lines = 200): string {
   const arr = text.split(/\r?\n/);
   return arr.slice(Math.max(0, arr.length - lines)).join("\n");
 }
 
-function tailFile(p, lines = 200) {
+export function tailFile(p: string, lines = 200): string {
   return tailText(readText(p), lines);
 }
 
-function freeBytes(dir) {
+export function freeBytes(dir: string): number | null {
   let p = path.resolve(dir);
   while (p) {
     try {
       const s = fs.statfsSync(p);
       return Number(s.bavail) * Number(s.bsize);
-    } catch { }
+    } catch { /* walk up to a parent that exists */ }
     const parent = path.dirname(p);
     if (parent === p) break;
     p = parent;
@@ -185,23 +206,18 @@ function freeBytes(dir) {
   return null;
 }
 
-async function fetchJson(url, options = {}) {
+export async function fetchJson<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(url, options);
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
-  return res.json();
+  return (await res.json()) as T;
 }
 
-async function fetchToFile(url, dest, options = {}) {
+export async function fetchToFile(url: string, dest: string, options: RequestInit = {}): Promise<void> {
   const res = await fetch(url, options);
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
+  if (!res.body) throw new Error(`HTTP ${res.status} ${url}: empty body`);
   ensureDir(path.dirname(dest));
-  await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(dest));
+  await pipeline(Readable.fromWeb(res.body as import("node:stream/web").ReadableStream), fs.createWriteStream(dest));
 }
 
-module.exports = {
-  ensureDir, readJson, writeJson, readText, writeText,
-  sha256File, walkFiles, safeJoin, relPosix, formatBytes,
-  nowStamp, randomToken, detectLanIp, lanAddresses, isGameRunning, mapLimit,
-  materialize, modeFor, tailText, tailFile, fetchJson, fetchToFile,
-  freeBytes, fsp,
-};
+export { fsp };

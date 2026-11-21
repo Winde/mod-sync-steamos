@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { applyBg3, revertBg3, plan, dataDirFor, readApplied } = require("../src/installers/bg3");
+const { applyBg3, revertBg3, plan, dataDirFor, readApplied } = require("../dist/src/installers/bg3");
 
 function write(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true });

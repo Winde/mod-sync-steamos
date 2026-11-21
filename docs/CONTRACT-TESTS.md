@@ -46,8 +46,8 @@ and native BG3 tests are skipped there for the same reason.
 ## Running
 
 ```bash
-node --test             # everything, including the white-box tests
-node --test test/contract
+npm test                 # build, then everything including the white-box tests
+npm run build && node --test test/contract
 ```
 
 The suite runs in under ten seconds because fixtures are a few hundred bytes.
@@ -56,9 +56,10 @@ Two offline tests wait for the agent's 2.5-second remote-catalog cache to expire
 ## White-box tests
 
 `test/preconditions.test.js`, `test/rollback.test.js`, `test/smoke.test.js`,
-`test/storage.test.js`, and `test/steam.test.js` import `src/` functions
-directly. They are useful characterization tests, but they are tied to current
-module boundaries and will need import updates when those modules are split.
+`test/storage.test.js`, and `test/steam.test.js` import the compiled functions
+from `dist/` directly. They are useful characterization tests, but they are tied
+to current module boundaries and will need import updates when those modules are
+split.
 
 During the refactor:
 

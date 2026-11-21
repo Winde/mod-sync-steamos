@@ -3,11 +3,11 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { validatePack, validateFiles } = require("../src/manifest");
-const { safeJoin, formatBytes, readJson } = require("../src/util");
-const { compareVersions } = require("../src/version-store");
-const { shortcutId } = require("../src/steam");
-const { parseRange } = require("../src/server");
+const { validatePack, validateFiles } = require("../dist/src/manifest");
+const { safeJoin, formatBytes, readJson } = require("../dist/src/util");
+const { compareVersions } = require("../dist/src/version-store");
+const { shortcutId } = require("../dist/src/steam");
+const { parseRange } = require("../dist/src/server");
 
 const pack = {
   schema: 1,

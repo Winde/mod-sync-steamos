@@ -7,15 +7,15 @@ Two machines, two different jobs:
 
 ## PC: one-time setup
 
-1. Install Node 22+ and run `npm install` in this repo.
+1. Install Node 22+ and run `npm install` and `npm run build` in this repo.
 2. Remember the working install once:
    ```powershell
-   node bin/modsync.js init
+   npm start -- init
    ```
    This writes `state/config.json` with the source and output paths.
 3. Build a pack from the working install:
    ```powershell
-   node bin/modsync.js pack
+   npm start -- pack
    ```
 4. Allow the LAN port once (admin PowerShell):
    ```powershell
@@ -49,7 +49,7 @@ On the PC:
 
 ```powershell
 cd D:\source\mod-sync-steamos
-node bin/modsync.js serve --lan --packs packs --port 8787 --token <token>
+npm start -- serve --lan --packs packs --port 8787 --token <token>
 ```
 
 Keep that terminal open while the TV downloads. On the Steam Machine:

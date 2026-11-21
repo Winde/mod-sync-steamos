@@ -13,12 +13,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { parseArgs } = require("node:util");
-const { createServer } = require("../src/server");
-const { createAgent } = require("../src/agent");
-const { loadPack } = require("../src/manifest");
-const versionStore = require("../src/version-store");
-const { sha256File, mapLimit, safeJoin, walkFiles, formatBytes } = require("../src/util");
-const paths = require("../src/paths");
+const { createServer } = require("../dist/src/server");
+const { createAgent } = require("../dist/src/agent");
+const { loadPack } = require("../dist/src/manifest");
+const versionStore = require("../dist/src/version-store");
+const { sha256File, mapLimit, safeJoin, walkFiles, formatBytes } = require("../dist/src/util");
+const paths = require("../dist/src/paths");
 
 const repoRoot = path.resolve(__dirname, "..");
 const stateDir = path.join(repoRoot, "state");

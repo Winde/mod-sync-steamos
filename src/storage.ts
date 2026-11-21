@@ -1,11 +1,20 @@
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { readJson, freeBytes } = require("./util");
-const versionStore = require("./version-store");
-const installers = require("./installers");
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { readJson, freeBytes } from "./util";
+import * as versionStore from "./version-store";
+import * as installers from "./installers";
+import type {
+  ClearPlan,
+  ClearResult,
+  Pack,
+  PackAdapter,
+  PackStorage,
+  StorageReport,
+  StorageVersion,
+} from "./types";
 
-function dirBytes(dir) {
+export function dirBytes(dir: string): number {
   if (!fs.existsSync(dir)) return 0;
   let total = 0;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -18,7 +27,7 @@ function dirBytes(dir) {
   return total;
 }
 
-function modIdFor(packRoot, pack) {
+function modIdFor(packRoot: string, pack: Pack | null): string {
   if (pack && pack.mod && pack.mod.id) return pack.mod.id;
   const modsDir = path.join(packRoot, "mods");
   if (!fs.existsSync(modsDir)) return "";
@@ -26,16 +35,16 @@ function modIdFor(packRoot, pack) {
   return first ? first.name : "";
 }
 
-function packStorage(packRoot) {
-  let pack = null;
-  try { pack = readJson(versionStore.packFile(packRoot)); } catch { }
+export function packStorage(packRoot: string): PackStorage {
+  let pack: Pack | null = null;
+  try { pack = readJson<Pack>(versionStore.packFile(packRoot)); } catch { /* pack.json is optional for a damaged pack */ }
   const id = pack && pack.id ? pack.id : path.basename(packRoot);
   const modId = modIdFor(packRoot, pack);
   const versionsDir = modId ? versionStore.versionsDir(packRoot, modId) : "";
   const current = modId ? versionStore.readCurrent(packRoot, modId) : "";
   const totalBytes = dirBytes(packRoot);
 
-  const versions = [];
+  const versions: StorageVersion[] = [];
   let stagingBytes = 0;
   let backupBytes = 0;
   if (versionsDir && fs.existsSync(versionsDir)) {
@@ -70,9 +79,9 @@ function packStorage(packRoot) {
   };
 }
 
-function computeStorage(root) {
+export function computeStorage(root: string): StorageReport {
   const packsDir = versionStore.packsDir(root);
-  const packs = [];
+  const packs: PackStorage[] = [];
   if (fs.existsSync(packsDir)) {
     for (const entry of fs.readdirSync(packsDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
@@ -93,17 +102,17 @@ function computeStorage(root) {
   };
 }
 
-function validPackId(id) {
+function validPackId(id: unknown): id is string {
   return typeof id === "string" && /^[a-zA-Z0-9._-]+$/.test(id) && path.basename(id) === id;
 }
 
-function removeProfile(packRoot, pack, version) {
+function removeProfile(packRoot: string, pack: Pack | null, version: string): void {
   if (!pack || !version) return;
   const profile = versionStore.profileFile(packRoot, pack, version);
   if (profile && fs.existsSync(profile)) fs.rmSync(profile, { force: true });
 }
 
-function removeDesktopShortcuts(modId) {
+function removeDesktopShortcuts(modId: string): void {
   if (process.platform !== "linux" || !modId) return;
   for (const file of [
     path.join(os.homedir(), ".local", "share", "applications", `${modId}.desktop`),
@@ -113,18 +122,22 @@ function removeDesktopShortcuts(modId) {
   }
 }
 
-function planClear(root, { packId, scope }) {
+function adapterFor(pack: Pack | null): PackAdapter | null {
+  return installers.forPack(pack) as unknown as PackAdapter | null;
+}
+
+export function planClear(root: string, { packId, scope }: { packId?: string; scope: string }): ClearPlan {
   if (scope === "logs") {
     return { ok: true, scope, actions: ["Clear the log files"], errors: [], warnings: [] };
   }
   if (!validPackId(packId)) throw new Error("invalid pack id");
   const packRoot = versionStore.packRoot(root, packId);
   if (!fs.existsSync(packRoot)) throw new Error(`Pack is not installed: ${packId}`);
-  let pack = null;
-  try { pack = readJson(versionStore.packFile(packRoot)); } catch { }
+  let pack: Pack | null = null;
+  try { pack = readJson<Pack>(versionStore.packFile(packRoot)); } catch { /* use the folder name */ }
 
   if (scope === "pack") {
-    const adapter = installers.forPack(pack);
+    const adapter = adapterFor(pack);
     if (adapter && adapter.plan) {
       const plan = adapter.plan({ pack, root });
       return { ...plan, scope, packId };
@@ -151,7 +164,7 @@ function planClear(root, { packId, scope }) {
   throw new Error(`unknown scope: ${scope}`);
 }
 
-function clearStorage(root, { packId, scope }) {
+export function clearStorage(root: string, { packId, scope }: { packId?: string; scope: string }): ClearResult {
   if (scope === "logs") {
     const logs = path.join(root, "logs");
     const before = dirBytes(logs);
@@ -166,8 +179,8 @@ function clearStorage(root, { packId, scope }) {
   if (!validPackId(packId)) throw new Error("invalid pack id");
   const packRoot = versionStore.packRoot(root, packId);
   if (!fs.existsSync(packRoot)) throw new Error(`Pack is not installed: ${packId}`);
-  let pack = null;
-  try { pack = readJson(versionStore.packFile(packRoot)); } catch { }
+  let pack: Pack | null = null;
+  try { pack = readJson<Pack>(versionStore.packFile(packRoot)); } catch { /* use the folder name */ }
   const modId = modIdFor(packRoot, pack);
   const versionsDir = modId ? versionStore.versionsDir(packRoot, modId) : "";
   const current = modId ? versionStore.readCurrent(packRoot, modId) : "";
@@ -195,7 +208,7 @@ function clearStorage(root, { packId, scope }) {
   } else if (scope === "pack") {
     const plan = planClear(root, { packId, scope });
     if (!plan.ok) throw new Error(`Uninstall preflight failed: ${plan.errors.join("; ")}`);
-    const adapter = installers.forPack(pack);
+    const adapter = adapterFor(pack);
     if (adapter && adapter.revert) {
       // If the game-side revert fails, keep the pack root and its backups so
       // the user can retry instead of losing the only record of applied files.
@@ -210,5 +223,3 @@ function clearStorage(root, { packId, scope }) {
   const after = fs.existsSync(packRoot) ? dirBytes(packRoot) : 0;
   return { freedBytes: Math.max(0, before - after), scope, packId };
 }
-
-module.exports = { computeStorage, clearStorage, planClear, dirBytes, packStorage };

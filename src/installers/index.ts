@@ -8,13 +8,16 @@
  * hardcoded executable path.
  */
 
-const bg3 = require("./bg3");
+import * as bg3 from "./bg3";
+import type { Pack, PackAdapter } from "../types";
 
-const adapters = { bg3 };
+const adapters: Record<string, PackAdapter> = {
+  bg3: bg3 as unknown as PackAdapter,
+};
 
-function forPack(pack) {
+export function forPack(pack: Pack | null | undefined): PackAdapter | null {
   if (!pack || !pack.install || !pack.install.type) return null;
   return adapters[pack.install.type] || null;
 }
 
-module.exports = { adapters, forPack };
+export { adapters };

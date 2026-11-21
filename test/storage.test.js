@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { computeStorage, clearStorage, planClear } = require("../src/storage");
+const { computeStorage, clearStorage, planClear } = require("../dist/src/storage");
 
 function setup() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-storage-"));

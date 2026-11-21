@@ -6,22 +6,36 @@
   "author": "Winde",
   "license": "MIT",
   "type": "commonjs",
-  "main": "electron/main.js",
+  "main": "dist/electron/main.js",
   "bin": {
     "modsync": "bin/modsync.js"
   },
   "scripts": {
+    "clean": "node -e \"const fs=require('node:fs');fs.rmSync('dist',{ recursive: true, force: true });for (const f of ['web/app.js','web/app.js.map','web/labels.js','web/labels.js.map']) fs.rmSync(f,{ force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json && tsc -p tsconfig.web.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prestart": "npm run build",
     "start": "node bin/modsync.js",
+    "preelectron": "npm run build",
     "electron": "electron .",
+    "predev": "npm run build",
     "dev": "electron . --devtools",
+    "prebuild:linux": "npm run build",
     "build:linux": "electron-builder --linux AppImage",
+    "prebuild:dir": "npm run build",
     "build:dir": "electron-builder --dir",
+    "pretest": "npm run build",
     "test": "node --test",
+    "precontents": "npm run build",
     "contents": "node scripts/refresh-contents.js",
+    "prepacks:check": "npm run build",
     "packs:check": "node scripts/audit-packs.js",
+    "prefetch:bg3le": "npm run build",
     "fetch:bg3le": "node scripts/fetch-bg3le.js",
     "notes": "node scripts/release-notes.mjs",
+    "pree2e": "npm run build",
     "e2e": "node scripts/e2e-factory.js",
+    "preverify-install": "npm run build",
     "verify-install": "node scripts/e2e-factory.js --verify-only"
   },
   "dependencies": {
@@ -31,7 +45,10 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "electron": "^45.3.4",
-    "electron-builder": "^26.18.0"
+    "electron-builder": "^26.18.0",
+    "jsdom": "^31.0.1",
+    "typescript": "~5.9.3"
   }
 }

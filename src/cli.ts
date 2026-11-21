@@ -1,18 +1,52 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const { parseArgs } = require("node:util");
-const readline = require("node:readline/promises");
-const util = require("./util");
-const { driverFor } = require("./drivers");
-const recipes = require("./recipes");
-const { loadPack, packSummary } = require("./manifest");
-const { createServer } = require("./server");
-const { createAgent } = require("./agent");
-const labels = require("./labels");
-const paths = require("./paths");
-const steam = require("./steam");
+import fs from "node:fs";
+import path from "node:path";
+import { parseArgs } from "node:util";
+import readline from "node:readline/promises";
+import * as util from "./util";
+import { driverFor } from "./drivers";
+import * as recipes from "./recipes";
+import { loadPack, packSummary } from "./manifest";
+import { createServer } from "./server";
+import { createAgent } from "./agent";
+import labels from "./labels";
+import * as paths from "./paths";
+import * as steam from "./steam";
+import { projectRoot } from "./root";
+import type { AgentConfig } from "./agent";
+import type { PackSummary } from "./types";
 
-const repoRoot = path.resolve(__dirname, "..");
+interface CliValues {
+  source?: string;
+  out?: string;
+  version?: string;
+  recipe?: string;
+  "game-root"?: string;
+  copy?: boolean;
+  packs?: string;
+  host?: string;
+  lan?: boolean;
+  port?: string;
+  token?: string;
+  config?: string;
+  exe?: string;
+  name?: string;
+  icon?: string;
+  grid?: string;
+  hero?: string;
+  logo?: string;
+  header?: string;
+  portrait?: string;
+  help?: boolean;
+}
+
+interface CliConfig {
+  recipe?: string;
+  source?: string;
+  out?: string;
+  version?: string;
+}
+
+const repoRoot = projectRoot;
 const configPath = path.join(repoRoot, "state", "config.json");
 
 const help = `modsync — mod pack deployment for Windows and SteamOS (mods only)
@@ -55,16 +89,16 @@ register:
   [--header <png>] [--portrait <png>]
 `;
 
-function fail(msg) {
+function fail(msg: string): never {
   console.error(`ERROR: ${msg}`);
   process.exit(1);
 }
 
-function readConfig() {
-  try { return util.readJson(configPath); } catch { return {}; }
+function readConfig(): CliConfig {
+  try { return util.readJson<CliConfig>(configPath); } catch { return {}; }
 }
 
-async function cmdInit(values = {}) {
+async function cmdInit(values: CliValues = {}): Promise<CliConfig | undefined> {
   const current = readConfig();
   const list = recipes.listRecipes();
   if (!list.length) fail(`No recipes in ${recipes.recipesDir}. Add a recipe first.`);
@@ -92,7 +126,7 @@ async function cmdInit(values = {}) {
   }
 }
 
-async function cmdPack(values) {
+async function cmdPack(values: CliValues): Promise<void> {
   if (!fs.existsSync(configPath) && !values.recipe && !values.source && !values.out && process.stdin.isTTY) {
     console.log("No pack config yet. Set it once; press Enter to accept each default.\n");
     await cmdInit(values);
@@ -127,7 +161,7 @@ async function cmdPack(values) {
   console.log(`Size: ${(result.totalBytes / 1024 / 1024 / 1024).toFixed(2)} GB`);
 }
 
-async function cmdServe(values) {
+async function cmdServe(values: CliValues): Promise<void> {
   const packsDir = path.resolve(values.packs || path.join(repoRoot, "packs"));
   const loopback = !values.lan && !values.host;
   const host = values.host || (values.lan ? util.detectLanIp() : "127.0.0.1");
@@ -142,7 +176,7 @@ async function cmdServe(values) {
   const baseUrl = `http://${host}:${port}`;
   const packs = fs.existsSync(packsDir)
     ? fs.readdirSync(packsDir, { withFileTypes: true }).filter((e) => e.isDirectory() && fs.existsSync(path.join(packsDir, e.name, "pack.json")))
-      .map((e) => { try { return packSummary(path.join(packsDir, e.name)); } catch { return null; } }).filter(Boolean)
+      .map((e) => { try { return packSummary(path.join(packsDir, e.name)); } catch { return null; } }).filter((p): p is PackSummary => p !== null)
     : [];
 
   const server = createServer({
@@ -173,21 +207,20 @@ async function cmdServe(values) {
   });
 }
 
-async function cmdAgent(values) {
-  const configPath = path.resolve(values.config || path.join(process.cwd(), "agent.json"));
-  if (!fs.existsSync(configPath)) fail(`agent config not found: ${configPath} (install the TV app once)`);
-  const config = util.readJson(configPath);
+async function cmdAgent(values: CliValues): Promise<void> {
+  const agentConfigPath = path.resolve(values.config || path.join(process.cwd(), "agent.json"));
+  if (!fs.existsSync(agentConfigPath)) fail(`agent config not found: ${agentConfigPath} (install the TV app once)`);
+  const config = util.readJson<AgentConfig>(agentConfigPath);
   if (values.port) config.port = Number(values.port);
   const agent = createAgent(config);
   agent.listen(() => {
-    console.log(labels.agent.dashboard(config.port || 8788));
+    console.log(labels.agent.dashboard(Number(config.port || 8788)));
     console.log(labels.agent.root(config.root || "~/ModSync"));
-    console.log(labels.agent.pc(config.pcUrl));
+    console.log(labels.agent.pc(String(config.pcUrl || "")));
   });
 }
 
-
-function cmdDoctor(values) {
+function cmdDoctor(values: CliValues): void {
   console.log(`Node: ${process.version} (${process.platform}/${process.arch})`);
   console.log(`Repo: ${repoRoot}`);
   console.log(`Steam roots: ${steam.steamRoots().join(", ") || "none"}`);
@@ -207,23 +240,24 @@ function cmdDoctor(values) {
       console.log(`  Found: ${game ? game.root : "NO"} build=${game ? game.build : "-"} mode=${game ? game.mode : "-"} prefix=${game ? game.prefixReady : "-"}`);
       console.log(`  Target: ${target.variant} supported=${target.supported}${target.error ? ` error=${target.error}` : ""}`);
     } catch (err) {
-      console.log(`Pack ${ent.name}: INVALID (${err.message})`);
+      console.log(`Pack ${ent.name}: INVALID (${util.errorMessage(err)})`);
     }
   }
 }
 
-async function cmdRegister(values) {
+async function cmdRegister(values: CliValues): Promise<void> {
   if (!values.exe || !values.name) fail("register needs --exe and --name");
+  const resolve = (value: string | undefined) => value ? path.resolve(value) : "";
   const out = await steam.registerShortcut({
     exePath: path.resolve(values.exe),
     name: values.name,
     icon: values.icon ? path.resolve(values.icon) : "",
     art: {
-      grid: values.grid ? path.resolve(values.grid) : "",
-      hero: values.hero ? path.resolve(values.hero) : "",
-      logo: values.logo ? path.resolve(values.logo) : "",
-      header: values.header ? path.resolve(values.header) : "",
-      portrait: values.portrait ? path.resolve(values.portrait) : "",
+      grid: resolve(values.grid),
+      hero: resolve(values.hero),
+      logo: resolve(values.logo),
+      header: resolve(values.header),
+      portrait: resolve(values.portrait),
       icon: values.icon ? path.resolve(values.icon) : "",
     },
   });
@@ -231,8 +265,8 @@ async function cmdRegister(values) {
   console.log("Restart Steam if it does not appear.");
 }
 
-async function main(argv) {
-  const { values, positionals } = parseArgs({
+export async function main(argv: string[] = process.argv): Promise<void> {
+  const parsed = parseArgs({
     args: argv.slice(2),
     allowPositionals: true,
     options: {
@@ -246,15 +280,14 @@ async function main(argv) {
       help: { type: "boolean", short: "h" },
     },
   });
-  const cmd = positionals[0] || "help";
-  if (cmd === "help" || values.help) return console.log(help);
-  if (cmd === "init") return cmdInit(values);
-  if (cmd === "pack") return cmdPack(values);
-  if (cmd === "serve") return cmdServe(values);
-  if (cmd === "agent") return cmdAgent(values);
-  if (cmd === "doctor") return cmdDoctor(values);
-  if (cmd === "register") return cmdRegister(values);
-  return console.log(help);
+  const values = parsed.values as CliValues;
+  const cmd = parsed.positionals[0] || "help";
+  if (cmd === "help" || values.help) { console.log(help); return; }
+  if (cmd === "init") { await cmdInit(values); return; }
+  if (cmd === "pack") { await cmdPack(values); return; }
+  if (cmd === "serve") { await cmdServe(values); return; }
+  if (cmd === "agent") { await cmdAgent(values); return; }
+  if (cmd === "doctor") { cmdDoctor(values); return; }
+  if (cmd === "register") { await cmdRegister(values); return; }
+  console.log(help);
 }
-
-module.exports = { main, repoRoot };

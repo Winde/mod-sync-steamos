@@ -10,8 +10,10 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { loadPack } = require("../src/manifest");
-const paths = require("../src/paths");
+const { loadPack } = require("../dist/src/manifest");
+const paths = require("../dist/src/paths");
+
+const repoRoot = path.resolve(__dirname, "..");
 
 function executableExpected(target) {
   return target.endsWith(".sh");
@@ -52,8 +54,9 @@ function auditPackRoot(packRoot) {
     if (!templateName) {
       errors.push(`${variant}: no launcher template for launch type ${pack.launch.type}`);
     } else {
-      const template = path.resolve(__dirname, "..", "templates", "linux", templateName);
-      if (!template.startsWith(path.resolve(__dirname, "..", "templates", "linux") + path.sep)) {
+      const templatesDir = path.join(repoRoot, "templates", "linux");
+      const template = path.resolve(templatesDir, templateName);
+      if (!template.startsWith(templatesDir + path.sep)) {
         errors.push(`${variant}: launcher template escapes templates/linux: ${templateName}`);
       } else if (!fs.existsSync(template)) {
         errors.push(`${variant}: launcher template missing: ${templateName}`);
@@ -109,7 +112,7 @@ function formatBytes(n) {
 }
 
 function main() {
-  const packsDir = path.resolve(__dirname, "..", "packs");
+  const packsDir = path.join(repoRoot, "packs");
   const roots = fs.existsSync(packsDir)
     ? fs.readdirSync(packsDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(packsDir, entry.name, "pack.json")))

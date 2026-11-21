@@ -1,20 +1,40 @@
-const http = require("node:http");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const crypto = require("node:crypto");
-const { URL } = require("node:url");
-const { spawn } = require("node:child_process");
-const util = require("./util");
-const steam = require("./steam");
-const installer = require("./installer");
-const preconditions = require("./preconditions");
-const paths = require("./paths");
-const storage = require("./storage");
-const versionStore = require("./version-store");
-const projectRoot = path.resolve(__dirname, "..");
+import http from "node:http";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import crypto from "node:crypto";
+import { URL } from "node:url";
+import { spawn } from "node:child_process";
+import * as util from "./util";
+import * as steam from "./steam";
+import * as installer from "./installer";
+import * as preconditions from "./preconditions";
+import * as paths from "./paths";
+import * as storage from "./storage";
+import * as versionStore from "./version-store";
+import { projectRoot } from "./root";
+import type { ProgressUpdate } from "./installer";
+import type {
+  ArtInfo,
+  Confirmations,
+  ContentsSummary,
+  FilesDoc,
+  GameInfo,
+  InstallInfo,
+  LaunchInfo,
+  LoaderInfo,
+  ModInfo,
+  Note,
+  Pack,
+  PackSummary,
+  Platforms,
+  PreconditionConfig,
+  PreconditionsResult,
+  SteamGame,
+  Variant,
+} from "./types";
 
-function contentType(p) {
+function contentType(p: string): string {
   switch (path.extname(p).toLowerCase()) {
     case ".png": return "image/png";
     case ".jpg": case ".jpeg": return "image/jpeg";
@@ -25,19 +45,74 @@ function contentType(p) {
   }
 }
 
-function readBody(req) {
+interface RequestBody {
+  packId?: string;
+  checkId?: string;
+  confirmed?: boolean;
+  scope?: string;
+  dryRun?: boolean;
+  [key: string]: unknown;
+}
+
+function readBody(req: http.IncomingMessage): Promise<RequestBody> {
   return new Promise((resolve, reject) => {
     let data = "";
-    req.on("data", (c) => { data += c; if (data.length > 1e6) reject(new Error("body too large")); });
+    req.on("data", (c: Buffer) => {
+      data += c;
+      if (data.length > 1e6) reject(new Error("body too large"));
+    });
     req.on("end", () => {
       if (!data) return resolve({});
-      try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+      try {
+        const parsed = JSON.parse(data) as unknown;
+        resolve(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as RequestBody : {});
+      } catch (e) { reject(e); }
     });
     req.on("error", reject);
   });
 }
 
-function jobSummary(job) {
+export interface AgentConfig {
+  root?: string;
+  port?: number | string;
+  pcUrl?: string;
+  token?: string;
+  steamRoot?: string;
+  steamLibraries?: string[];
+}
+
+interface Job {
+  id: string;
+  type: string;
+  packId: string;
+  status: "running" | "done" | "error" | "canceled";
+  phase: string;
+  done: number;
+  total: number;
+  bytesDone: number;
+  bytesTotal: number;
+  error: string | null;
+  log: string[];
+  controller: AbortController;
+  startedAt: string;
+}
+
+interface JobSummary {
+  id: string;
+  type: string;
+  packId: string;
+  status: string;
+  phase: string;
+  done: number;
+  total: number;
+  bytesDone: number;
+  bytesTotal: number;
+  error: string | null;
+  startedAt: string | null;
+  log: string[];
+}
+
+function jobSummary(job: Job | null | undefined): JobSummary | null {
   if (!job) return null;
   return {
     id: job.id,
@@ -55,7 +130,83 @@ function jobSummary(job) {
   };
 }
 
-function createAgent(config) {
+interface AgentPackInput {
+  id: string;
+  name: string;
+  game: GameInfo;
+  mod: ModInfo;
+  art?: ArtInfo;
+  description?: string;
+  files?: number;
+  totalBytes?: number;
+  platformFiles?: Record<Variant, number> | null;
+  platformBytes?: Record<Variant, number> | null;
+  launch?: LaunchInfo;
+  platforms?: Platforms | null;
+  install?: InstallInfo | null;
+  loader?: LoaderInfo | null;
+  contents?: ContentsSummary | null;
+  notes?: Note[];
+  preconditions?: unknown;
+}
+
+interface LocalInfo {
+  installed: boolean;
+  installedVersion: string | null;
+  versions: string[];
+  canRollback: boolean;
+  status: string;
+  staging: boolean;
+  packRoot: string;
+  launcher: string | null;
+  desktopFile: string | null;
+  artUrl: string;
+}
+
+interface AgentPackState extends AgentPackInput, LocalInfo {
+  platform: { variant: Variant; supported: boolean; error: string | null };
+  preconditions: PreconditionsResult;
+  blocked: boolean;
+  local: boolean;
+}
+
+interface GameState {
+  title?: string;
+  expectedBuild: string | null;
+  path: string | null;
+  build: string | null;
+  mode: string | null;
+  variant: Variant;
+  supported: boolean;
+  prefixReady: boolean | null;
+  running: boolean;
+  ok: boolean;
+}
+
+interface AgentState {
+  agent: { version: string; root: string; port: number };
+  pc: { url: string; online: boolean; error: string | null };
+  game: GameState | null;
+  packs: AgentPackState[];
+  diskFreeBytes: number | null;
+  job: JobSummary | null;
+}
+
+interface RemoteCache {
+  at: number;
+  packs: PackSummary[];
+  error: string | null;
+}
+
+export interface Agent {
+  server: http.Server;
+  listen: (callback?: () => void) => void;
+  state: () => Promise<AgentState>;
+  startInstallJob: (packId: string) => Job;
+  config: { root: string; port: number; pcUrl: string };
+}
+
+export function createAgent(config: AgentConfig): Agent {
   const root = config.root || path.join(os.homedir(), "ModSync");
   const port = Number(config.port || 8788);
   const pcUrl = String(config.pcUrl || "").replace(/\/+$/, "");
@@ -63,53 +214,53 @@ function createAgent(config) {
   if (config.steamRoot) process.env.STEAM_ROOT = String(config.steamRoot);
   if (Array.isArray(config.steamLibraries)) steam.setExtraLibraries(config.steamLibraries);
   const webDir = path.join(projectRoot, "web");
-  const jobs = new Map();
-  let activeJob = null;
-  let lastJob = null;
-  let remoteCache = { at: 0, packs: [], error: null };
-  const artCache = new Map();
+  const jobs = new Map<string, Job>();
+  let activeJob: Job | null = null;
+  let lastJob: Job | null = null;
+  let remoteCache: RemoteCache = { at: 0, packs: [], error: null };
+  const artCache = new Map<string, Buffer>();
   const confirmFile = path.join(root, "state", "preconditions.json");
 
-  const packRoot = (id) => versionStore.packRoot(root, id);
+  const packRoot = (id: string) => versionStore.packRoot(root, id);
 
-  function localPack(id) {
+  function localPack(id: string): Pack | null {
     const file = versionStore.packFile(packRoot(id));
     if (!fs.existsSync(file)) return null;
-    try { return util.readJson(file); } catch { return null; }
+    try { return util.readJson<Pack>(file); } catch { return null; }
   }
 
-  function localPacks() {
+  function localPacks(): Pack[] {
     const dir = versionStore.packsDir(root);
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => localPack(e.name))
-      .filter(Boolean);
+      .filter((p): p is Pack => p !== null);
   }
 
-  function localSummary(pack) {
+  function localSummary(pack: Pack): AgentPackInput {
     let files = 0;
     let totalBytes = 0;
-    let platformFiles = null;
-    let platformBytes = null;
+    let platformFiles: Record<Variant, number> | null = null;
+    let platformBytes: Record<Variant, number> | null = null;
     try {
-      const doc = util.readJson(versionStore.filesDocFile(packRoot(pack.id), pack));
+      const doc = util.readJson<FilesDoc>(versionStore.filesDocFile(packRoot(pack.id), pack));
       if (Array.isArray(doc.files)) {
         files = doc.files.length;
         totalBytes = doc.files.reduce((n, f) => n + (f.size || 0), 0);
         const stats = paths.platformStats(doc.files);
-        platformFiles = Object.fromEntries(paths.VARIANTS.map((variant) => [variant, stats[variant].files]));
-        platformBytes = Object.fromEntries(paths.VARIANTS.map((variant) => [variant, stats[variant].totalBytes]));
+        platformFiles = Object.fromEntries(paths.VARIANTS.map((variant) => [variant, stats[variant].files])) as Record<Variant, number>;
+        platformBytes = Object.fromEntries(paths.VARIANTS.map((variant) => [variant, stats[variant].totalBytes])) as Record<Variant, number>;
       }
-    } catch { }
+    } catch { /* files.json is optional for a partially installed pack */ }
     return { ...pack, files, totalBytes, platformFiles, platformBytes };
   }
 
-  function readConfirmations() {
-    try { return util.readJson(confirmFile); } catch { return {}; }
+  function readConfirmations(): Confirmations {
+    try { return util.readJson<Confirmations>(confirmFile); } catch { return {}; }
   }
 
-  function setConfirmation(packId, checkId, confirmed) {
+  function setConfirmation(packId: string, checkId: string, confirmed: boolean): { packId: string; checkId: string; confirmed: boolean } {
     const all = readConfirmations();
     const forPack = all[packId] || (all[packId] = {});
     if (confirmed) forPack[checkId] = { confirmedAt: new Date().toISOString() };
@@ -119,19 +270,19 @@ function createAgent(config) {
     return { packId, checkId, confirmed };
   }
 
-  async function fetchRemote(force = false) {
+  async function fetchRemote(force = false): Promise<RemoteCache> {
     if (!force && Date.now() - remoteCache.at < 2500) return remoteCache;
     if (!pcUrl) return (remoteCache = { at: Date.now(), packs: [], error: "PC URL is not configured" });
     try {
-      const packs = await util.fetchJson(`${pcUrl}/api/packs`, { headers: { "x-modsync-token": token } });
+      const packs = await util.fetchJson<PackSummary[]>(`${pcUrl}/api/packs`, { headers: { "x-modsync-token": token } });
       remoteCache = { at: Date.now(), packs, error: null };
     } catch (err) {
-      remoteCache = { at: Date.now(), packs: [], error: err.message };
+      remoteCache = { at: Date.now(), packs: [], error: util.errorMessage(err) };
     }
     return remoteCache;
   }
 
-  function localInfo(pack) {
+  function localInfo(pack: { id: string; mod: { id: string; version: string } }): LocalInfo {
     const pr = packRoot(pack.id);
     const current = versionStore.readCurrent(pr, pack.mod.id);
     const versions = versionStore.listVersions(pr, pack.mod.id);
@@ -151,40 +302,40 @@ function createAgent(config) {
     };
   }
 
-  async function gameState(pack) {
+  async function gameState(pack: AgentPackInput | null | undefined): Promise<GameState | null> {
     if (!pack) return null;
     const g = steam.findGame(pack.game);
-    const target = paths.resolve(pack, g);
+    const target = paths.resolve(pack as unknown as Pack, g);
     return {
       title: pack.game.title,
       expectedBuild: pack.game.build || null,
       path: g ? g.root : null,
-      build: g ? g.build : null,
-      mode: g ? g.mode : null,
+      build: g ? g.build || null : null,
+      mode: g ? g.mode || null : null,
       variant: target.variant,
       supported: target.supported,
-      prefixReady: g ? g.prefixReady : null,
+      prefixReady: g ? g.prefixReady ?? null : null,
       running: util.isGameRunning(target.processes),
       ok: !!g
         && (!pack.game.build || g.build === String(pack.game.build))
         && target.supported
-        && (target.variant !== "linux-proton" || !pack.game.prefix || g.prefixReady),
+        && (target.variant !== "linux-proton" || !pack.game.prefix || !!g.prefixReady),
     };
   }
 
-  async function state() {
+  async function state(): Promise<AgentState> {
     const remote = await fetchRemote();
     const confirmed = readConfirmations();
     const local = new Map(localPacks().map((p) => [p.id, p]));
-    const merged = new Map();
+    const merged = new Map<string, AgentPackInput>();
     for (const p of remote.packs || []) merged.set(p.id, p);
     for (const [id, pack] of local) {
       if (!merged.has(id)) merged.set(id, localSummary(pack));
     }
-    const packs = [...merged.values()].map((p) => {
+    const packs: AgentPackState[] = [...merged.values()].map((p) => {
       const li = localInfo(p);
       const game = steam.findGame(p.game);
-      const target = paths.resolve(p, game);
+      const target = paths.resolve(p as unknown as Pack, game);
       const variant = target.variant;
       const selected = {
         ...p,
@@ -192,7 +343,7 @@ function createAgent(config) {
         totalBytes: p.platformBytes?.[variant] ?? p.totalBytes,
       };
       const pre = preconditions.evaluatePreconditions({
-        pack: p,
+        pack: p as unknown as Pack,
         game,
         root,
         totalBytes: selected.totalBytes,
@@ -221,18 +372,18 @@ function createAgent(config) {
     };
   }
 
-  async function getPack(id) {
+  async function getPack(id: string): Promise<{ pack: Pack; files: FilesDoc }> {
     const remote = await fetchRemote(true);
     const summary = (remote.packs || []).find((p) => p.id === id);
     if (!summary) throw new Error(`Pack not found: ${id}`);
-    const pack = await util.fetchJson(`${pcUrl}/api/packs/${encodeURIComponent(id)}/pack.json`, { headers: { "x-modsync-token": token } });
-    const files = await util.fetchJson(`${pcUrl}/api/packs/${encodeURIComponent(id)}/files.json`, { headers: { "x-modsync-token": token } });
+    const pack = await util.fetchJson<Pack>(`${pcUrl}/api/packs/${encodeURIComponent(id)}/pack.json`, { headers: { "x-modsync-token": token } });
+    const files = await util.fetchJson<FilesDoc>(`${pcUrl}/api/packs/${encodeURIComponent(id)}/files.json`, { headers: { "x-modsync-token": token } });
     return { pack, files };
   }
 
-  function startInstallJob(packId) {
+  function startInstallJob(packId: string): Job {
     if (activeJob) throw new Error("Another job is already running.");
-    const job = {
+    const job: Job = {
       id: crypto.randomUUID(),
       type: "install",
       packId,
@@ -242,6 +393,7 @@ function createAgent(config) {
       total: 0,
       bytesDone: 0,
       bytesTotal: 0,
+      error: null,
       log: [],
       controller: new AbortController(),
       startedAt: new Date().toISOString(),
@@ -249,14 +401,14 @@ function createAgent(config) {
     jobs.set(job.id, job);
     activeJob = job;
     lastJob = job;
-    const log = (msg) => {
+    const log = (msg: string): void => {
       const line = `[${new Date().toISOString()}] ${msg}`;
       job.log.push(line);
       if (job.log.length > 500) job.log.shift();
       try {
         util.ensureDir(path.join(root, "logs"));
         fs.appendFileSync(path.join(root, "logs", "install.log"), line + "\n");
-      } catch { }
+      } catch { /* logging is best-effort */ }
     };
     (async () => {
       const { pack, files } = await getPack(packId);
@@ -267,22 +419,22 @@ function createAgent(config) {
         pack, filesDoc: files, remoteBase: pcUrl, token, root, game,
         signal: job.controller.signal,
         confirmed: readConfirmations()[packId] || {},
-        progress: (p) => Object.assign(job, p),
+        progress: (p: ProgressUpdate) => { Object.assign(job, p); },
         log,
       });
       job.status = "done";
       job.phase = "done";
       log("Install complete.");
     })().catch((err) => {
-      if (err.name === "AbortError" || job.controller.signal.aborted) {
+      if ((err instanceof Error && err.name === "AbortError") || job.controller.signal.aborted) {
         job.status = "canceled";
         job.phase = "canceled";
         log("Canceled. Completed files are kept; Resume continues.");
       } else {
         job.status = "error";
         job.phase = "error";
-        job.error = err.message;
-        log(`ERROR: ${err.message}`);
+        job.error = util.errorMessage(err);
+        log(`ERROR: ${util.errorMessage(err)}`);
       }
     }).finally(() => {
       activeJob = null;
@@ -290,14 +442,14 @@ function createAgent(config) {
     return job;
   }
 
-  function cancelJob(id) {
+  function cancelJob(id: string): { ok: boolean } {
     const job = jobs.get(id) || activeJob;
     if (!job || job.status !== "running") throw new Error("No running job.");
     job.controller.abort();
     return { ok: true };
   }
 
-  async function launchPack(packId) {
+  async function launchPack(packId: string): Promise<{ ok: boolean; launcher: string }> {
     const pack = localPack(packId);
     if (!pack) throw new Error("Pack is not installed on this TV.");
     const info = localInfo(pack);
@@ -311,23 +463,25 @@ function createAgent(config) {
     return { ok: true, launcher };
   }
 
-  async function art(packId, key) {
+  async function art(packId: string, key: string): Promise<Buffer> {
     const cacheKey = `${packId}:${key}`;
-    if (artCache.has(cacheKey)) return artCache.get(cacheKey);
+    const cached = artCache.get(cacheKey);
+    if (cached) return cached;
     const pr = packRoot(packId);
     const localPackFile = versionStore.packFile(pr);
     if (fs.existsSync(localPackFile)) {
       try {
-        const pack = util.readJson(localPackFile);
-        if (pack.art && pack.art[key]) {
-          const file = path.join(pr, pack.art[key]);
+        const pack = util.readJson<Pack>(localPackFile);
+        const art = pack.art as ArtInfo & Record<string, string | undefined>;
+        if (art && art[key]) {
+          const file = path.join(pr, art[key]);
           if (fs.existsSync(file)) {
             const buf = fs.readFileSync(file);
             artCache.set(cacheKey, buf);
             return buf;
           }
         }
-      } catch { }
+      } catch { /* fall back to the PC */ }
     }
     const res = await fetch(`${pcUrl}/api/packs/${encodeURIComponent(packId)}/art/${encodeURIComponent(key)}`, {
       headers: { "x-modsync-token": token },
@@ -339,7 +493,7 @@ function createAgent(config) {
   }
 
   const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, "http://localhost");
+    const url = new URL(req.url || "/", "http://localhost");
     try {
       if (url.pathname === "/api/health") {
         res.writeHead(200, { "content-type": "application/json" });
@@ -385,29 +539,29 @@ function createAgent(config) {
         const body = await readBody(req);
         if (body.scope !== "logs" && body.packId) {
           try {
-            const pack = util.readJson(versionStore.packFile(versionStore.packRoot(root, body.packId)));
+            const pack = util.readJson<Pack>(versionStore.packFile(versionStore.packRoot(root, body.packId)));
             const target = paths.resolve(pack, steam.findGame(pack.game));
             if (util.isGameRunning(target.processes)) {
               res.writeHead(409, { "content-type": "application/json" });
               return res.end(JSON.stringify({ error: "Close the game before removing installed files." }));
             }
-          } catch { }
+          } catch { /* missing pack data just skips the running-game guard */ }
         }
         if (body.dryRun) {
-          const plan = storage.planClear(root, body);
+          const plan = storage.planClear(root, { packId: body.packId, scope: String(body.scope || "") });
           res.writeHead(200, { "content-type": "application/json" });
           return res.end(JSON.stringify(plan));
         }
-        const packRoot = body.packId ? versionStore.packRoot(root, body.packId) : "";
-        let packForShortcut = null;
-        if (packRoot) {
-          try { packForShortcut = util.readJson(versionStore.packFile(packRoot)); } catch { }
+        const shortcutPackRoot = body.packId ? versionStore.packRoot(root, body.packId) : "";
+        let packForShortcut: Pack | null = null;
+        if (shortcutPackRoot) {
+          try { packForShortcut = util.readJson<Pack>(versionStore.packFile(shortcutPackRoot)); } catch { /* no pack data */ }
         }
         const shortcutMod = packForShortcut && packForShortcut.mod ? packForShortcut.mod.id : "";
-        const launcher = packRoot && shortcutMod ? versionStore.launcherFile(packRoot, shortcutMod) : "";
-        const out = storage.clearStorage(root, body);
-        if (body.scope === "pack" && launcher) {
-          try { await steam.removeShortcut({ exePath: launcher }); } catch { }
+        const shortcutLauncher = shortcutPackRoot && shortcutMod ? versionStore.launcherFile(shortcutPackRoot, shortcutMod) : "";
+        const out = storage.clearStorage(root, { packId: body.packId, scope: String(body.scope || "") });
+        if (body.scope === "pack" && shortcutLauncher) {
+          try { await steam.removeShortcut({ exePath: shortcutLauncher }); } catch { /* Steam data may be absent */ }
         }
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify({ ok: true, ...out, storage: storage.computeStorage(root) }));
@@ -445,14 +599,14 @@ function createAgent(config) {
         return res.end(JSON.stringify(out));
       }
 
-      let file = path.join(webDir, url.pathname === "/" ? "index.html" : url.pathname);
+      const file = path.join(webDir, url.pathname === "/" ? "index.html" : url.pathname);
       if (!path.resolve(file).startsWith(path.resolve(webDir))) { res.writeHead(403); return res.end("forbidden"); }
       if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end("not found"); }
       res.writeHead(200, { "content-type": contentType(file) });
       fs.createReadStream(file).pipe(res);
     } catch (err) {
       res.writeHead(500, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: err.message }));
+      res.end(JSON.stringify({ error: util.errorMessage(err) }));
     }
   });
 
@@ -461,17 +615,15 @@ function createAgent(config) {
   for (const pack of localPacks()) {
     const game = steam.findGame(pack.game);
     if (!game) continue;
-    try { installer.writeLauncher({ pack, root, game }); } catch { }
+    try { installer.writeLauncher({ pack, root, game }); } catch { /* regenerate on install */ }
   }
-  steam.pruneMissingShortcuts({ prefix: path.join(root, "packs") + path.sep }).catch(() => { });
+  steam.pruneMissingShortcuts({ prefix: path.join(root, "packs") + path.sep }).catch(() => { /* Steam data may be absent */ });
 
   return {
     server,
-    listen: (cb) => server.listen(port, "127.0.0.1", cb),
+    listen: (cb?: () => void) => server.listen(port, "127.0.0.1", cb),
     state,
     startInstallJob,
     config: { root, port, pcUrl },
   };
 }
-
-module.exports = { createAgent };

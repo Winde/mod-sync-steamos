@@ -1,23 +1,38 @@
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const {
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
   ensureDir, writeJson, writeText, walkFiles, materialize,
   sha256File, modeFor, formatBytes,
-} = require("../util");
-const steam = require("../steam");
-const paths = require("../paths");
-const { ensureBg3le, VERSION: BG3LE_VERSION } = require("../../scripts/fetch-bg3le");
+} from "../util";
+import * as steam from "../steam";
+import * as paths from "../paths";
+import { projectRoot } from "../root";
+import { ensureBg3le, VERSION as BG3LE_VERSION } from "../bg3le";
+import type {
+  BuildPackOptions,
+  BuildPackResult,
+  ContentsSummary,
+  GameInfo,
+  Note,
+  Pack,
+  PackFile,
+  Platforms,
+  PreconditionConfig,
+  Recipe,
+  SteamGame,
+  Variant,
+} from "../types";
 
 const PACK_ID = "bg3-modded";
 const MOD_ID = "bg3";
-const WINDOWS_EXTENDER_PLATFORMS = ["windows", "linux-proton"];
+const WINDOWS_EXTENDER_PLATFORMS: Variant[] = ["windows", "linux-proton"];
 const BG3LE_EXECUTABLES = new Set([
   "tools/bg3le/install.py",
   "tools/bg3le/installer/bg3le-launch",
   "tools/bg3le/client/bg3lua",
 ]);
-const GAME = {
+const GAME: GameInfo = {
   id: "bg3",
   title: "Baldur's Gate 3",
   store: "steam",
@@ -30,7 +45,7 @@ const GAME = {
   prefix: true,
 };
 
-const DEFAULT_PLATFORMS = {
+const DEFAULT_PLATFORMS: Platforms = {
   windows: {
     dataDir: "%LOCALAPPDATA%/Larian Studios/Baldur's Gate 3",
     saveDir: "%LOCALAPPDATA%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
@@ -54,12 +69,12 @@ const DEFAULT_PLATFORMS = {
   },
 };
 
-function defaultSource() {
+export function defaultSource(): string {
   if (process.platform === "win32") {
     return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
       "Larian Studios", "Baldur's Gate 3");
   }
-  const game = steam.findGame(GAME);
+  const game: SteamGame | null = steam.findGame(GAME) || null;
   if (game) {
     const resolved = paths.resolve({ platforms: DEFAULT_PLATFORMS }, game);
     if (resolved.dataDir) return resolved.dataDir;
@@ -67,16 +82,28 @@ function defaultSource() {
   return paths.expand("%DATA_HOME%/Larian Studios/Baldur's Gate 3", paths.contextFor(null));
 }
 
-function defaultVersion() {
+function defaultVersion(): string {
   return new Date().toISOString().slice(0, 10).replace(/-/g, ".");
 }
 
 const BUILTIN_MODULES = new Set(["GustavX", "HonourX"]);
 
-function parseModSettings(xml) {
-  const mods = [];
+interface Bg3Mod {
+  name: string;
+  id: string;
+  folder: string;
+  version64: string;
+  md5: string;
+  publishHandle: string;
+  builtin: boolean;
+  file?: string;
+  [key: string]: unknown;
+}
+
+export function parseModSettings(xml: string): Bg3Mod[] {
+  const mods: Bg3Mod[] = [];
   for (const match of String(xml).matchAll(/<node id="ModuleShortDesc">([\s\S]*?)<\/node>/g)) {
-    const attrs = {};
+    const attrs: Record<string, string> = {};
     for (const attr of match[1].matchAll(/<attribute id="([^"]+)"[^>]*value="([^"]*)"/g)) {
       attrs[attr[1]] = attr[2];
     }
@@ -95,7 +122,7 @@ function parseModSettings(xml) {
   return mods;
 }
 
-function matchPak(mod, paks, used) {
+function matchPak(mod: Bg3Mod, paks: string[], used: Set<string>): string | null {
   const folder = String(mod.folder || "").toLowerCase();
   const short = folder.split("_")[0];
   const id = String(mod.id || "").toLowerCase();
@@ -108,10 +135,10 @@ function matchPak(mod, paks, used) {
   }) || null;
 }
 
-function contentsFor(source, paks) {
+export function contentsFor(source: string, paks: string[]): ContentsSummary {
   const xml = fs.readFileSync(path.join(source, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8");
   const mods = parseModSettings(xml);
-  const used = new Set();
+  const used = new Set<string>();
   for (const mod of mods) {
     if (mod.builtin) continue;
     const file = matchPak(mod, paks, used);
@@ -132,7 +159,7 @@ function contentsFor(source, paks) {
   };
 }
 
-function discover(source) {
+export function discover(source: string): ContentsSummary {
   const modsDir = path.join(source, "Mods");
   const paks = fs.existsSync(modsDir)
     ? fs.readdirSync(modsDir).filter((name) => name.toLowerCase().endsWith(".pak")).sort()
@@ -140,15 +167,24 @@ function discover(source) {
   return contentsFor(source, paks);
 }
 
-function requireDir(p, label) {
+function requireDir(p: string, label: string): void {
   if (!fs.existsSync(p)) throw new Error(`${label} not found: ${p}`);
 }
 
-function copyTree(src, dst) {
+function copyTree(src: string, dst: string): void {
   fs.cpSync(src, dst, { recursive: true });
 }
 
-async function buildPack({ recipe, source, out, link = true, version: requestedVersion, gameRoot: requestedGameRoot, bg3leRoot: requestedBg3le, log = () => {} }) {
+export async function buildPack({
+  recipe,
+  source,
+  out,
+  link = true,
+  version: requestedVersion,
+  gameRoot: requestedGameRoot,
+  bg3leRoot: requestedBg3le,
+  log = () => {},
+}: BuildPackOptions): Promise<BuildPackResult> {
   if (recipe && recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for Baldur's Gate 3`);
   const packId = recipe && recipe.id ? recipe.id : PACK_ID;
   const modId = recipe && recipe.modId ? recipe.modId : MOD_ID;
@@ -162,7 +198,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   const modsDir = path.join(src, "Mods");
   const modsettings = path.join(src, "PlayerProfiles", "Public", "modsettings.lsx");
   const scriptExtender = path.join(src, "Script Extender");
-  const game = steam.findGame(GAME);
+  const game: SteamGame | null = steam.findGame(GAME) || null;
   const gameRoot = requestedGameRoot ? path.resolve(requestedGameRoot) : (game ? game.root : "");
 
   requireDir(modsDir, "BG3 Mods folder");
@@ -222,7 +258,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   }
   log(`BG3SE files: ${bg3seFiles}${gameRoot ? "" : " (game root not found)"}`);
 
-  const artSrc = path.resolve(__dirname, "..", "..", "web");
+  const artSrc = path.join(projectRoot, "web");
   const artDst = path.join(dst, "art", MOD_ID);
   ensureDir(artDst);
   for (const [from, to] of [
@@ -237,19 +273,19 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     if (fs.existsSync(file)) fs.copyFileSync(file, path.join(artDst, to));
   }
 
-  const files = [];
+  const files: PackFile[] = [];
   let processed = 0;
   const payloadFiles = walkFiles(payload);
   const bg3leFiles = walkFiles(path.join(dst, "tools", "bg3le"));
   const artFiles = walkFiles(artDst);
   const total = payloadFiles.length + bg3leFiles.length + artFiles.length;
-  const byHash = new Map();
-  const add = async (sourceRel, targetRel, platformList) => {
+  const byHash = new Map<string, PackFile>();
+  const add = async (sourceRel: string, targetRel: string, platformList?: readonly Variant[] | null): Promise<void> => {
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
     const mode = BG3LE_EXECUTABLES.has(targetRel) ? "755" : modeFor(targetRel);
-    const entry = { source: sourceRel, target: targetRel, size, sha256, mode };
+    const entry: PackFile = { source: sourceRel, target: targetRel, size, sha256, mode };
     if (platformList) entry.platforms = [...platformList];
     const shared = byHash.get(sha256);
     if (shared) {
@@ -267,7 +303,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     }
   };
 
-  const extenderFile = (rel) => rel === "bg3se" || rel.startsWith("bg3se/");
+  const extenderFile = (rel: string) => rel === "bg3se" || rel.startsWith("bg3se/");
   for (const file of payloadFiles) {
     await add(
       `payload/versions/${version}/${file.rel}`,
@@ -283,7 +319,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   }
 
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
-  const notes = [...(recipe && Array.isArray(recipe.notes) ? recipe.notes : [])];
+  const notes: Note[] = [...(recipe && Array.isArray(recipe.notes) ? recipe.notes : [])];
   notes.push({
     title: "Script Extender",
     body: bg3seFiles
@@ -292,7 +328,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
     tone: bg3seFiles ? "info" : "warning",
   });
   const contents = contentsFor(src, paks);
-  const preconditions = recipe && Array.isArray(recipe.preconditions)
+  const preconditions: PreconditionConfig[] = recipe && Array.isArray(recipe.preconditions)
     ? recipe.preconditions
     : [
       { id: "game-installed", type: "game-installed", required: true, title: "Baldur's Gate 3 is installed" },
@@ -303,7 +339,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
       { id: "disk-free-game", type: "disk-free", scope: "game", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough space to apply the pack" },
     ];
 
-  const pack = {
+  const pack: Pack = {
     schema: 1,
     id: packId,
     name: packName,
@@ -352,4 +388,4 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   return { packRoot: dst, pack, files: files.length, totalBytes };
 }
 
-module.exports = { buildPack, defaultSource, discover, contentsFor, parseModSettings, PACK_ID, MOD_ID, GAME };
+export { PACK_ID, MOD_ID, GAME };

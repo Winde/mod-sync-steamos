@@ -1,20 +1,45 @@
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { Readable } = require("node:stream");
-const { pipeline } = require("node:stream/promises");
-const {
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import {
   ensureDir, writeText, writeJson, sha256File, safeJoin, mapLimit,
-  nowStamp, formatBytes,
-} = require("./util");
-const steam = require("./steam");
-const preconditions = require("./preconditions");
-const versionStore = require("./version-store");
-const paths = require("./paths");
-const installers = require("./installers");
-const projectRoot = path.resolve(__dirname, "..");
+  nowStamp, formatBytes, errorMessage,
+} from "./util";
+import * as steam from "./steam";
+import * as preconditions from "./preconditions";
+import * as versionStore from "./version-store";
+import * as paths from "./paths";
+import * as installers from "./installers";
+import { projectRoot } from "./root";
+import type {
+  Confirmations,
+  FilesDoc,
+  Pack,
+  PackFile,
+  SteamGame,
+} from "./types";
 
-function renderTemplate(file, values) {
+export interface ProgressUpdate {
+  phase?: string;
+  done?: number;
+  total?: number;
+  bytesDone?: number;
+  bytesTotal?: number;
+  file?: string;
+}
+
+export interface InstallResult {
+  version: string;
+  packRoot: string;
+  launcher: string;
+  desktopFile: string | null;
+  files: number;
+  totalBytes: number;
+}
+
+function renderTemplate(file: string, values: Record<string, unknown>): string {
   let text = fs.readFileSync(file, "utf8");
   for (const [key, value] of Object.entries(values)) {
     text = text.split(`{{${key}}}`).join(String(value));
@@ -22,12 +47,20 @@ function renderTemplate(file, values) {
   return text;
 }
 
-function writeLauncher({ pack, root, game }) {
+export function writeLauncher({
+  pack,
+  root,
+  game,
+}: {
+  pack: Pack;
+  root: string;
+  game: SteamGame | null | undefined;
+}): string {
   const packRoot = versionStore.packRoot(root, pack.id);
   const target = paths.resolve(pack, game);
   const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
   const templates = path.join(projectRoot, "templates", "linux");
-  const defaultTemplates = { steam: "launch-steam.sh" };
+  const defaultTemplates: Record<string, string> = { steam: "launch-steam.sh" };
   const templateName = target.template || defaultTemplates[pack.launch.type];
   if (!templateName) throw new Error(`No launcher template for launch type ${pack.launch.type}.`);
   const templateFile = path.resolve(templates, templateName);
@@ -52,25 +85,56 @@ function writeLauncher({ pack, root, game }) {
   return launcher;
 }
 
-function abortError() {
+function abortError(): Error {
   const err = new Error("Canceled");
   err.name = "AbortError";
   return err;
 }
 
-async function downloadResumable(url, dest, token, signal) {
+async function downloadResumable(
+  url: string,
+  dest: string,
+  token: string,
+  signal: AbortSignal | undefined,
+): Promise<void> {
   let start = 0;
-  try { start = fs.statSync(dest).size; } catch { }
-  const headers = { "x-modsync-token": token };
+  try { start = fs.statSync(dest).size; } catch { /* no partial download yet */ }
+  const headers: Record<string, string> = { "x-modsync-token": token };
   if (start > 0) headers.Range = `bytes=${start}-`;
   const res = await fetch(url, { headers, signal });
   if (res.status === 416) return; // already complete; caller verifies hash
   if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
   const append = res.status === 206 && start > 0;
-  await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(dest, { flags: append ? "a" : "w" }));
+  if (!res.body) throw new Error(`HTTP ${res.status}: empty body`);
+  await pipeline(
+    Readable.fromWeb(res.body as import("node:stream/web").ReadableStream),
+    fs.createWriteStream(dest, { flags: append ? "a" : "w" }),
+  );
 }
 
-async function installPack({ pack, filesDoc, remoteBase, token, root, game, signal, confirmed = {}, progress = () => {}, log = () => {} }) {
+export async function installPack({
+  pack,
+  filesDoc,
+  remoteBase,
+  token,
+  root,
+  game,
+  signal,
+  confirmed = {},
+  progress = () => {},
+  log = () => {},
+}: {
+  pack: Pack;
+  filesDoc: FilesDoc;
+  remoteBase: string;
+  token: string;
+  root: string;
+  game: SteamGame | null;
+  signal?: AbortSignal;
+  confirmed?: Confirmations[string];
+  progress?: (update: ProgressUpdate) => void;
+  log?: (message: string) => void;
+}): Promise<InstallResult> {
   const version = pack.mod.version;
   const packRoot = versionStore.packRoot(root, pack.id);
   const payloadPrefix = versionStore.payloadPrefix(pack.mod.id, version);
@@ -103,8 +167,8 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   let done = 0;
   let bytesDone = 0;
   let lastReport = 0;
-  const counted = new Map();
-  const setCounted = (file, n) => {
+  const counted = new Map<string, number>();
+  const setCounted = (file: PackFile, n: number): void => {
     const key = file.target;
     const prev = counted.get(key) || 0;
     const next = Math.max(0, Math.min(file.size, n));
@@ -112,7 +176,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
     counted.set(key, next);
     bytesDone += next - prev;
   };
-  const pathFor = (file) => {
+  const pathFor = (file: PackFile): string => {
     const isPayload = file.target.startsWith(payloadPrefix);
     return isPayload
       ? path.join(staging, file.target.slice(payloadPrefix.length))
@@ -122,15 +186,15 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   // Resume baseline: count what is already on disk so the bar starts where the
   // previous run stopped instead of at 0%.
   for (const file of files) {
-    const target = pathFor(file);
+    const targetPath = pathFor(file);
     let have = 0;
     try {
-      const stat = fs.statSync(target);
+      const stat = fs.statSync(targetPath);
       if (stat.isFile() && stat.size === file.size) have = file.size;
     } catch { /* target not present */ }
     if (!have) {
       try {
-        const part = `${target}.part`;
+        const part = `${targetPath}.part`;
         if (fs.existsSync(part)) have = Math.min(fs.statSync(part).size, file.size);
       } catch { /* part not present */ }
     }
@@ -141,7 +205,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
     log(`Resume: ${formatBytes(bytesDone)} already on disk; verifying.`);
   }
 
-  const report = (file) => {
+  const report = (file: string): void => {
     const now = Date.now();
     if (now - lastReport > 750 || done === files.length) {
       lastReport = now;
@@ -160,26 +224,26 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
 
   await mapLimit(files, 6, async (file) => {
     if (signal?.aborted) throw abortError();
-    const target = pathFor(file);
-    ensureDir(path.dirname(target));
-    const tmp = `${target}.part`;
+    const targetPath = pathFor(file);
+    ensureDir(path.dirname(targetPath));
+    const tmp = `${targetPath}.part`;
     const url = `${remoteBase}/api/packs/${encodeURIComponent(pack.id)}/file?path=${encodeURIComponent(file.source)}`;
 
     // Resume: a file that is already complete is skipped.
-    if (fs.existsSync(target)) {
+    if (fs.existsSync(targetPath)) {
       try {
-        if ((await sha256File(target)) === file.sha256) {
+        if ((await sha256File(targetPath)) === file.sha256) {
           done++;
           setCounted(file, file.size);
           report(file.target);
           return;
         }
-      } catch { }
-      fs.rmSync(target, { force: true });
+      } catch { /* re-download a file that cannot be hashed */ }
+      fs.rmSync(targetPath, { force: true });
       setCounted(file, 0);
     }
 
-    let lastError = null;
+    let lastError: unknown = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (signal?.aborted) throw abortError();
       try {
@@ -190,15 +254,15 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
           setCounted(file, 0);
           throw new Error("hash mismatch");
         }
-        if (fs.existsSync(target)) fs.rmSync(target, { force: true });
-        fs.renameSync(tmp, target);
-        if (file.mode) fs.chmodSync(target, Number.parseInt(file.mode, 8));
+        if (fs.existsSync(targetPath)) fs.rmSync(targetPath, { force: true });
+        fs.renameSync(tmp, targetPath);
+        if (file.mode) fs.chmodSync(targetPath, Number.parseInt(file.mode, 8));
         lastError = null;
         break;
       } catch (err) {
         lastError = err;
-        if (signal?.aborted || err.name === "AbortError") throw abortError();
-        if (attempt === 3) throw new Error(`${file.source}: ${err.message}`);
+        if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) throw abortError();
+        if (attempt === 3) throw new Error(`${file.source}: ${errorMessage(err)}`);
         await new Promise((r) => setTimeout(r, 500 * attempt));
       }
     }
@@ -225,9 +289,9 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   progress({ phase: "launcher" });
   const launcher = writeLauncher({ pack, root, game });
 
-  const icon = path.join(packRoot, pack.art.icon);
+  const icon = path.join(packRoot, pack.art.icon || "");
   const shortcutName = target.shortcut || (pack.launch.mode !== "default" ? pack.name : "");
-  let desktopFile = null;
+  let desktopFile: string | null = null;
   if (process.platform === "linux") {
     log(`Launcher: ${launcher}`);
     if (!shortcutName) {
@@ -257,9 +321,9 @@ Categories=Game;
           icon,
           allowOverlay: pack.launch.allowOverlay !== false,
           art: {
-            grid: path.join(packRoot, pack.art.grid),
-            hero: path.join(packRoot, pack.art.hero),
-            logo: path.join(packRoot, pack.art.logo),
+            grid: path.join(packRoot, pack.art.grid || ""),
+            hero: path.join(packRoot, pack.art.hero || ""),
+            logo: path.join(packRoot, pack.art.logo || ""),
             header: pack.art.header ? path.join(packRoot, pack.art.header) : "",
             portrait: pack.art.portrait ? path.join(packRoot, pack.art.portrait) : "",
             icon,
@@ -267,7 +331,7 @@ Categories=Game;
         });
         log(`Steam shortcut ${shortcut.action}: app ${shortcut.appId}. Restart Steam if it is not visible.`);
       } catch (err) {
-        log(`Steam shortcut was not added automatically: ${err.message}`);
+        log(`Steam shortcut was not added automatically: ${errorMessage(err)}`);
       }
     }
   } else {
@@ -277,7 +341,15 @@ Categories=Game;
   return { version, packRoot, launcher, desktopFile, files: files.length, totalBytes };
 }
 
-function rollback({ pack, root, log = () => {} }) {
+export function rollback({
+  pack,
+  root,
+  log = () => {},
+}: {
+  pack: Pack;
+  root: string;
+  log?: (message: string) => void;
+}): { previous: string; current: string } {
   const packRoot = versionStore.packRoot(root, pack.id);
   const current = versionStore.readCurrent(packRoot, pack.mod.id);
   const versions = versionStore.listVersions(packRoot, pack.mod.id);
@@ -295,5 +367,3 @@ function rollback({ pack, root, log = () => {} }) {
   log(`Rolled back ${pack.name} to ${previous}`);
   return { previous, current };
 }
-
-module.exports = { installPack, rollback, writeLauncher };

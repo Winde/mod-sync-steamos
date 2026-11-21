@@ -5,8 +5,8 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   validateNotes, validatePreconditions, evaluatePreconditions,
-} = require("../src/preconditions");
-const { validatePack } = require("../src/manifest");
+} = require("../dist/src/preconditions");
+const { validatePack } = require("../dist/src/manifest");
 
 function basePack(preconditions, notes) {
   return {

@@ -53,7 +53,7 @@ are selected by pack data, never by a game check in the generic installer.
 `modsync init` lists recipes; `modsync pack --recipe <id>` builds one. The
 generated `pack.json` remains the definition the agent serves.
 
-## v1 contract (implemented in `src/drivers/eldenring.js`)
+## v1 contract (implemented in `src/drivers/eldenring.ts`)
 
 - `id` — `eldenring`
 - `buildPack({ recipe, source, out, link })` — read the working install and

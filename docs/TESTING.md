@@ -17,9 +17,11 @@ Stop those PIDs before starting. Do not stop Steam or the game.
 
 ## 1. Start the PC pack server
 
-From `D:\source\mod-sync-steamos`:
+From `D:\source\mod-sync-steamos`, build once after `npm install` (the manual
+commands below run the compiled `dist/` code directly):
 
 ```powershell
+npm run build
 node bin/modsync.js serve --lan --packs packs --port 8787 --token test123
 ```
 

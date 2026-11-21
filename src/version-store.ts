@@ -8,62 +8,68 @@
  * own paths. No behavior is implemented here beyond reading/writing the layout.
  */
 
-const fs = require("node:fs");
-const path = require("node:path");
-const { readText, writeText } = require("./util");
+import fs from "node:fs";
+import path from "node:path";
+import { readText, writeText } from "./util";
 
 const STAGING_PREFIX = ".staging-";
 const BACKUP_MARK = ".bak-";
 
-function packsDir(root) {
+interface PackRef {
+  files?: string;
+  profilePattern?: string;
+  mod: { id: string };
+}
+
+export function packsDir(root: string): string {
   return path.join(root, "packs");
 }
 
-function packRoot(root, packId) {
+export function packRoot(root: string, packId: string): string {
   return path.join(packsDir(root), packId);
 }
 
-function packFile(packRoot) {
+export function packFile(packRoot: string): string {
   return path.join(packRoot, "pack.json");
 }
 
-function filesDocFile(packRoot, pack) {
+export function filesDocFile(packRoot: string, pack?: PackRef | null): string {
   return path.join(packRoot, (pack && pack.files) || "files.json");
 }
 
-function modDir(packRoot, modId) {
+export function modDir(packRoot: string, modId: string): string {
   return path.join(packRoot, "mods", modId);
 }
 
-function versionsDir(packRoot, modId) {
+export function versionsDir(packRoot: string, modId: string): string {
   return path.join(modDir(packRoot, modId), "versions");
 }
 
-function versionDir(packRoot, modId, version) {
+export function versionDir(packRoot: string, modId: string, version: string): string {
   return path.join(versionsDir(packRoot, modId), version);
 }
 
-function stagingDir(packRoot, modId, version) {
+export function stagingDir(packRoot: string, modId: string, version: string): string {
   return path.join(versionsDir(packRoot, modId), `${STAGING_PREFIX}${version}`);
 }
 
-function backupDir(packRoot, modId, version, stamp) {
+export function backupDir(packRoot: string, modId: string, version: string, stamp: string): string {
   return `${versionDir(packRoot, modId, version)}${BACKUP_MARK}${stamp}`;
 }
 
-function currentFile(packRoot, modId) {
+export function currentFile(packRoot: string, modId: string): string {
   return path.join(modDir(packRoot, modId), "current.txt");
 }
 
-function readCurrent(packRoot, modId) {
+export function readCurrent(packRoot: string, modId: string): string {
   return readText(currentFile(packRoot, modId)).trim();
 }
 
-function writeCurrent(packRoot, modId, version) {
+export function writeCurrent(packRoot: string, modId: string, version: string): void {
   writeText(currentFile(packRoot, modId), `${version}\n`);
 }
 
-function profileFile(packRoot, pack, version) {
+export function profileFile(packRoot: string, pack: PackRef | null | undefined, version: string): string | null {
   if (!pack || !pack.profilePattern) return null;
   const rel = pack.profilePattern
     .replace(/\{mod\}/g, pack.mod.id)
@@ -71,27 +77,27 @@ function profileFile(packRoot, pack, version) {
   return path.join(packRoot, rel);
 }
 
-function launcherFile(packRoot, modId) {
+export function launcherFile(packRoot: string, modId: string): string {
   return path.join(packRoot, "launchers", `launch-${modId}.sh`);
 }
 
-function payloadPrefix(modId, version) {
+export function payloadPrefix(modId: string, version: string): string {
   return `mods/${modId}/versions/${version}/`;
 }
 
-function isStaging(name) {
+export function isStaging(name: string): boolean {
   return String(name).startsWith(STAGING_PREFIX);
 }
 
-function isBackup(name) {
+export function isBackup(name: string): boolean {
   return String(name).includes(BACKUP_MARK);
 }
 
-function semverParts(version) {
+function semverParts(version: string): number[] {
   return String(version).split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
 }
 
-function compareVersions(a, b) {
+export function compareVersions(a: string, b: string): number {
   const pa = semverParts(a);
   const pb = semverParts(b);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
@@ -101,7 +107,7 @@ function compareVersions(a, b) {
   return 0;
 }
 
-function listVersions(packRoot, modId) {
+export function listVersions(packRoot: string, modId: string): string[] {
   const dir = versionsDir(packRoot, modId);
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true })
@@ -111,33 +117,13 @@ function listVersions(packRoot, modId) {
     .sort(compareVersions);
 }
 
-function canRollback(packRoot, modId) {
+export function canRollback(packRoot: string, modId: string): boolean {
   const current = readCurrent(packRoot, modId);
   if (!current) return false;
   return listVersions(packRoot, modId).indexOf(current) > 0;
 }
 
-module.exports = {
+export {
   BACKUP_MARK,
   STAGING_PREFIX,
-  backupDir,
-  canRollback,
-  compareVersions,
-  currentFile,
-  filesDocFile,
-  isBackup,
-  isStaging,
-  launcherFile,
-  listVersions,
-  modDir,
-  packFile,
-  packRoot,
-  packsDir,
-  payloadPrefix,
-  profileFile,
-  readCurrent,
-  stagingDir,
-  versionDir,
-  versionsDir,
-  writeCurrent,
 };

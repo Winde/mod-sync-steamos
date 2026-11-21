@@ -3,9 +3,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildPack } = require("../src/drivers/bg3");
-const { loadRecipe } = require("../src/recipes");
-const { loadPack } = require("../src/manifest");
+const { buildPack } = require("../dist/src/drivers/bg3");
+const { loadRecipe } = require("../dist/src/recipes");
+const { loadPack } = require("../dist/src/manifest");
 
 function write(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true });

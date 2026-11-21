@@ -10,9 +10,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { parseArgs } = require("node:util");
-const { loadRecipe } = require("../src/recipes");
-const { driverFor } = require("../src/drivers");
-const bg3 = require("../src/drivers/bg3");
+const { loadRecipe } = require("../dist/src/recipes");
+const { driverFor } = require("../dist/src/drivers");
+const bg3 = require("../dist/src/drivers/bg3");
 
 const repoRoot = path.resolve(__dirname, "..");
 

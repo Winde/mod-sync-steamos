@@ -1,12 +1,23 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const {
+import fs from "node:fs";
+import path from "node:path";
+import {
   ensureDir, writeJson, writeText, walkFiles, materialize,
   sha256File, modeFor, formatBytes,
-} = require("../util");
-const paths = require("../paths");
+} from "../util";
+import * as paths from "../paths";
+import type {
+  BuildPackOptions,
+  BuildPackResult,
+  ContentsSummary,
+  GameInfo,
+  Pack,
+  PackFile,
+  Platforms,
+  Recipe,
+  Variant,
+} from "../types";
 
-const GAME = {
+const GAME: GameInfo = {
   id: "eldenring",
   title: "ELDEN RING",
   store: "steam",
@@ -18,7 +29,7 @@ const GAME = {
   prefix: true,
 };
 
-const DEFAULT_PLATFORMS = {
+const DEFAULT_PLATFORMS: Platforms = {
   windows: {
     exe: "Game/eldenring.exe",
     gameProcess: "eldenring.exe",
@@ -33,12 +44,12 @@ const DEFAULT_PLATFORMS = {
   },
 };
 
-const TOOL_PLATFORMS = {
+const TOOL_PLATFORMS: Record<string, Variant[]> = {
   "me3-linux/": ["linux-proton"],
   "me3-win/": ["windows"],
 };
 
-function platformsForTool(rel, windowsBinaries) {
+function platformsForTool(rel: string, windowsBinaries: string): Variant[] | null {
   if (rel.startsWith("me3-win/") && windowsBinaries === "tools/me3-win/bin") {
     // Linux me3 needs the launcher and host DLL, not the Windows CLI.
     return rel.endsWith("/me3.exe") ? ["windows"] : ["windows", "linux-proton"];
@@ -47,14 +58,19 @@ function platformsForTool(rel, windowsBinaries) {
   return prefix ? TOOL_PLATFORMS[prefix] : null;
 }
 
-function defaultSource() {
+export function defaultSource(): string {
   return "D:\\EldenRingMods";
 }
 
-function parseMe3Profile(text) {
-  const packages = [];
-  const natives = [];
-  let block = null;
+interface Me3Block {
+  type: string;
+  [key: string]: unknown;
+}
+
+export function parseMe3Profile(text: string): { packages: Me3Block[]; natives: Me3Block[] } {
+  const packages: Me3Block[] = [];
+  const natives: Me3Block[] = [];
+  let block: Me3Block | null = null;
   for (const raw of String(text).split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
@@ -70,35 +86,42 @@ function parseMe3Profile(text) {
     if (!block) continue;
     const kv = /^([A-Za-z_]+)\s*=\s*(.+)$/.exec(line);
     if (!kv) continue;
-    let value = kv[2].trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    } else if (value === "true") value = true;
-    else if (value === "false") value = false;
-    else if (value.startsWith("[") && value.endsWith("]")) {
-      value = value.slice(1, -1).split(",").map((v) => v.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+    const rawValue = kv[2].trim();
+    let value: string | boolean | string[] = rawValue;
+    if ((rawValue.startsWith('"') && rawValue.endsWith('"')) || (rawValue.startsWith("'") && rawValue.endsWith("'"))) {
+      value = rawValue.slice(1, -1);
+    } else if (rawValue === "true") value = true;
+    else if (rawValue === "false") value = false;
+    else if (rawValue.startsWith("[") && rawValue.endsWith("]")) {
+      value = rawValue.slice(1, -1).split(",").map((v) => v.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
     }
     block[kv[1]] = value;
   }
   return { packages, natives };
 }
 
-function contentsFor(recipe, source, version) {
+export function contentsFor(recipe: Recipe, source: string, version: string): ContentsSummary {
   const profile = path.join(source, "profiles", `${recipe.modId}-${version}.me3`);
   const parsed = parseMe3Profile(fs.readFileSync(profile, "utf8"));
-  const packages = parsed.packages.map((entry, index) => ({
-    path: entry.path || "",
-    label: index === 0 ? recipe.name : (String(entry.path || "").split("/").filter(Boolean).pop() || ""),
-    enabled: entry.enabled !== false,
-    loadAfter: entry.load_after || [],
-    loadBefore: entry.load_before || [],
-  }));
-  const natives = parsed.natives.map((entry) => ({
-    path: entry.path || "",
-    label: String(entry.path || "").split("/").filter(Boolean).pop() || "",
-    enabled: entry.enabled !== false,
-    optional: entry.optional === true,
-  }));
+  const packages = parsed.packages.map((entry, index) => {
+    const entryPath = typeof entry.path === "string" ? entry.path : "";
+    return {
+      path: entryPath,
+      label: index === 0 ? recipe.name : (entryPath.split("/").filter(Boolean).pop() || ""),
+      enabled: entry.enabled !== false,
+      loadAfter: entry.load_after || [],
+      loadBefore: entry.load_before || [],
+    };
+  });
+  const natives = parsed.natives.map((entry) => {
+    const entryPath = typeof entry.path === "string" ? entry.path : "";
+    return {
+      path: entryPath,
+      label: entryPath.split("/").filter(Boolean).pop() || "",
+      enabled: entry.enabled !== false,
+      optional: entry.optional === true,
+    };
+  });
   return {
     kind: "packages",
     source: "me3 profile",
@@ -109,11 +132,11 @@ function contentsFor(recipe, source, version) {
   };
 }
 
-function requirePath(p, label) {
+function requirePath(p: string, label: string): void {
   if (!fs.existsSync(p)) throw new Error(`${label} not found: ${p}`);
 }
 
-function sameFile(a, b) {
+function sameFile(a: string, b: string): boolean {
   if (!fs.existsSync(a) || !fs.existsSync(b)) return false;
   if (fs.statSync(a).size !== fs.statSync(b).size) return false;
   return fs.readFileSync(a).equals(fs.readFileSync(b));
@@ -124,7 +147,7 @@ function sameFile(a, b) {
  * the Windows distribution's bin directory, so the duplicate win64 tree is
  * only kept when the two downloads are not byte-identical.
  */
-function copyMe3Runtime(me3Linux, me3Win, toolsDst) {
+function copyMe3Runtime(me3Linux: string, me3Win: string, toolsDst: string): string {
   const linuxLoader = path.join(me3Linux, "bin", "me3");
   requirePath(linuxLoader, "me3 Linux loader");
   for (const name of ["me3.exe", "me3-launcher.exe", "me3_mod_host.dll"]) {
@@ -161,7 +184,14 @@ function copyMe3Runtime(me3Linux, me3Win, toolsDst) {
   return windowsBinaries;
 }
 
-async function buildPack({ recipe, source, out, link = true, version: requestedVersion, log = () => {} }) {
+export async function buildPack({
+  recipe,
+  source,
+  out,
+  link = true,
+  version: requestedVersion,
+  log = () => {},
+}: BuildPackOptions): Promise<BuildPackResult> {
   if (!recipe) throw new Error("ELDEN RING driver needs a pack recipe");
   if (recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for ELDEN RING`);
   const modId = recipe.modId;
@@ -209,21 +239,22 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   log("Copying profile, tools, and art...");
   fs.cpSync(profileSrc, path.join(dst, "profiles", path.basename(profileSrc)), { recursive: true });
   const windowsBinaries = copyMe3Runtime(me3Linux, me3Win, path.join(dst, "tools"));
-  platforms["linux-proton"].loaderSupport = windowsBinaries;
+  const linuxProfile = platforms["linux-proton"];
+  if (linuxProfile) linuxProfile.loaderSupport = windowsBinaries;
   fs.cpSync(artSrc, path.join(dst, "art", artId), { recursive: true });
 
   const toolFiles = walkFiles(path.join(dst, "tools"));
   const artFiles = walkFiles(path.join(dst, "art", artId));
   const totalEntries = payloadFiles.length + 1 + toolFiles.length + artFiles.length;
   let processed = 0;
-  const files = [];
-  const byHash = new Map();
-  const add = async (sourceRel, targetRel, platformList) => {
+  const files: PackFile[] = [];
+  const byHash = new Map<string, PackFile>();
+  const add = async (sourceRel: string, targetRel: string, platformList?: readonly Variant[] | null): Promise<void> => {
     const abs = path.join(dst, sourceRel);
     const size = fs.statSync(abs).size;
     const sha256 = await sha256File(abs);
     const mode = targetRel === "tools/me3-linux/bin/me3" ? "755" : modeFor(targetRel);
-    const entry = { source: sourceRel, target: targetRel, size, sha256, mode };
+    const entry: PackFile = { source: sourceRel, target: targetRel, size, sha256, mode };
     if (platformList) entry.platforms = [...platformList];
     const shared = byHash.get(sha256);
     if (shared) {
@@ -254,7 +285,7 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
 
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
   const contents = contentsFor(recipe, src, version);
-  const pack = {
+  const pack: Pack = {
     schema: 1,
     id: recipe.id,
     name: recipe.name,
@@ -298,4 +329,4 @@ async function buildPack({ recipe, source, out, link = true, version: requestedV
   return { packRoot: dst, pack, files: files.length, totalBytes };
 }
 
-module.exports = { buildPack, defaultSource, contentsFor, parseMe3Profile, GAME };
+export { GAME };

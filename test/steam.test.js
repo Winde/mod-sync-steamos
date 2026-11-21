@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const steam = require("../src/steam");
+const steam = require("../dist/src/steam");
 
 function shortcut(name, exe) {
   return { appname: name, Exe: `"${exe}"`, StartDir: `"${exe}"` };
@@ -205,6 +205,7 @@ test("findGame checks every Steam library for the Proton prefix", { skip: proces
 
   const game = steam.findGame({ appId: 999999, installDir: "Wrong Folder", exe: "bin/game.exe" });
   assert.ok(game);
+  assert.equal(game.appId, 999999);
   assert.equal(game.prefix, path.join(prefixRoot, "steamapps", "compatdata", "999999", "pfx"));
   assert.equal(game.prefixReady, true);
 });
