@@ -296,7 +296,6 @@ async function startRepository({ packsDir, token = "test-token", host = "127.0.0
     "--packs", packsDir,
     "--port", String(port),
     "--token", token,
-    "--skip-bootstrap",
   ];
   if (host) args.push("--host", host);
   const child = startCliChild(args);

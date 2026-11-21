@@ -87,7 +87,7 @@ function loadPacks(packsDir) {
   return out;
 }
 
-function createServer({ packsDir, token, baseUrl, bootstrapTar, bootstrapTemplate }) {
+function createServer({ packsDir, token, baseUrl }) {
   return http.createServer((req, res) => {
     const url = new URL(req.url, baseUrl || "http://localhost");
     const authorized = url.searchParams.get("token") === token || req.headers["x-modsync-token"] === token;
@@ -98,21 +98,11 @@ function createServer({ packsDir, token, baseUrl, bootstrapTar, bootstrapTemplat
     if (url.pathname === "/") {
       const packs = loadPacks(packsDir);
       const list = packs.map((p) => `<li>${p.summary.name} ${p.summary.mod.version} <span>(${p.summary.files} files)</span></li>`).join("");
-      return sendText(res, 200, `<!doctype html><meta charset="utf-8"><title>ModSync</title><style>body{font:15px system-ui;background:#0b0e14;color:#e9edf5;padding:24px}code{background:#151b27;padding:2px 6px;border-radius:4px}li{margin:6px 0}span{color:#8b94a7}</style><h2>ModSync repository</h2><ul>${list || "<li>No packs</li>"}</ul><p>The TV bootstrap URL and token are printed in the serve console.</p>`, "text/html; charset=utf-8");
+      return sendText(res, 200, `<!doctype html><meta charset="utf-8"><title>ModSync</title><style>body{font:15px system-ui;background:#0b0e14;color:#e9edf5;padding:24px}code{background:#151b27;padding:2px 6px;border-radius:4px}li{margin:6px 0}span{color:#8b94a7}</style><h2>ModSync repository</h2><ul>${list || "<li>No packs</li>"}</ul><p>Install the TV app from the URL and token printed by <code>modsync serve</code>.</p>`, "text/html; charset=utf-8");
     }
     if (!authorized) return sendJson(res, 403, { error: "bad or missing token" });
 
     const parts = url.pathname.split("/").filter(Boolean);
-    if (url.pathname === "/bootstrap.sh") {
-      const text = fs.readFileSync(bootstrapTemplate, "utf8")
-        .replaceAll("__BASE__", baseUrl)
-        .replaceAll("__TOKEN__", token);
-      return sendText(res, 200, text, "text/x-shellscript; charset=utf-8");
-    }
-    if (url.pathname === "/bootstrap.tar.gz") {
-      if (!fs.existsSync(bootstrapTar)) return sendJson(res, 404, { error: "bootstrap not built" });
-      return sendFile(req, res, bootstrapTar);
-    }
     if (url.pathname === "/api/packs") {
       return sendJson(res, 200, loadPacks(packsDir).map((p) => p.summary));
     }

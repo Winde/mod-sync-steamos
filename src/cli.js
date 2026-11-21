@@ -8,7 +8,6 @@ const recipes = require("./recipes");
 const { loadPack, packSummary } = require("./manifest");
 const { createServer } = require("./server");
 const { createAgent } = require("./agent");
-const { buildBootstrap } = require("./bootstrap");
 const steam = require("./steam");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -19,9 +18,8 @@ const help = `modsync — mod pack deployment for Windows and SteamOS (mods only
 Commands:
   init      Remember the working install and pack output
   pack      Build a pack from a working install
-  serve     Serve packs + bootstrap over HTTP
+  serve     Serve packs over HTTP
   agent     Run the TV agent/dashboard
-  bootstrap Build the TV bootstrap tarball
   doctor    Inspect packs, Steam, and game detection
   register  Add a .sh launcher to Steam with art
   help      This help
@@ -45,8 +43,6 @@ serve:
   --host <ip>       Bind a specific address (default: 127.0.0.1)
   --port <n>        Port (default: 8787)
   --token <token>   Fixed token (default: random per run)
-  --rebuild-bootstrap
-  --skip-bootstrap
 
 agent:
   --config <file>   agent.json (default: ./agent.json)
@@ -142,10 +138,6 @@ async function cmdServe(values) {
   const port = Number(values.port || 8787);
   const token = values.token || util.randomToken();
   const baseUrl = `http://${host}:${port}`;
-  const bootstrapTar = path.join(repoRoot, "state", "bootstrap.tar.gz");
-  if (!values["skip-bootstrap"] && (values["rebuild-bootstrap"] || !fs.existsSync(bootstrapTar))) {
-    await buildBootstrap(repoRoot, bootstrapTar, (m) => console.log(m));
-  }
   const packs = fs.existsSync(packsDir)
     ? fs.readdirSync(packsDir, { withFileTypes: true }).filter((e) => e.isDirectory() && fs.existsSync(path.join(packsDir, e.name, "pack.json")))
       .map((e) => { try { return packSummary(path.join(packsDir, e.name)); } catch { return null; } }).filter(Boolean)
@@ -155,8 +147,6 @@ async function cmdServe(values) {
     packsDir,
     token,
     baseUrl,
-    bootstrapTar,
-    bootstrapTemplate: path.join(repoRoot, "scripts", "bootstrap.sh"),
   });
   server.listen(port, host, () => {
     console.log(`\nModSync repository: ${baseUrl}/`);
@@ -172,7 +162,6 @@ async function cmdServe(values) {
       console.log(`LAN interfaces: ${candidates.map((c) => `${c.address} (${c.name})`).join(", ")}`);
       console.log(`Using ${host}. Pass --host <ip> if that is the wrong interface.`);
     }
-    if (!fs.existsSync(bootstrapTar)) console.log("WARNING: bootstrap.tar.gz is missing; TV bootstrap will 404.");
     console.log("\nSteam Machine (Desktop Mode):");
     console.log(`curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' | bash -s -- --pc '${baseUrl}' --token '${token}'`);
     console.log("\nFirewall (admin PowerShell, once; local subnet only):");
@@ -184,7 +173,7 @@ async function cmdServe(values) {
 
 async function cmdAgent(values) {
   const configPath = path.resolve(values.config || path.join(process.cwd(), "agent.json"));
-  if (!fs.existsSync(configPath)) fail(`agent config not found: ${configPath} (run the TV bootstrap once)`);
+  if (!fs.existsSync(configPath)) fail(`agent config not found: ${configPath} (install the TV app once)`);
   const config = util.readJson(configPath);
   if (values.port) config.port = Number(values.port);
   const agent = createAgent(config);
@@ -195,10 +184,6 @@ async function cmdAgent(values) {
   });
 }
 
-async function cmdBootstrap(values) {
-  const out = path.resolve(values.out || path.join(repoRoot, "state", "bootstrap.tar.gz"));
-  await buildBootstrap(repoRoot, out, (m) => console.log(m));
-}
 
 function cmdDoctor(values) {
   console.log(`Node: ${process.version} (${process.platform}/${process.arch})`);
@@ -251,7 +236,6 @@ async function main(argv) {
       recipe: { type: "string" }, "game-root": { type: "string" },
       copy: { type: "boolean" }, packs: { type: "string" }, host: { type: "string" }, lan: { type: "boolean" },
       port: { type: "string" }, token: { type: "string" }, config: { type: "string" },
-      "rebuild-bootstrap": { type: "boolean" }, "skip-bootstrap": { type: "boolean" },
       exe: { type: "string" }, name: { type: "string" }, icon: { type: "string" },
       grid: { type: "string" }, hero: { type: "string" }, logo: { type: "string" },
       header: { type: "string" }, portrait: { type: "string" },
@@ -264,7 +248,6 @@ async function main(argv) {
   if (cmd === "pack") return cmdPack(values);
   if (cmd === "serve") return cmdServe(values);
   if (cmd === "agent") return cmdAgent(values);
-  if (cmd === "bootstrap") return cmdBootstrap(values);
   if (cmd === "doctor") return cmdDoctor(values);
   if (cmd === "register") return cmdRegister(values);
   return console.log(help);

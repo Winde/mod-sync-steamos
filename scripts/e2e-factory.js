@@ -132,8 +132,6 @@ async function main() {
     packsDir: path.dirname(packRoot),
     token,
     baseUrl: "http://127.0.0.1",
-    bootstrapTar: path.join(stateDir, "bootstrap.tar.gz"),
-    bootstrapTemplate: path.join(repoRoot, "scripts", "bootstrap.sh"),
   });
   const serverPort = await listen(server);
   const pcUrl = `http://127.0.0.1:${serverPort}`;

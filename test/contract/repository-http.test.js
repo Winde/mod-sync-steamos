@@ -131,20 +131,11 @@ test("pack files stream fully and support byte ranges", { timeout: 60000 }, asyn
   assert.equal(missingPath.status, 400);
 });
 
-test("landing page and bootstrap are available", { timeout: 60000 }, async () => {
+test("landing page is available", { timeout: 60000 }, async () => {
   const landing = await request(repo.base, "/");
   assert.equal(landing.status, 200);
   assert.match(landing.headers.get("content-type"), /text\/html/);
   assert.match(landing.text, /Graceborne/);
-
-  const bootstrap = await request(repo.base, `/bootstrap.sh?token=${TOKEN}`);
-  assert.equal(bootstrap.status, 200);
-  assert.doesNotMatch(bootstrap.text, /__BASE__|__TOKEN__/);
-  assert.ok(bootstrap.text.includes(`BASE="${repo.base}"`));
-  assert.ok(bootstrap.text.includes(`TOKEN="${TOKEN}"`));
-
-  const noBootstrap = await request(repo.base, `/bootstrap.tar.gz?token=${TOKEN}`);
-  assert.equal(noBootstrap.status, 404);
 });
 
 test("serve defaults to loopback", { timeout: 60000 }, async () => {
@@ -165,7 +156,6 @@ test("serve refuses to bind all interfaces", { timeout: 60000 }, async () => {
       "--packs", packsDir,
       "--host", "0.0.0.0",
       "--port", "0",
-      "--skip-bootstrap",
     ]),
   );
 });

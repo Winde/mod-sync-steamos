@@ -37,9 +37,7 @@ Two machines, two different jobs:
      | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '<token>'
    ```
    This installs `~/Applications/ModSync.AppImage`, writes `agent.json`, and
-   registers the ModSync Steam shortcut and art. It replaces the older
-   bootstrap agent; the bootstrap remains available for the legacy browser
-   dashboard.
+   registers the ModSync Steam shortcut and art.
 4. Restart Steam once if the ModSync shortcut is not visible.
 5. Open ModSync and install the pack. Default-exe packs use the regular Steam
    game link; loader/alternate-exe packs add their own shortcut.

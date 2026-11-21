@@ -20,7 +20,7 @@ Stop those PIDs before starting. Do not stop Steam or the game.
 From `D:\source\mod-sync-steamos`:
 
 ```powershell
-node bin/modsync.js serve --lan --packs packs --port 8787 --token test123 --skip-bootstrap
+node bin/modsync.js serve --lan --packs packs --port 8787 --token test123
 ```
 
 The output should show the **actual** LAN address, for example:
@@ -91,7 +91,7 @@ Then:
 1. Stop the 0.2.7 server with `Ctrl+C`.
 2. Serve 0.2.5:
    ```powershell
-   node bin/modsync.js serve --lan --packs "state\packs-0.2.5" --port 8787 --token test123 --skip-bootstrap
+   node bin/modsync.js serve --lan --packs "state\packs-0.2.5" --port 8787 --token test123
    ```
 3. Refresh the dashboard. It will offer an update to 0.2.5. Install it.
 4. Stop the server, serve the normal `packs` directory again, refresh, and

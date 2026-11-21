@@ -12,7 +12,7 @@ splitting, or renaming modules does not require touching these tests.
 | File | Contract |
 |---|---|
 | `pack-cli.test.js` | `modsync pack` writes a valid `pack.json`/`files.json`, payload, profile, tools, and art for a requested version; prints build progress |
-| `repository-http.test.js` | token auth, catalog, pack documents, art, full and ranged file streaming, bootstrap endpoint, loopback default, refusal to bind all interfaces |
+| `repository-http.test.js` | token auth, catalog, pack documents, art, full and ranged file streaming, loopback default, refusal to bind all interfaces |
 | `agent-install.test.js` | `/api/state`, install job lifecycle, complete TV output (hashes, `current.txt`, launcher), resume from `.part`, launch errors, BOM config, dashboard assets |
 | `agent-rollback.test.js` | two installed versions, pointer switch, both versions kept, version list and status; offline listing, BOM pack data, and offline rollback |
 | `agent-offline.test.js` | an installed pack remains listed after the PC server stops |
@@ -80,6 +80,5 @@ During the refactor:
   `0.0.0.0` are covered, but choosing a specific LAN IP is environment-dependent
   and remains part of the manual run.
 - Real Steam shortcut registration and `.desktop` launch on a Steam Machine.
-- `modsync bootstrap` downloading the Linux Node runtime.
 - Cancel during an active transfer; resume is covered by the `.part` test. A
   storage clear during an install is covered.

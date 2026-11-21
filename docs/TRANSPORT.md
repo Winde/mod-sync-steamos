@@ -6,7 +6,7 @@ listener, and only on the LAN.
 ## Two servers, one listener
 
 - **PC pack server** (`modsync serve --lan`) — the only LAN listener. Serves
-  pack metadata, files, and the bootstrap tarball. Token required.
+  pack metadata and files. Token required.
 - **Electron app on the TV** — runs the installer in-process. Its renderer talks
   to the main process over IPC, not HTTP. It does not listen on the LAN. If a
   local control API is kept for automation, it binds `127.0.0.1` and uses a
@@ -54,9 +54,9 @@ Test from the TV: `curl http://<PC-LAN-IP>:8787/api/health`.
 ## Token
 
 `serve` generates a random token per run unless `--token` is supplied. The token
-is required by `/api/*`, `/bootstrap.sh` and `/bootstrap.tar.gz`. The install
-one-liner includes it; the TV app stores it in `~/ModSync/agent.json`. The
-dashboard is local and never exposes the token to the browser.
+is required by `/api/*`. The install one-liner includes it; the TV app stores it
+in `~/ModSync/agent.json`. The dashboard is local and never exposes the token to
+the browser.
 
 ## Steam Machine install
 
@@ -70,15 +70,6 @@ curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/i
 The installer downloads `ModSync.AppImage` into `~/Applications`, verifies its
 checksum, writes `~/ModSync/agent.json`, creates the desktop entry, and adds the
 ModSync Steam shortcut and art.
-
-The legacy browser agent is still available from the PC:
-
-```bash
-curl -fsSL 'http://<PC-LAN-IP>:8787/bootstrap.sh?token=…' | bash
-```
-
-It installs the agent + Linux Node under `~/ModSync` and starts the local
-dashboard. Do not run both on the same port.
 
 ## Pairing and changing IPs
 
