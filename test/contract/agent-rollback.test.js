@@ -15,6 +15,7 @@ const {
   buildPackSet,
   makeSteamEnv,
   pollJob,
+  prefixBom,
   remove,
   request,
   setLaunchGameProcess,
@@ -82,11 +83,23 @@ test("rollback moves the pointer and keeps both versions installed", { timeout: 
   await installCurrent();
   assert.equal(currentVersion(), "0.2.5");
 
+  let state = await request(agent.base, "/api/state");
+  let pack = state.json.packs.find((p) => p.id === PACK_ID);
+  assert.equal(pack.installedVersion, "0.2.5");
+  assert.equal(pack.local, true);
+  assert.equal(pack.canRollback, false);
+
   // The server reads the pack directory on each request, so swapping it is
   // equivalent to publishing a new pack version on the PC.
   activatePack(packsDir, fixture.packs["0.2.7"]);
   await installCurrent();
   assert.equal(currentVersion(), "0.2.7");
+
+  state = await request(agent.base, "/api/state");
+  pack = state.json.packs.find((p) => p.id === PACK_ID);
+  assert.equal(pack.installedVersion, "0.2.7");
+  assert.equal(pack.local, true);
+  assert.equal(pack.canRollback, true);
 
   const versionsDir = path.join(tv, "packs", PACK_ID, "mods", MOD_ID, "versions");
   assert.ok(fs.existsSync(path.join(versionsDir, "0.2.5")));
@@ -97,6 +110,28 @@ test("rollback moves the pointer and keeps both versions installed", { timeout: 
   assert.match(oldPayload, /0\.2\.5/);
   assert.match(newPayload, /0\.2\.7/);
 
+  // Local-first: stop the PC, put a BOM in the installed JSON (as a Windows
+  // editor might), and the agent must still list, launch, and roll back.
+  await repo.stop();
+  repo = null;
+  prefixBom(path.join(tv, "packs", PACK_ID, "pack.json"));
+  prefixBom(path.join(tv, "packs", PACK_ID, "files.json"));
+
+  // The remote catalog cache is 2.5 s; wait for it to expire so the agent
+  // actually observes the PC as offline.
+  await new Promise((resolve) => setTimeout(resolve, 2600));
+
+  state = await request(agent.base, "/api/state");
+  assert.equal(state.json.pc.online, false);
+  pack = state.json.packs.find((p) => p.id === PACK_ID);
+  assert.ok(pack, "local pack survives an offline PC");
+  assert.equal(pack.local, true);
+  assert.equal(pack.installedVersion, "0.2.7");
+  assert.equal(pack.status, "up-to-date");
+  assert.equal(pack.canRollback, true);
+  assert.ok(pack.files > 0, "local summary reads files.json");
+  assert.ok(pack.totalBytes > 0, "local summary totals bytes");
+
   const rolled = await request(agent.base, "/api/rollback", {
     method: "POST",
     body: { packId: PACK_ID },
@@ -106,11 +141,22 @@ test("rollback moves the pointer and keeps both versions installed", { timeout: 
   assert.equal(rolled.json.current, "0.2.7");
   assert.equal(currentVersion(), "0.2.5");
 
-  const state = await request(agent.base, "/api/state");
-  const pack = state.json.packs.find((p) => p.id === PACK_ID);
+  state = await request(agent.base, "/api/state");
+  assert.equal(state.json.pc.online, false);
+  pack = state.json.packs.find((p) => p.id === PACK_ID);
   assert.equal(pack.installedVersion, "0.2.5");
+  assert.equal(pack.canRollback, false);
   assert.deepEqual(pack.versions, ["0.2.5", "0.2.7"]);
   assert.equal(pack.status, "update-available");
+
+  if (process.platform === "linux") {
+    const launched = await request(agent.base, "/api/launch", {
+      method: "POST",
+      body: { packId: PACK_ID },
+    });
+    assert.equal(launched.status, 200);
+    assert.equal(launched.json.ok, true);
+  }
 
   const again = await request(agent.base, "/api/rollback", {
     method: "POST",

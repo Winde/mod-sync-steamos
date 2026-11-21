@@ -91,7 +91,7 @@ function freePort() {
  * Create a working install shaped like the one the Elden Ring driver expects:
  * mods/graceborne/versions/<version>, profiles/*.me3, tools/me3-*, art.
  */
-function workingInstall({ versions = ["0.2.7"] } = {}) {
+function workingInstall({ versions = ["0.2.7"], payloadBytes = 0 } = {}) {
   const root = tempDir("modsync-source-");
   for (const version of versions) {
     write(
@@ -104,6 +104,13 @@ function workingInstall({ versions = ["0.2.7"] } = {}) {
       `mods/graceborne/versions/${version}/mod/parts/test.partsbnd.dcx`,
       Buffer.from(`part-${version}-${"y".repeat(32)}`),
     );
+    if (payloadBytes > 0) {
+      write(
+        root,
+        `mods/graceborne/versions/${version}/mod/padding.bin`,
+        Buffer.alloc(payloadBytes, 7),
+      );
+    }
     write(root, `profiles/graceborne-${version}.me3`, `profile ${version}\n`);
   }
   write(root, "mods/graceborne/current.txt", `${versions[versions.length - 1]}\n`);
@@ -153,8 +160,8 @@ async function buildPack({ source, out, version }) {
   };
 }
 
-async function buildPackSet({ versions = ["0.2.7"] } = {}) {
-  const source = workingInstall({ versions });
+async function buildPackSet({ versions = ["0.2.7"], payloadBytes = 0 } = {}) {
+  const source = workingInstall({ versions, payloadBytes });
   const root = tempDir("modsync-builds-");
   const packs = {};
   for (const version of versions) {
@@ -205,6 +212,7 @@ function makeSteamEnv({ build = "25827938", layout = "standard" } = {}) {
   const gameRoot = path.join(steamapps, "common", "ELDEN RING");
   fs.mkdirSync(path.join(gameRoot, "Game"), { recursive: true });
   fs.writeFileSync(path.join(gameRoot, "Game", "eldenring.exe"), "");
+  fs.mkdirSync(path.join(steamRoot, "userdata", "12345678", "config"), { recursive: true });
 
   if (process.platform !== "win32") {
     fs.mkdirSync(path.join(steamapps, "compatdata", "1245620", "pfx"), { recursive: true });

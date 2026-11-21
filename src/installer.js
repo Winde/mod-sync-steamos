@@ -125,13 +125,15 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
     const target = pathFor(file);
     let have = 0;
     try {
-      if (fs.statSync(target).isFile() && fs.statSync(target).size === file.size) {
-        have = file.size;
-      } else {
+      const stat = fs.statSync(target);
+      if (stat.isFile() && stat.size === file.size) have = file.size;
+    } catch { /* target not present */ }
+    if (!have) {
+      try {
         const part = `${target}.part`;
         if (fs.existsSync(part)) have = Math.min(fs.statSync(part).size, file.size);
-      }
-    } catch { /* not present */ }
+      } catch { /* part not present */ }
+    }
     if (have > 0) setCounted(file, have);
   }
   if (bytesDone > 0) {

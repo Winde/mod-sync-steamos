@@ -155,6 +155,11 @@ test("install writes the complete TV contract", { timeout: 60000 }, async (t) =>
   if (process.platform === "linux") {
     assert.ok(fs.existsSync(path.join(steam.home, ".local", "share", "applications", `${MOD_ID}.desktop`)));
     assert.ok(fs.existsSync(path.join(steam.home, "Desktop", `${MOD_ID}.desktop`)));
+
+    const configDir = path.join(steam.steamRoot, "userdata", "12345678", "config");
+    assert.ok(fs.existsSync(path.join(configDir, "shortcuts.vdf")), "Steam shortcut is written");
+    const gridArt = fs.readdirSync(path.join(configDir, "grid"));
+    assert.ok(gridArt.length >= 3, "Steam art is copied");
   }
 
   const afterState = await request(agent.base, "/api/state");
@@ -179,7 +184,7 @@ test("install resumes a partially downloaded staging file", { timeout: 60000 }, 
   const sourceBytes = fs.readFileSync(path.join(built.packRoot, sample.source));
   const half = Math.floor(sourceBytes.length / 2);
   const payloadPrefix = `mods/${MOD_ID}/versions/${VERSION}/`;
-  const partFile = path.join(
+  const stagingDir = path.join(
     root,
     "packs",
     PACK_ID,
@@ -187,10 +192,20 @@ test("install resumes a partially downloaded staging file", { timeout: 60000 }, 
     MOD_ID,
     "versions",
     `.staging-${VERSION}`,
-    sample.target.slice(payloadPrefix.length),
-  ) + ".part";
+  );
+  const partFile = path.join(stagingDir, sample.target.slice(payloadPrefix.length)) + ".part";
   fs.mkdirSync(path.dirname(partFile), { recursive: true });
   fs.writeFileSync(partFile, sourceBytes.subarray(0, half));
+
+  // A second payload file is already complete; it should be verified and
+  // counted, not downloaded again.
+  const complete = filesDoc.files.find(
+    (file) => file.target.startsWith(payloadPrefix) && file.source !== sample.source && file.size > 0,
+  );
+  assert.ok(complete, "fixture has a second payload file");
+  const completeTarget = path.join(stagingDir, complete.target.slice(payloadPrefix.length));
+  fs.mkdirSync(path.dirname(completeTarget), { recursive: true });
+  fs.copyFileSync(path.join(built.packRoot, complete.source), completeTarget);
 
   const job = await install(agent);
   const totalBytes = filesDoc.files.reduce((n, file) => n + file.size, 0);
