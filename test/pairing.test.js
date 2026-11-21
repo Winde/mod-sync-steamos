@@ -49,21 +49,22 @@ test("a TV pairs once and persists the approved token", async (t) => {
   const control = await service.listen();
 
   let saved = null;
+  const agentPort = await h.freePort();
   const agentConfig = path.join(tvRoot, "agent.json");
   fs.writeFileSync(agentConfig, JSON.stringify({
     root: tvRoot,
-    port: 0,
+    port: agentPort,
     pcUrl: packServer.url,
     token: "wrong-token",
   }, null, 2) + "\n");
   agent = createAgent({
     root: tvRoot,
-    port: 0,
+    port: agentPort,
     pcUrl: packServer.url,
     token: "wrong-token",
     saveConnection: (connection) => {
       saved = connection;
-      fs.writeFileSync(agentConfig, JSON.stringify({ root: tvRoot, port: 0, ...connection }, null, 2) + "\n");
+      fs.writeFileSync(agentConfig, JSON.stringify({ root: tvRoot, port: agentPort, ...connection }, null, 2) + "\n");
     },
   });
   await new Promise((resolve) => agent.listen(resolve));
@@ -111,8 +112,9 @@ test("a TV pairs once and persists the approved token", async (t) => {
 
   // A later launch reads the saved token and stays connected without asking
   // the Server to approve the TV again.
-  agent.server.close();
-  agent = createAgent({ ...h.readJson(agentConfig), port: 0 });
+  await new Promise((resolve) => agent.server.close(resolve));
+  const restartedPort = await h.freePort();
+  agent = createAgent({ ...h.readJson(agentConfig), port: restartedPort });
   await new Promise((resolve) => agent.listen(resolve));
   const restartedAddress = agent.server.address();
   const restartedUrl = `http://127.0.0.1:${restartedAddress.port}`;
