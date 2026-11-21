@@ -204,10 +204,19 @@ v1 supports overlay packs on SteamOS. Profile/in-place drivers come later.
 
 ## v1 vs v2
 
-- v1: mods only, ER + SteamOS, HTTP pull, dashboard, deploy/update/launch.
+- v1: mods only, Steam games, HTTP pull, Electron app, deploy/update/rollback/
+  launch/storage.
 - v2: save sync as a separate module. It needs per-game save models, account
   identity checks, conflict handling, Steam Cloud interaction, atomic writes
   and validation. It is not a generic file copy.
+
+## Save boundary
+
+- A pack never contains saves.
+- The installer never writes a save directory.
+- Steam Cloud handles the vanilla save where the game supports it.
+- Mod saves stay local to each machine.
+- Save sync is v2, with per-game parsers and semantics.
 
 ## Rollback
 

@@ -103,14 +103,6 @@ the game is closed.
 - Writes a launcher and adds a Steam shortcut for loader/alternate-exe packs.
   Default-exe packs use the regular Steam game link.
 
-## Save boundary (v1)
-
-- The pack never contains saves.
-- The installer never writes the save directory.
-- Steam Cloud handles the vanilla save where the game supports it.
-- Mod saves stay local to each machine.
-- Save sync is a separate **v2** module with per-game parsers/semantics.
-
 ## Docs
 
 - [`docs/DESIGN.md`](docs/DESIGN.md) — pack/driver/platform model and restrictions
