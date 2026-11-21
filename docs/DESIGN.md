@@ -234,7 +234,11 @@ dashboard; confirmations are stored on the TV at
 
 The agent evaluates the checks for the dashboard and again in the installer, so
 an install cannot start from a stale or bypassed dashboard. The same
-`src/preconditions.js` module is used by the Electron client.
+`src/preconditions.js` module is used by the Electron client. The installer
+adds no build, prefix, running-state, or disk policy of its own: if a pack omits
+a check, the install is allowed to proceed. Core invariants stay in the
+installer: the game must exist, the platform variant must be supported, and the
+resolved target must be valid.
 
 The agent writes files whose target starts with
 `mods/<mod>/versions/<version>/` into a staging directory, then swaps it in.

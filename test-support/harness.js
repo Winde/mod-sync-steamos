@@ -125,6 +125,53 @@ function workingInstall({ versions = ["0.2.7"], payloadBytes = 0 } = {}) {
   return root;
 }
 
+function bg3ModSettings(version = "") {
+  return `<!-- modsync-${version} -->
+<save><version major="4" minor="8"/><region id="ModuleSettings"><node id="root"><children>
+  <node id="Mods"><children>
+    <node id="ModuleShortDesc">
+      <attribute id="Folder" type="LSString" value="TestMod_uuid"/>
+      <attribute id="MD5" type="LSString" value="d41d8cd98f00b204e9800998ecf8427e"/>
+      <attribute id="Name" type="LSString" value="Test Mod"/>
+      <attribute id="PublishHandle" type="uint64" value="1"/>
+      <attribute id="UUID" type="guid" value="11111111-1111-1111-1111-111111111111"/>
+      <attribute id="Version64" type="int64" value="36028797018963968"/>
+    </node>
+  </children></node>
+</children></node></region></save>`;
+}
+
+/** Create a working BG3 data directory shaped like the pack builder expects. */
+function bg3WorkingInstall({ version = "1.0.0", extras = true } = {}) {
+  const root = tempDir("modsync-bg3-source-");
+  write(root, "Mods/TestMod_uuid.pak", `pak-${version}`);
+  if (extras) write(root, "Mods/Extra.pak", `extra-${version}`);
+  write(root, "PlayerProfiles/Public/modsettings.lsx", bg3ModSettings(version));
+  write(root, "Script Extender/Test/Config.json", `config-${version}`);
+  return root;
+}
+
+/** Create a fake cached BG3LE release; no network access. */
+function bg3leRuntime(version = "0.4.6") {
+  const root = tempDir("modsync-bg3le-");
+  write(root, "build/libbg3le.so", `bg3le-${version}`);
+  write(root, "install.py", "# installer\n");
+  write(root, "installer/bg3le-launch", "#!/bin/sh\n");
+  write(root, "client/bg3lua", "#!/bin/sh\n");
+  return root;
+}
+
+async function buildBg3Pack({ source, out, version, gameRoot, bg3le }) {
+  return runCli([
+    "pack",
+    "--recipe", "bg3-modded",
+    "--source", source,
+    "--out", out,
+    "--version", version,
+    "--game-root", gameRoot,
+  ], { env: { ...process.env, BG3LE_DIR: bg3le } });
+}
+
 function runCli(args, { env = process.env, timeout = 60000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cli, ...args], {
@@ -148,6 +195,33 @@ function runCli(args, { env = process.env, timeout = 60000 } = {}) {
       clearTimeout(timer);
       if (code === 0) resolve({ code, stdout, stderr });
       else reject(new Error(`CLI failed (${code}): ${args.join(" ")}\n${stdout}\n${stderr}`));
+    });
+  });
+}
+
+function runScript(script, args = [], { env = process.env, timeout = 60000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [script, ...args], {
+      cwd: repoRoot,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (data) => { stdout += data; });
+    child.stderr.on("data", (data) => { stderr += data; });
+    const timer = setTimeout(() => {
+      try { child.kill("SIGKILL"); } catch { }
+      reject(new Error(`script timed out: ${script} ${args.join(" ")}\n${stdout}\n${stderr}`));
+    }, timeout);
+    child.once("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve({ code, stdout, stderr });
+      else reject(new Error(`script failed (${code}): ${script} ${args.join(" ")}\n${stdout}\n${stderr}`));
     });
   });
 }
@@ -190,12 +264,34 @@ async function buildPackSet({ versions = ["0.2.7"], payloadBytes = 0 } = {}) {
   };
 }
 
+const STEAM_FIXTURES = {
+  eldenring: {
+    appId: 1245620,
+    installDir: "ELDEN RING",
+    build: "25827938",
+    exe: "Game/eldenring.exe",
+  },
+  bg3: {
+    appId: 1086940,
+    installDir: "Baldurs Gate 3",
+    build: "25605617",
+    exe: "bin/bg3.exe",
+    linuxExe: "bin/bg3",
+  },
+};
+
 /**
- * Build an environment whose Steam library contains a fake ELDEN RING install.
+ * Build an environment whose Steam library contains a fake game install.
  * Pass the returned env to the agent child process.
+ *
+ * `game` selects the fake app; `native` selects the native Linux fixture for
+ * games that expose a Linux executable (currently BG3).
  */
-function makeSteamEnv({ build = "25827938", layout = "standard" } = {}) {
-  const base = tempDir("modsync-steam-");
+function makeSteamEnv({ game = "eldenring", build, layout = "standard", native = false } = {}) {
+  const spec = STEAM_FIXTURES[game];
+  if (!spec) throw new Error(`unknown Steam fixture game: ${game}`);
+  const appBuild = build || spec.build;
+  const base = tempDir(`modsync-steam-${game}-`);
   const env = { ...process.env };
   let home;
   let steamRoot;
@@ -206,9 +302,14 @@ function makeSteamEnv({ build = "25827938", layout = "standard" } = {}) {
     env.ProgramFiles = programFiles;
     steamRoot = path.join(programFiles, "Steam");
     home = path.join(base, "home");
+    env.LOCALAPPDATA = path.join(home, "AppData", "Local");
+    env.APPDATA = path.join(home, "AppData", "Roaming");
   } else {
     home = path.join(base, "home");
     env.HOME = home;
+    env.XDG_DATA_HOME = path.join(home, ".local", "share");
+    env.LOCALAPPDATA = path.join(home, "AppData", "Local");
+    env.APPDATA = path.join(home, "AppData", "Roaming");
     if (layout === "flatpak") {
       steamRoot = path.join(home, ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam");
     } else {
@@ -217,24 +318,29 @@ function makeSteamEnv({ build = "25827938", layout = "standard" } = {}) {
   }
 
   const steamapps = path.join(steamRoot, "steamapps");
-  const gameRoot = path.join(steamapps, "common", "ELDEN RING");
-  fs.mkdirSync(path.join(gameRoot, "Game"), { recursive: true });
-  fs.writeFileSync(path.join(gameRoot, "Game", "eldenring.exe"), "");
+  const gameRoot = path.join(steamapps, "common", spec.installDir);
+  const useNative = process.platform !== "win32" && native && spec.linuxExe;
+  fs.mkdirSync(path.dirname(path.join(gameRoot, spec.exe)), { recursive: true });
+  if (useNative) {
+    fs.writeFileSync(path.join(gameRoot, spec.linuxExe), "");
+  } else {
+    fs.writeFileSync(path.join(gameRoot, spec.exe), "");
+  }
   fs.mkdirSync(path.join(steamRoot, "userdata", "12345678", "config"), { recursive: true });
 
-  if (process.platform !== "win32") {
-    fs.mkdirSync(path.join(steamapps, "compatdata", "1245620", "pfx"), { recursive: true });
+  if (process.platform !== "win32" && !useNative) {
+    fs.mkdirSync(path.join(steamapps, "compatdata", String(spec.appId), "pfx"), { recursive: true });
   }
 
   fs.writeFileSync(
-    path.join(steamapps, "appmanifest_1245620.acf"),
+    path.join(steamapps, `appmanifest_${spec.appId}.acf`),
     `"AppState"
 {
-\t"appid"\t\t"1245620"
-\t"buildid"\t\t"${build}"
+\t"appid"\t\t"${spec.appId}"
+\t"buildid"\t\t"${appBuild}"
 \t"InstalledDepots"
 \t{
-\t\t"1245621"
+\t\t"${spec.appId + 1}"
 \t\t{
 \t\t}
 \t}
@@ -242,7 +348,7 @@ function makeSteamEnv({ build = "25827938", layout = "standard" } = {}) {
 `,
   );
   fs.mkdirSync(home, { recursive: true });
-  return { base, env, home, steamRoot };
+  return { base, env, home, steamRoot, gameRoot, appId: spec.appId, native: useNative };
 }
 
 function startCliChild(args, { env = process.env } = {}) {
@@ -387,6 +493,9 @@ function setLaunchGameProcess(packRoot, processName) {
 module.exports = {
   PNG,
   activatePack,
+  bg3WorkingInstall,
+  bg3leRuntime,
+  buildBg3Pack,
   buildPack,
   buildPackSet,
   freePort,
@@ -397,6 +506,7 @@ module.exports = {
   remove,
   request,
   runCli,
+  runScript,
   setLaunchGameProcess,
   sha256,
   sha256File,

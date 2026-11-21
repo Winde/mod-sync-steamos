@@ -5,7 +5,7 @@ const { Readable } = require("node:stream");
 const { pipeline } = require("node:stream/promises");
 const {
   ensureDir, writeText, writeJson, sha256File, safeJoin, mapLimit,
-  nowStamp, isGameRunning, freeBytes, formatBytes,
+  nowStamp, formatBytes,
 } = require("./util");
 const steam = require("./steam");
 const preconditions = require("./preconditions");
@@ -49,18 +49,10 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   const files = paths.filesFor(filesDoc.files, target.variant);
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
 
+  if (!game) throw new Error(`${pack.game.title} was not found in the Steam libraries.`);
   if (!files.length) throw new Error(`This pack has no files for ${target.variant}.`);
-  if (game && !target.supported) {
+  if (!target.supported) {
     throw new Error(`${pack.game.title} is the ${target.variant} build, but this pack does not support it.`);
-  }
-  if (isGameRunning(target.processes)) {
-    throw new Error(`${pack.game.title} is running. Close it before installing.`);
-  }
-  if (game && pack.game.build && game.build && game.build !== String(pack.game.build)) {
-    throw new Error(`Expected ${pack.game.title} build ${pack.game.build}; found ${game.build}.`);
-  }
-  if (game && target.variant === "linux-proton" && !game.prefixReady) {
-    throw new Error(`Launch ${pack.game.title} once via Steam first so its Proton prefix exists.`);
   }
   if (target.error) throw new Error(target.error);
 
@@ -77,11 +69,6 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   writeJson(versionStore.packFile(packRoot), pack);
   writeJson(versionStore.filesDocFile(packRoot, pack), filesDoc);
 
-  const free = freeBytes(root);
-  const need = totalBytes + 1024 * 1024 * 1024;
-  if (free != null && free < need) {
-    throw new Error(`Not enough space on the TV: ${formatBytes(free)} free, need about ${formatBytes(need)}.`);
-  }
   let done = 0;
   let bytesDone = 0;
   let lastReport = 0;
@@ -139,7 +126,6 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   };
 
   log(`Installing ${pack.name} ${version} for ${target.variant}: ${files.length} of ${filesDoc.files.length} files, ${formatBytes(totalBytes)}`);
-  log(free != null ? `Free space: ${formatBytes(free)}` : "Free space: unknown");
 
   await mapLimit(files, 6, async (file) => {
     if (signal?.aborted) throw abortError();
