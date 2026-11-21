@@ -43,7 +43,14 @@ function copyTree(src, dst) {
   fs.cpSync(src, dst, { recursive: true });
 }
 
-async function buildPack({ source, out, link = true, version: requestedVersion, gameRoot: requestedGameRoot, log = () => {} }) {
+async function buildPack({ recipe, source, out, link = true, version: requestedVersion, gameRoot: requestedGameRoot, log = () => {} }) {
+  if (recipe && recipe.game !== GAME.id) throw new Error(`Recipe ${recipe.id} is not for Baldur's Gate 3`);
+  const packId = recipe && recipe.id ? recipe.id : PACK_ID;
+  const modId = recipe && recipe.modId ? recipe.modId : MOD_ID;
+  const packName = recipe && recipe.name ? recipe.name : "BG3 Modded";
+  const packDescription = recipe && recipe.description
+    ? recipe.description
+    : "Baldur's Gate 3 mod snapshot with modsettings and Script Extender";
   const src = path.resolve(source || defaultSource());
   const dst = path.resolve(out);
   const version = String(requestedVersion || defaultVersion());
@@ -136,47 +143,46 @@ async function buildPack({ source, out, link = true, version: requestedVersion, 
   };
 
   for (const file of payloadFiles) {
-    await add(`payload/versions/${version}/${file.rel}`, `mods/${MOD_ID}/versions/${version}/${file.rel}`);
+    await add(`payload/versions/${version}/${file.rel}`, `mods/${modId}/versions/${version}/${file.rel}`);
   }
   for (const art of artFiles) {
-    await add(`art/${MOD_ID}/${art.rel}`, `art/${MOD_ID}/${art.rel}`);
+    await add(`art/${modId}/${art.rel}`, `art/${modId}/${art.rel}`);
   }
 
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
-  const notes = [
-    {
-      title: "Close Baldur's Gate 3 before installing",
-      body: "The pack writes mods and modsettings into the game's Proton prefix. Close the game and its launcher first.",
-      tone: "warning",
-    },
-    {
-      title: "Script Extender",
-      body: bg3seFiles
-        ? "BG3 Script Extender is included and applied with the pack."
-        : "This pack has no BG3 Script Extender files. Install BG3SE in the game before using Script Extender mods.",
-      tone: bg3seFiles ? "info" : "warning",
-    },
-    {
-      title: "Saves",
-      body: "Saves are not part of the pack and are not synced. Adding or removing mods can affect existing saves.",
-      tone: "warning",
-    },
-  ];
+  const notes = [...(recipe && Array.isArray(recipe.notes) ? recipe.notes : [])];
+  notes.push({
+    title: "Script Extender",
+    body: bg3seFiles
+      ? "BG3 Script Extender is included and applied with the pack."
+      : "This pack has no BG3 Script Extender files. Install BG3SE in the game before using Script Extender mods.",
+    tone: bg3seFiles ? "info" : "warning",
+  });
+  const preconditions = recipe && Array.isArray(recipe.preconditions)
+    ? recipe.preconditions
+    : [
+      { id: "game-installed", type: "game-installed", required: true, title: "Baldur's Gate 3 is installed" },
+      { id: "game-build", type: "game-build", required: true, build: GAME.build, title: `Game is build ${GAME.build} (${GAME.version})` },
+      { id: "proton-prefix", type: "proton-prefix", required: true, title: "Proton prefix exists", hint: "Launch the vanilla game once from Steam." },
+      { id: "game-closed", type: "game-not-running", required: true, title: "Game is closed" },
+      { id: "disk-free", type: "disk-free", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough space for the pack" },
+      { id: "disk-free-game", type: "disk-free", scope: "game", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough space to apply the pack" },
+    ];
 
   const pack = {
     schema: 1,
-    id: PACK_ID,
-    name: "BG3 Modded",
-    description: "Baldur's Gate 3 mod snapshot with modsettings and Script Extender",
+    id: packId,
+    name: packName,
+    description: packDescription,
     game: { ...GAME },
-    mod: { id: MOD_ID, version },
-    loader: { type: "bg3se", profile: `mods/${MOD_ID}/versions/${version}/modsettings.lsx` },
+    mod: { id: modId, version },
+    loader: { type: "bg3se", profile: `mods/${modId}/versions/${version}/modsettings.lsx` },
     launch: {
       type: "steam",
       exe: "bin/bg3.exe",
       gameProcess: "bg3.exe",
       steamAppId: GAME.appId,
-      profile: `mods/${MOD_ID}/versions/${version}/modsettings.lsx`,
+      profile: `mods/${modId}/versions/${version}/modsettings.lsx`,
       saveFile: "PlayerProfiles/Public",
       dataDir: "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3",
     },
@@ -186,28 +192,22 @@ async function buildPack({ source, out, link = true, version: requestedVersion, 
       bg3se: bg3seFiles > 0,
     },
     art: {
-      grid: `art/${MOD_ID}/grid.png`,
-      hero: `art/${MOD_ID}/hero.png`,
-      logo: `art/${MOD_ID}/logo.png`,
-      icon: `art/${MOD_ID}/icon.png`,
-      header: `art/${MOD_ID}/header.png`,
-      portrait: `art/${MOD_ID}/portrait.png`,
+      grid: `art/${modId}/grid.png`,
+      hero: `art/${modId}/hero.png`,
+      logo: `art/${modId}/logo.png`,
+      icon: `art/${modId}/icon.png`,
+      header: `art/${modId}/header.png`,
+      portrait: `art/${modId}/portrait.png`,
     },
     notes,
-    preconditions: [
-      { id: "game-installed", type: "game-installed", required: true, title: "Baldur's Gate 3 is installed" },
-      { id: "game-build", type: "game-build", required: true, build: GAME.build, title: "Game is build 25605617 (Patch 8)" },
-      { id: "proton-prefix", type: "proton-prefix", required: true, title: "Proton prefix exists", hint: "Launch the vanilla game once from Steam." },
-      { id: "game-closed", type: "game-not-running", required: true, title: "Game is closed" },
-      { id: "disk-free", type: "disk-free", required: true, reserveBytes: 1024 * 1024 * 1024, title: "Enough free space" },
-    ],
+    preconditions,
     files: "files.json",
     save: { transfer: "out-of-scope" },
   };
 
   writeJson(path.join(dst, "pack.json"), pack);
-  writeJson(path.join(dst, "files.json"), { schema: 1, pack: PACK_ID, version, files });
-  writeText(path.join(dst, "README.md"), `# BG3 Modded pack\n\nBaldur's Gate 3 ${GAME.version} (build ${GAME.build})\n${paks.length} mods, ${version}\n\nMods and modsettings only. No base game, no saves.\n`);
+  writeJson(path.join(dst, "files.json"), { schema: 1, pack: packId, version, files });
+  writeText(path.join(dst, "README.md"), `# ${packName} pack\n\nBaldur's Gate 3 ${GAME.version} (build ${GAME.build})\n${paks.length} mods, ${version}\n\nMods and modsettings only. No base game, no saves.\n`);
   log(`Wrote ${files.length} files, ${formatBytes(totalBytes)}`);
   return { packRoot: dst, pack, files: files.length, totalBytes };
 }

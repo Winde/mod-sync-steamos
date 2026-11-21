@@ -92,7 +92,15 @@
       "type": "disk-free",
       "required": true,
       "reserveBytes": 1073741824,
-      "title": "Enough free space"
+      "title": "Enough space for the pack"
+    },
+    {
+      "id": "disk-free-game",
+      "type": "disk-free",
+      "scope": "game",
+      "required": true,
+      "reserveBytes": 1073741824,
+      "title": "Enough space to apply the pack"
     }
   ],
   "files": "files.json",

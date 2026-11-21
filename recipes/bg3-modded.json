@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "bg3-modded",
+  "game": "bg3",
+  "name": "BG3 Modded",
+  "description": "Baldur's Gate 3 mod snapshot with modsettings and Script Extender",
+  "modId": "bg3",
+  "notes": [
+    {
+      "title": "Close Baldur's Gate 3 before installing",
+      "body": "The pack writes mods and modsettings into the game's Proton prefix. Close the game and its launcher first.",
+      "tone": "warning"
+    },
+    {
+      "title": "Saves",
+      "body": "Saves are not part of the pack and are not synced. Adding or removing mods can affect existing saves.",
+      "tone": "warning"
+    }
+  ],
+  "preconditions": [
+    { "id": "game-installed", "type": "game-installed", "required": true, "title": "Baldur's Gate 3 is installed" },
+    { "id": "game-build", "type": "game-build", "required": true, "build": "25605617", "title": "Game is build 25605617 (Patch 8)" },
+    { "id": "proton-prefix", "type": "proton-prefix", "required": true, "title": "Proton prefix exists", "hint": "Launch the vanilla game once from Steam." },
+    { "id": "game-closed", "type": "game-not-running", "required": true, "title": "Game is closed" },
+    { "id": "disk-free", "type": "disk-free", "required": true, "reserveBytes": 1073741824, "title": "Enough space for the pack" },
+    { "id": "disk-free-game", "type": "disk-free", "scope": "game", "required": true, "reserveBytes": 1073741824, "title": "Enough space to apply the pack" }
+  ]
+}

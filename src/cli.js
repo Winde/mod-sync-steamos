@@ -3,8 +3,8 @@ const path = require("node:path");
 const { parseArgs } = require("node:util");
 const readline = require("node:readline/promises");
 const util = require("./util");
-const { buildPack } = require("./drivers/eldenring");
-const bg3 = require("./drivers/bg3");
+const { driverFor } = require("./drivers");
+const recipes = require("./recipes");
 const { loadPack, packSummary } = require("./manifest");
 const { createServer } = require("./server");
 const { createAgent } = require("./agent");
@@ -27,17 +27,17 @@ Commands:
   help      This help
 
 pack:
-  --game <id>       eldenring (default) or bg3
+  --recipe <id|file> Pack recipe from recipes/ (e.g. eldenring-graceborne)
   --source <dir>    Working install (default: state/config.json or the game's data dir)
-  --out <dir>       Pack output (default: config or packs/<game>)
+  --out <dir>       Pack output (default: config or packs/<recipe>)
   --version <ver>   Mod version (default: current.txt for ER, date for BG3)
   --game-root <dir> BG3 game install (default: detected Steam library)
   --copy            Copy payload instead of hardlinking
 
 init:
-  --game <id>       eldenring (default) or bg3
-  Asks once for the working install and pack output, then writes state/config.json.
-  After that, \`modsync pack\` needs no arguments.
+  --recipe <id|file> Pack recipe to remember
+  Asks once for the recipe, working install, and pack output, then writes
+  state/config.json. After that, \`modsync pack\` needs no arguments.
 
 serve:
   --packs <dir>     Packs directory (default: packs)
@@ -68,57 +68,58 @@ function readConfig() {
 
 async function cmdInit(values = {}) {
   const current = readConfig();
-  const game = String(values.game || current.game || "eldenring");
-  const defaultSource = values.source || current.source
-    || (game === "bg3" ? bg3.defaultSource() : "D:\\EldenRingMods");
-  const defaultOut = values.out || current.out
-    || path.join("packs", game === "bg3" ? "bg3-modded" : "eldenring-graceborne");
+  const list = recipes.listRecipes();
+  if (!list.length) fail(`No recipes in ${recipes.recipesDir}. Add a recipe first.`);
+  const recipeDefault = values.recipe || current.recipe || list[0].id;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const gameAnswer = await rl.question(`Game (eldenring/bg3) [${game}]: `);
-    const chosen = (gameAnswer.trim() || game).toLowerCase();
-    const sourceDefault = chosen === game
-      ? defaultSource
-      : (chosen === "bg3" ? bg3.defaultSource() : "D:\\EldenRingMods");
-    const outDefault = chosen === game
-      ? defaultOut
-      : path.join("packs", chosen === "bg3" ? "bg3-modded" : "eldenring-graceborne");
+    console.log(`Recipes: ${list.map((r) => r.id).join(", ")}`);
+    const recipeAnswer = await rl.question(`Pack recipe [${recipeDefault}]: `);
+    const recipe = recipes.loadRecipe(recipeAnswer.trim() || recipeDefault);
+    const driver = driverFor(recipe.game);
+    const same = recipe.id === current.recipe;
+    const sourceDefault = values.source || (same && current.source) || driver.defaultSource();
+    const outDefault = values.out || (same && current.out) || path.join("packs", recipe.id);
     const sourceAnswer = await rl.question(`Working install [${sourceDefault}]: `);
     const source = sourceAnswer.trim() || sourceDefault;
     const outAnswer = await rl.question(`Pack output [${outDefault}]: `);
     const out = outAnswer.trim() || outDefault;
     util.ensureDir(path.dirname(configPath));
-    util.writeJson(configPath, { game: chosen, source, out });
+    util.writeJson(configPath, { recipe: recipe.id, source, out });
     console.log(`Wrote ${configPath}`);
     if (!fs.existsSync(source)) console.log(`WARNING: ${source} does not exist yet.`);
-    return { game: chosen, source, out };
+    return { recipe: recipe.id, source, out };
   } finally {
     rl.close();
   }
 }
 
 async function cmdPack(values) {
-  if (!fs.existsSync(configPath) && !values.source && !values.out && process.stdin.isTTY) {
+  if (!fs.existsSync(configPath) && !values.recipe && !values.source && !values.out && process.stdin.isTTY) {
     console.log("No pack config yet. Set it once; press Enter to accept each default.\n");
     await cmdInit(values);
     console.log("");
   }
   const config = readConfig();
-  const game = String(values.game || config.game || "eldenring");
-  const isBg3 = game === "bg3";
-  if (game !== "eldenring" && !isBg3) fail(`Unknown game: ${game} (use eldenring or bg3)`);
-  const source = values.source || config.source
-    || (isBg3 ? bg3.defaultSource() : "D:\\EldenRingMods");
-  const out = path.resolve(values.out || config.out || path.join(repoRoot, "packs", isBg3 ? "bg3-modded" : "eldenring-graceborne"));
-  console.log(`Game: ${isBg3 ? "Baldur's Gate 3" : "ELDEN RING"}`);
+  const recipeRef = values.recipe || config.recipe;
+  if (!recipeRef) {
+    const list = recipes.listRecipes().map((r) => r.id).join(", ") || "none";
+    fail(`No pack recipe. Run modsync init or pass --recipe <id>. Recipes: ${list}`);
+  }
+  const recipe = recipes.loadRecipe(recipeRef);
+  const driver = driverFor(recipe.game);
+  const source = values.source || config.source || driver.defaultSource();
+  const out = path.resolve(values.out || config.out || path.join(repoRoot, "packs", recipe.id));
+  console.log(`Game: ${driver.GAME.title}`);
+  console.log(`Pack: ${recipe.name} (${recipe.id})`);
   console.log(`Source: ${source}`);
   console.log(`Output: ${out}`);
-  const build = isBg3 ? bg3.buildPack : buildPack;
-  const result = await build({
+  const result = await driver.buildPack({
+    recipe,
     source,
     out,
     link: !values.copy,
-    version: values.version || config.version,
+    version: values.version || config.version || recipe.version,
     gameRoot: values["game-root"],
     log: (m) => console.log(m),
   });
@@ -247,7 +248,7 @@ async function main(argv) {
     allowPositionals: true,
     options: {
       source: { type: "string" }, out: { type: "string" }, version: { type: "string" },
-      game: { type: "string" }, "game-root": { type: "string" },
+      recipe: { type: "string" }, "game-root": { type: "string" },
       copy: { type: "boolean" }, packs: { type: "string" }, host: { type: "string" }, lan: { type: "boolean" },
       port: { type: "string" }, token: { type: "string" }, config: { type: "string" },
       "rebuild-bootstrap": { type: "boolean" }, "skip-bootstrap": { type: "boolean" },

@@ -34,7 +34,7 @@ the bind address is detected or passed explicitly, and the firewall rule uses
 pack.json          metadata: game, mod, launch, art, files manifest path
 files.json         source -> target, size, sha256, mode
 payload/           the mod files (hardlinked or copied)
-profiles/          loader profile (me3)
+profiles/          loader profile (me3 for ELDEN RING; modsettings for BG3)
 tools/             loader runtime (me3 Linux/Windows)
 art/               grid/hero/logo/icon
 README.md
@@ -195,7 +195,8 @@ v1 supports overlay packs on SteamOS. Profile/in-place drivers come later.
 Installs are versioned:
 
 - `mods/<mod>/versions/<version>/`
-- `profiles/<mod>-<version>.me3`
+- `profiles/<mod>-<version>.me3` for me3 packs; BG3 keeps its versioned
+  `modsettings.lsx` inside the version directory.
 - `mods/<mod>/current.txt`
 
 The launcher reads `current.txt` at launch. Installing a new version keeps the
@@ -208,6 +209,7 @@ rollback list. Saves are not versioned in v1.
 
 ## Console/terminal
 
-The Linux launcher starts me3, waits for the game process, waits for exit, then
-stops me3 and exits. The `.desktop` uses `Terminal=false`. Windows uses the same
-wait/kill pattern in PowerShell.
+For me3 packs, the Linux launcher starts me3, waits for the game process, waits
+for exit, then stops me3 and exits. BG3 packs are applied to the Proton prefix
+at install/rollback time, then the launcher starts the game through Steam. The
+`.desktop` uses `Terminal=false`.

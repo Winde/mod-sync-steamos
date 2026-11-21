@@ -18,8 +18,8 @@ BG3, BG2 and others are added as drivers/packs later.
 - Steam Cloud continues to handle the vanilla save. The mod save stays local on
   each machine.
 - ReShade is skipped on SteamOS; the in-game mod changes still apply.
-- The launcher waits for the game to exit, stops me3, and exits (no lingering
-  console/terminal).
+- Game-specific launchers handle their own loader: me3 waits for ELDEN RING and
+  exits, BG3 applies its mods and starts through Steam.
 
 ## Quick start (PC)
 
@@ -38,7 +38,9 @@ node bin/modsync.js serve --lan --packs packs --port 8787
 ```
 
 `init` writes `state/config.json`; after that `pack` needs no arguments. The
-full form is still available: `pack --source <dir> --out <dir> --version <ver>`.
+full form is still available: `pack --recipe eldenring-graceborne --source <dir> --out <dir> --version <ver>`.
+Pack identity lives in `recipes/<id>.json` (Graceborne, Convergence, BG3);
+the driver only knows the game's layout and loader.
 The planned PC pack-builder app uses the same source/output fields.
 
 `serve` binds loopback by default. `--lan` binds the detected LAN IPv4 and
@@ -85,16 +87,17 @@ No SSH. No port forwarding. LAN only.
 
 ## Rollback
 
-Every installed version and its me3 profile stay on disk. The launcher reads
+Every installed version and its loader profile stay on disk (me3 for ELDEN
+RING, modsettings for BG3). The launcher reads
 `mods/<mod>/current.txt`, so rollback is a pointer switch:
 
 1. Build 0.2.5 and install it on the TV:
    ```powershell
-   node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.5
+   node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.5
    ```
 2. Build 0.2.7 and install/update:
    ```powershell
-   node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.7
+   node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.7
    ```
 3. The dashboard now shows **Roll back** (home and Details). It switches
    `current.txt` to 0.2.5; 0.2.7 stays installed.
@@ -110,7 +113,9 @@ the game is closed.
 - Verifies the game build declared by the pack and the Proton prefix.
 - Refuses to install while the game is running.
 - Downloads each file with SHA-256 verification; writes to a staging version.
-- Writes a me3 profile, a Linux launcher, and a `.desktop` shortcut.
+- Writes the loader artifacts the pack declares: an me3 profile for ELDEN RING,
+  or `modsettings.lsx` plus BG3 Script Extender for Baldur's Gate 3.
+- Writes a Linux launcher and a `.desktop` shortcut.
 - Optionally registers the shortcuts in Steam (restart Steam afterwards).
 
 ## Save boundary (v1)

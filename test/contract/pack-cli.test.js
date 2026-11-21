@@ -29,6 +29,7 @@ test("pack CLI produces a complete pack contract", { timeout: 60000 }, async (t)
 
   const result = await runCli([
     "pack",
+    "--recipe", "eldenring-graceborne",
     "--source", source,
     "--out", out,
     "--version", "0.2.7",
@@ -99,6 +100,7 @@ test("pack CLI builds a requested older version", { timeout: 60000 }, async (t) 
 
   await runCli([
     "pack",
+    "--recipe", "eldenring-graceborne",
     "--source", source,
     "--out", out,
     "--version", "0.2.5",
@@ -120,6 +122,7 @@ test("pack CLI fails when the source install is missing", { timeout: 60000 }, as
   await assert.rejects(
     runCli([
       "pack",
+      "--recipe", "eldenring-graceborne",
       "--source", path.join(root, "missing"),
       "--out", path.join(root, "pack"),
       "--version", "0.2.7",

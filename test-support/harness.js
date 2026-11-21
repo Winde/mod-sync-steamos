@@ -151,7 +151,13 @@ function runCli(args, { env = process.env, timeout = 60000 } = {}) {
 }
 
 async function buildPack({ source, out, version }) {
-  const result = await runCli(["pack", "--source", source, "--out", out, "--version", version]);
+  const result = await runCli([
+    "pack",
+    "--recipe", "eldenring-graceborne",
+    "--source", source,
+    "--out", out,
+    "--version", version,
+  ]);
   return {
     packRoot: out,
     pack: readJson(path.join(out, "pack.json")),

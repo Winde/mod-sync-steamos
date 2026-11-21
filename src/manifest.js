@@ -72,6 +72,8 @@ function packSummary(packRoot) {
     game: pack.game,
     mod: pack.mod,
     launch: pack.launch,
+    loader: pack.loader || null,
+    install: pack.install || null,
     art: pack.art,
     notes: pack.notes || [],
     preconditions: pack.preconditions || [],

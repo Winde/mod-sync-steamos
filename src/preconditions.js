@@ -51,6 +51,9 @@ function validatePreconditions(list) {
     if (check.type === "disk-free" && check.bytes != null && !Number.isFinite(check.bytes)) {
       throw new Error(`pack.json.preconditions: ${check.id} bytes must be a number`);
     }
+    if (check.type === "disk-free" && check.scope != null && !["tv", "game"].includes(check.scope)) {
+      throw new Error(`pack.json.preconditions: ${check.id} scope must be tv or game`);
+    }
     if (check.type === "path-exists") {
       const paths = check.paths || (check.path ? [check.path] : []);
       if (!Array.isArray(paths) || !paths.length) throw new Error(`pack.json.preconditions: ${check.id} needs path or paths`);
@@ -145,11 +148,13 @@ function checkOne(check, { pack, game, root, totalBytes }) {
     case "disk-free": {
       const reserve = Number.isFinite(check.reserveBytes) ? check.reserveBytes : 1024 * 1024 * 1024;
       const need = Number.isFinite(check.bytes) ? check.bytes : (totalBytes || 0) + reserve;
-      const free = util.freeBytes(root);
+      const base = check.scope === "game" ? (game && game.root) : root;
+      if (!base) return unknown("Game not found.");
+      const free = util.freeBytes(base);
       if (free == null) return unknown("Free space could not be read.");
       return free >= need
-        ? pass(`${util.formatBytes(free)} free.`)
-        : fail(`${util.formatBytes(free)} free; need ${util.formatBytes(need)}.`);
+        ? pass(`${util.formatBytes(free)} free at ${base}.`)
+        : fail(`${util.formatBytes(free)} free at ${base}; need ${util.formatBytes(need)}.`);
     }
     case "path-exists": {
       const paths = check.paths || [check.path];
@@ -207,7 +212,7 @@ function defaultTitle(check, pack) {
     case "game-build": return `${pack.game.title} build ${check.build || pack.game.build}`;
     case "game-not-running": return "Game is closed";
     case "proton-prefix": return "Proton prefix exists";
-    case "disk-free": return "Enough free space";
+    case "disk-free": return check.scope === "game" ? "Enough space in the game library" : "Enough free space";
     case "path-exists": return "Required files exist";
     case "dlc-installed": return "DLC is installed";
     case "manual": return "Manual check";

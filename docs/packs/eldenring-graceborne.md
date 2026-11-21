@@ -37,8 +37,8 @@ loads the profile.
 Build and install 0.2.5 before 0.2.7 if you want a rollback target:
 
 ```powershell
-node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.5
-node bin/modsync.js pack --source "D:\EldenRingMods" --version 0.2.7
+node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.5
+node bin/modsync.js pack --recipe eldenring-graceborne --version 0.2.7
 ```
 
 The dashboard switches `current.txt` back to the older version; the save is

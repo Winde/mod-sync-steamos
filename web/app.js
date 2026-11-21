@@ -188,6 +188,17 @@
       </div>`).join("")}</div>`;
   }
 
+  function packContents(p) {
+    const base = `${gb(p.totalBytes)} · ${p.files} files`;
+    if (p.loader && p.loader.type === "me3") return `${base} · me3 profile included`;
+    if (p.loader && p.loader.type === "bg3se") {
+      return p.install && p.install.bg3se
+        ? `${base} · modsettings + BG3SE included`
+        : `${base} · modsettings included`;
+    }
+    return p.loader && p.loader.type ? `${base} · ${p.loader.type} loader included` : base;
+  }
+
   function renderLibrary() {
     const list = games();
     if (!list.length) { library.innerHTML = ""; return; }
@@ -280,7 +291,7 @@
           <div class="meta">${esc(st.label)} · ${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</div>
           ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? ` (+${p.preconditions.failedRequired.length - 1} more)` : ""}</div>` : ""}
           <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${refreshHtml}</div>
-          <div class="hint">${installed ? "Saves stay on this TV · Steam Cloud handles the vanilla save" : `${gb(p.totalBytes)} · ${p.files} files · me3 profile included`}</div>
+          <div class="hint">${installed ? "Saves stay on this TV · Steam Cloud handles the vanilla save" : packContents(p)}</div>
         </div>
       </section>`;
     renderLibrary();
