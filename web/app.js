@@ -7,7 +7,9 @@
   const overlay = $("#overlay");
   const pc = $("#pc");
   const storageBtn = $("#storage-btn");
+  const updateBtn = $("#update-btn");
   const content = $(".content");
+  const desktop = typeof window !== "undefined" ? window.modsyncDesktop : null;
 
   const S = {
     data: null,
@@ -22,6 +24,7 @@
     details: null,
     download: null,
     storage: null,
+    update: null,
     wakeLock: null,
     rate: [],
     polling: false,
@@ -199,11 +202,66 @@
     return p.loader && p.loader.type ? `${base} · ${p.loader.type} loader included` : base;
   }
 
+  function renderUpdateButton() {
+    if (!updateBtn) return;
+    if (S.update && S.update.available) {
+      updateBtn.textContent = `Update ${S.update.latest}`;
+      updateBtn.classList.remove("hidden");
+    } else {
+      updateBtn.classList.add("hidden");
+    }
+  }
+
+  async function checkDesktopUpdate() {
+    if (!desktop || !desktop.checkUpdate) return;
+    try {
+      S.update = await desktop.checkUpdate();
+    } catch {
+      S.update = null;
+    }
+    renderUpdateButton();
+  }
+
+  function requestAppUpdate() {
+    if (!S.update || !S.update.available) return;
+    if (!S.update.canInstall) {
+      if (desktop && desktop.openReleases) desktop.openReleases();
+      return;
+    }
+    S.confirm = {
+      title: `Update ModSync to ${S.update.latest}?`,
+      message: "The app downloads the new AppImage, verifies its checksum, then restarts. Packs and saves stay on this TV.",
+      appUpdate: true,
+    };
+    render();
+  }
+
+  async function installAppUpdate() {
+    S.confirm = null;
+    render();
+    try {
+      await desktop.installUpdate();
+    } catch (err) {
+      S.confirm = { title: "Update failed", message: err.message, simple: true };
+      render();
+    }
+  }
+
   function renderLibrary() {
     const list = games();
     if (!list.length) { library.innerHTML = ""; return; }
 
     if (S.libraryView === "games") {
+      const installedCount = list.reduce((n, g) => n + g.packs.filter((p) => p.installed).length, 0);
+      const offline = S.data?.pc?.online === false;
+      const free = S.data?.diskFreeBytes;
+      const side = `
+        <div class="sidecard">
+          <div class="libtitle">This TV</div>
+          <div class="meta">${installedCount} pack${installedCount === 1 ? "" : "s"} installed${free != null ? ` · ${gb(free)} GB free` : ""}</div>
+          <div class="actions"><button class="btn ghost small" data-action="storage" data-focusable data-key="side-storage">Manage storage</button></div>
+        </div>
+        ${offline ? `<div class="sidecard"><div class="libtitle">PC offline</div><div class="meta">Installed packs can play. Start the PC server when you want to check for updates.</div></div>` : ""}`;
       library.innerHTML = `<div class="libtitle">Games</div>` + list.map((g) => {
         const sel = g.id === S.selectedGame ? " sel" : "";
         const pack = g.packs[0];
@@ -216,7 +274,7 @@
           <div class="art">${thumb}</div>
           <div class="txt"><div class="name">${esc(g.title)}</div><div class="sub">${esc(sub)}</div></div>
         </button>`;
-      }).join("");
+      }).join("") + side;
       return;
     }
 
@@ -267,8 +325,14 @@
     if (job) return renderProgress(job, p);
 
     const installed = p.installed;
+    const offline = S.data?.pc?.online === false;
     const canAct = !blocker;
     const primary = st.primary;
+    const stateText = !installed
+      ? null
+      : offline
+        ? "PC offline · can't check for updates"
+        : st.label.replace(/^Installed [^·]+· /, "");
     const primaryHtml = primary
       ? `<button class="btn primary" data-action="${primary.action}" data-pack="${esc(p.id)}" ${canAct ? "" : "disabled"} data-autofocus data-focusable data-key="primary">${primary.label}</button>`
       : "";
@@ -288,7 +352,7 @@
           <div class="kicker">${esc(p.game.title)} · ${esc(p.name)}</div>
           <h1>${esc(p.name)}</h1>
           <div class="bigstatus">${installed ? `Installed ${esc(p.installedVersion)}` : "Ready to install"}</div>
-          <div class="meta">${esc(st.label)} · ${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</div>
+          <div class="meta">${stateText ? `${esc(stateText)} · ` : ""}${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</div>
           ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? ` (+${p.preconditions.failedRequired.length - 1} more)` : ""}</div>` : ""}
           <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${refreshHtml}</div>
           <div class="hint">${installed ? "Saves stay on this TV · Steam Cloud handles the vanilla save" : packContents(p)}</div>
@@ -564,10 +628,13 @@
   }
 
   function render() {
-    S.focusKey = document.activeElement?.getAttribute("data-key") || S.focusKey;
+    const active = document.activeElement;
+    const activeKey = active && active.closest("#main, #overlay") ? active.getAttribute("data-key") : null;
+    if (activeKey) S.focusKey = activeKey;
     pc.classList.toggle("online", !!S.data?.pc?.online);
     pc.querySelector("span:last-child").textContent = S.data?.pc?.online ? "PC online" : "PC offline";
     content.classList.toggle("wide", S.view === "storage");
+    renderUpdateButton();
     if (S.confirm) return renderConfirm();
     if (S.download) return renderDownloadSheet();
     if (S.view === "storage") return renderStorage();
@@ -735,6 +802,7 @@
     else if (action === "dismiss-job") { S.job = null; S.view = "home"; render(); }
     else if (action === "close-download") { S.download = null; S.view = "home"; render(); }
     else if (action === "storage") openStorage();
+    else if (action === "update-app") requestAppUpdate();
     else if (action === "close-storage") { S.view = "home"; render(); }
     else if (action === "storage-clear") requestStorageClear(packId, el.getAttribute("data-scope"), Number(el.getAttribute("data-bytes") || 0));
     else if (action === "launch") launch(packId);
@@ -752,7 +820,8 @@
     else if (action === "confirm-yes") {
       const c = S.confirm;
       S.confirm = null;
-      if (c.storage) clearStorageData(c.storage);
+      if (c.appUpdate) installAppUpdate();
+      else if (c.storage) clearStorageData(c.storage);
       else if (c.packId) rollback(c.packId);
       else render();
     }
@@ -834,4 +903,5 @@
     if (!S.confirm && !S.download && !S.polling && S.view !== "details" && S.view !== "storage") refresh();
   }, 3000);
   refresh();
+  if (desktop) setTimeout(checkDesktopUpdate, 1200);
 })();
