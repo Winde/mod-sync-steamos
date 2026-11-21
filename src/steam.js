@@ -197,6 +197,86 @@ function mergeShortcut(list, entry) {
   return { list: out, action: "updated", deduped };
 }
 
+function shortcutList(parsed) {
+  return Array.isArray(parsed.shortcuts) ? parsed.shortcuts : Object.values(parsed.shortcuts || {});
+}
+
+function entryAppId(entry) {
+  const stored = Number(entry.appid);
+  if (Number.isFinite(stored)) return stored >>> 0;
+  return shortcutId(`${entry.Exe || entry.exe || ""}${entry.appname || entry.AppName || ""}`).unsigned;
+}
+
+function removeGridArt(configDir, id) {
+  const grid = path.join(configDir, "grid");
+  for (const suffix of [".png", "p.png", "_grid.png", "_hero.png", "_logo.png", "_icon.png"]) {
+    fs.rmSync(path.join(grid, `${id}${suffix}`), { force: true });
+  }
+}
+
+async function readShortcuts(file) {
+  const shortcut = require("steam-shortcut-editor");
+  return new Promise((resolve, reject) => {
+    shortcut.parseFile(file, { autoConvertArrays: true, autoConvertBooleans: true, dateProperties: ["LastPlayTime"] }, (err, parsed) => {
+      if (err) reject(err); else resolve(parsed);
+    });
+  });
+}
+
+async function writeShortcuts(file, list) {
+  const shortcut = require("steam-shortcut-editor");
+  await new Promise((resolve, reject) => {
+    shortcut.writeFile(file, { shortcuts: list }, (err) => err ? reject(err) : resolve());
+  });
+}
+
+async function removeShortcut({ exePath }) {
+  const ud = findUserData();
+  if (!ud) return { removed: 0 };
+  const file = path.join(ud.configDir, "shortcuts.vdf");
+  if (!fs.existsSync(file)) return { removed: 0 };
+  const parsed = await readShortcuts(file);
+  const target = unquote(exePath).replace(/\//g, "\\").toLowerCase();
+  const removed = [];
+  const keep = [];
+  for (const item of shortcutList(parsed)) {
+    const exe = unquote(item.Exe || item.exe).replace(/\//g, "\\").toLowerCase();
+    if (target && exe === target) removed.push(item); else keep.push(item);
+  }
+  if (!removed.length) return { removed: 0 };
+  fs.copyFileSync(file, `${file}.modsync-${Date.now()}.bak`);
+  await writeShortcuts(file, keep);
+  for (const item of removed) removeGridArt(ud.configDir, entryAppId(item));
+  return { removed: removed.length };
+}
+
+/**
+ * Remove shortcuts whose executable lives under this ModSync root but no
+ * longer exists. Used at startup to clean up after a pack was removed.
+ */
+async function pruneMissingShortcuts({ prefix }) {
+  const ud = findUserData();
+  if (!ud) return { removed: 0 };
+  const file = path.join(ud.configDir, "shortcuts.vdf");
+  if (!fs.existsSync(file)) return { removed: 0 };
+  const parsed = await readShortcuts(file);
+  const wanted = unquote(prefix).replace(/\//g, "\\").toLowerCase();
+  const base = wanted.endsWith("\\") ? wanted : `${wanted}\\`;
+  const removed = [];
+  const keep = [];
+  for (const item of shortcutList(parsed)) {
+    const raw = unquote(item.Exe || item.exe);
+    const exe = raw.replace(/\//g, "\\").toLowerCase();
+    if (base && exe.startsWith(base) && !fs.existsSync(raw)) removed.push(item);
+    else keep.push(item);
+  }
+  if (!removed.length) return { removed: 0 };
+  fs.copyFileSync(file, `${file}.modsync-${Date.now()}.bak`);
+  await writeShortcuts(file, keep);
+  for (const item of removed) removeGridArt(ud.configDir, entryAppId(item));
+  return { removed: removed.length };
+}
+
 async function registerShortcut({ exePath, name, icon, art, allowOverlay = true }) {
   const shortcut = require("steam-shortcut-editor");
   const ud = findUserData();
@@ -270,5 +350,6 @@ async function registerShortcut({ exePath, name, icon, art, allowOverlay = true 
 
 module.exports = {
   steamRoots, libraries, findGame, findUserData, findAppManifest, readManifest,
-  readInstalledDepots, registerShortcut, shortcutId, mergeShortcut, setExtraLibraries,
+  readInstalledDepots, registerShortcut, removeShortcut, pruneMissingShortcuts,
+  shortcutId, mergeShortcut, setExtraLibraries,
 };

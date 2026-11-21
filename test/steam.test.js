@@ -97,6 +97,88 @@ test("registerShortcut writes one Steam entry and updates it on a second run", a
   }
 });
 
+async function steamFixture(t, prefix) {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const oldEnv = {
+    home: process.env.HOME,
+    pf: process.env["ProgramFiles(x86)"],
+    pfx: process.env.ProgramFiles,
+  };
+  let config;
+  if (process.platform === "win32") {
+    const pf = path.join(base, "ProgramFiles");
+    process.env["ProgramFiles(x86)"] = pf;
+    process.env.ProgramFiles = pf;
+    config = path.join(pf, "Steam", "userdata", "123", "config");
+  } else {
+    process.env.HOME = path.join(base, "home");
+    config = path.join(process.env.HOME, ".steam", "steam", "userdata", "123", "config");
+  }
+  fs.mkdirSync(config, { recursive: true });
+  t.after(() => {
+    if (oldEnv.home === undefined) delete process.env.HOME; else process.env.HOME = oldEnv.home;
+    if (oldEnv.pf === undefined) delete process.env["ProgramFiles(x86)"]; else process.env["ProgramFiles(x86)"] = oldEnv.pf;
+    if (oldEnv.pfx === undefined) delete process.env.ProgramFiles; else process.env.ProgramFiles = oldEnv.pfx;
+    fs.rmSync(base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  });
+  return { base, config };
+}
+
+async function readList(config) {
+  const parser = require("steam-shortcut-editor");
+  const parsed = await new Promise((resolve, reject) => {
+    parser.parseFile(path.join(config, "shortcuts.vdf"), { autoConvertArrays: true, autoConvertBooleans: true }, (err, value) => {
+      if (err) reject(err); else resolve(value);
+    });
+  });
+  return Array.isArray(parsed.shortcuts) ? parsed.shortcuts : Object.values(parsed.shortcuts || {});
+}
+
+test("removeShortcut removes the entry and its grid art", async (t) => {
+  const { base, config } = await steamFixture(t, "modsync-steam-remove-");
+  const art = path.join(base, "art.png");
+  fs.writeFileSync(art, "art");
+  const exePath = process.platform === "win32" ? path.join(base, "launch.cmd") : path.join(base, "launch.sh");
+  const added = await steam.registerShortcut({
+    exePath,
+    name: "Graceborne",
+    icon: art,
+    art: { header: art, portrait: art, grid: art, hero: art, logo: art, icon: art },
+  });
+  assert.equal((await readList(config)).length, 1);
+  for (const suffix of [".png", "_grid.png", "_hero.png", "_logo.png", "_icon.png"]) {
+    assert.ok(fs.existsSync(path.join(config, "grid", `${added.appId}${suffix}`)));
+  }
+
+  const out = await steam.removeShortcut({ exePath });
+  assert.equal(out.removed, 1);
+  assert.deepEqual(await readList(config), []);
+  for (const suffix of [".png", "_grid.png", "_hero.png", "_logo.png", "_icon.png"]) {
+    assert.equal(fs.existsSync(path.join(config, "grid", `${added.appId}${suffix}`)), false);
+  }
+});
+
+test("pruneMissingShortcuts removes only missing launchers under the ModSync root", async (t) => {
+  const { base, config } = await steamFixture(t, "modsync-steam-prune-");
+  const art = path.join(base, "art.png");
+  fs.writeFileSync(art, "art");
+  const stale = path.join(base, "ModSync", "packs", "graceborne", "launchers", "launch-graceborne.sh");
+  const live = path.join(base, "ModSync", "packs", "bg3", "launchers", "launch-bg3.sh");
+  const other = path.join(base, "Other", "launch.sh");
+  fs.mkdirSync(path.dirname(live), { recursive: true });
+  fs.mkdirSync(path.dirname(other), { recursive: true });
+  fs.writeFileSync(live, "#!/bin/sh\n");
+  fs.writeFileSync(other, "#!/bin/sh\n");
+  await steam.registerShortcut({ exePath: stale, name: "Graceborne", icon: art, art: { grid: art, icon: art } });
+  await steam.registerShortcut({ exePath: live, name: "BG3 Modded", icon: art, art: { grid: art, icon: art } });
+  await steam.registerShortcut({ exePath: other, name: "Other", icon: art, art: { grid: art, icon: art } });
+
+  const out = await steam.pruneMissingShortcuts({ prefix: path.join(base, "ModSync", "packs") });
+  assert.equal(out.removed, 1);
+  const names = (await readList(config)).map((entry) => entry.appname).sort();
+  assert.deepEqual(names, ["BG3 Modded", "Other"]);
+});
+
 test("findGame checks every Steam library for the Proton prefix", { skip: process.platform === "win32" }, (t) => {
   const gameRoot = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-game-"));
   const prefixRoot = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-steam-prefix-"));

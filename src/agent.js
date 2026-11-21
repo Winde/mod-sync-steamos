@@ -398,7 +398,17 @@ function createAgent(config) {
           res.writeHead(200, { "content-type": "application/json" });
           return res.end(JSON.stringify(plan));
         }
+        const packRoot = body.packId ? versionStore.packRoot(root, body.packId) : "";
+        let packForShortcut = null;
+        if (packRoot) {
+          try { packForShortcut = util.readJson(versionStore.packFile(packRoot)); } catch { }
+        }
+        const shortcutMod = packForShortcut && packForShortcut.mod ? packForShortcut.mod.id : "";
+        const launcher = packRoot && shortcutMod ? versionStore.launcherFile(packRoot, shortcutMod) : "";
         const out = storage.clearStorage(root, body);
+        if (body.scope === "pack" && launcher) {
+          try { await steam.removeShortcut({ exePath: launcher }); } catch { }
+        }
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify({ ok: true, ...out, storage: storage.computeStorage(root) }));
       }
@@ -453,6 +463,7 @@ function createAgent(config) {
     if (!game) continue;
     try { installer.writeLauncher({ pack, root, game }); } catch { }
   }
+  steam.pruneMissingShortcuts({ prefix: path.join(root, "packs") + path.sep }).catch(() => { });
 
   return {
     server,
