@@ -109,7 +109,7 @@ Saves are not rolled back. That is intentional in v1.
 
 This is the step that proves the Linux launcher and me3, which the PC cannot.
 
-1. In Desktop Mode, run the bootstrap one-liner printed by `serve --lan`.
+1. In Desktop Mode, run the install one-liner printed by `serve --lan` (AppImage + Steam shortcut).
 2. Add `~/Desktop/ModSync.desktop` to Steam once.
 3. Install the pack from the dashboard.
 4. Launch from the generated game shortcut, not the Steam Play button.

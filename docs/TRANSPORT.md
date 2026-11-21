@@ -29,7 +29,8 @@ Bind: <PC-LAN-IP>
 Token: …
 Packs: Graceborne 0.2.7
 Steam Machine (Desktop Mode):
-curl -fsSL 'http://<PC-LAN-IP>:8787/bootstrap.sh?token=…' | bash
+curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
+  | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '…'
 ```
 
 If the PC has a VPN or virtual adapter, check the printed interface list and
@@ -53,23 +54,31 @@ Test from the TV: `curl http://<PC-LAN-IP>:8787/api/health`.
 ## Token
 
 `serve` generates a random token per run unless `--token` is supplied. The token
-is required by `/api/*`, `/bootstrap.sh` and `/bootstrap.tar.gz`. The one-liner
-includes it; the agent stores it in `agent.json`. The TV dashboard is local and
-never exposes the token to the browser.
+is required by `/api/*`, `/bootstrap.sh` and `/bootstrap.tar.gz`. The install
+one-liner includes it; the TV app stores it in `~/ModSync/agent.json`. The
+dashboard is local and never exposes the token to the browser.
 
-## Steam Machine bootstrap
+## Steam Machine install
 
 In Desktop Mode:
+
+```bash
+curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
+  | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '…'
+```
+
+The installer downloads `ModSync.AppImage` into `~/Applications`, verifies its
+checksum, writes `~/ModSync/agent.json`, creates the desktop entry, and adds the
+ModSync Steam shortcut and art.
+
+The legacy browser agent is still available from the PC:
 
 ```bash
 curl -fsSL 'http://<PC-LAN-IP>:8787/bootstrap.sh?token=…' | bash
 ```
 
-It downloads `bootstrap.tar.gz` (agent + Linux Node), extracts to `~/ModSync`,
-writes `agent.json`, creates `~/Desktop/ModSync.desktop`, and starts the agent.
-
-Add `ModSync.desktop` to Steam once. The agent writes game `.desktop` files as
-packs are installed.
+It installs the agent + Linux Node under `~/ModSync` and starts the local
+dashboard. Do not run both on the same port.
 
 ## Pairing and changing IPs
 

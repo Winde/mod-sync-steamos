@@ -54,14 +54,16 @@ The TV does **not** need Node or SSH; it pulls over HTTP.
 
 1. Install the pack's game via Steam and launch it once so its Proton prefix
    exists. Pack-specific prerequisites live in `docs/packs/<pack-id>.md`.
-2. In Desktop Mode, run the one-liner printed by `serve`:
+2. In Desktop Mode, run the install one-liner printed by `serve`:
    ```bash
-   curl -fsSL 'http://<PC-LAN-IP>:8787/bootstrap.sh?token=<token>' | bash
+   curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
+     | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '<token>'
    ```
-3. The bootstrap registers ModSync in Steam automatically (idempotent: running
-   it again updates the same shortcut). Restart Steam once if it is not visible.
-4. Open ModSync and install the pack. The installer registers the game shortcut
-   automatically; restart Steam once if it is not visible.
+3. The installer puts `ModSync.AppImage` in `~/Applications`, writes
+   `~/ModSync/agent.json`, and adds the ModSync Steam shortcut and art
+   automatically. Restart Steam once if it is not visible.
+4. Open ModSync and install the pack. Default-exe packs (BG3) use the regular
+   Steam game link; loader/alternate-exe packs add their own shortcut.
 5. Launch from Game Mode. Saves stay local to each machine in v1.
 
 ## Network (one-time, generic)

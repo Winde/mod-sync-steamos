@@ -94,6 +94,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -107,6 +109,11 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      - name: Release notes
+        env:
+          TAG: ${{ needs.verify.outputs.tag }}
+        run: node scripts/release-notes.mjs "$TAG" > notes.md
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -117,5 +124,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" artifacts/* --clobber
           else
-            gh release create "$TAG" artifacts/* --generate-notes
+            gh release create "$TAG" artifacts/* --notes-file notes.md
           fi

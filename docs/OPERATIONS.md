@@ -31,17 +31,19 @@ Two machines, two different jobs:
    the Proton prefix.
 2. Set the game to update only when launched, and keep the build the pack needs
    (Graceborne: 1.17 / `25827938`).
-3. In Desktop Mode, run the bootstrap one-liner printed by `serve`:
+3. In Desktop Mode, run the install one-liner printed by `serve`:
    ```bash
-   curl -fsSL 'http://<PC-LAN-IP>:8787/bootstrap.sh?token=<token>' | bash
+   curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
+     | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '<token>'
    ```
-   This installs the agent and Node under `~/ModSync`, writes `agent.json`,
-   creates a desktop shortcut, and registers ModSync in Steam. The registration
-   is idempotent: running the bootstrap again updates the same entry.
+   This installs `~/Applications/ModSync.AppImage`, writes `agent.json`, and
+   registers the ModSync Steam shortcut and art. It replaces the older
+   bootstrap agent; the bootstrap remains available for the legacy browser
+   dashboard.
 4. Restart Steam once if the ModSync shortcut is not visible.
-5. Open ModSync and install the pack. The installer registers the game shortcut
-   automatically; restart Steam once if it is not visible.
-6. Launch the game once from that shortcut. It creates the mod save.
+5. Open ModSync and install the pack. Default-exe packs use the regular Steam
+   game link; loader/alternate-exe packs add their own shortcut.
+6. Launch the game once from the correct link. It creates the mod save.
 
 ## Every install or update
 
