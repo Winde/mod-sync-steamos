@@ -3,23 +3,9 @@
 Reusable mod-pack deployment for Windows and SteamOS. **v1 is mods only** — no
 save transfer, no save payload, no save prompts.
 
-The first pack is **ELDEN RING + Graceborne 0.2.7**, but the core is
-game-agnostic: a pack manifest, a game driver, and platform decorators. Skyrim,
-BG3, BG2 and others are added as drivers/packs later.
-
-## v1 scope
-
-- One base game install, many packs.
-- Pack = mod files + loader profile + launcher + art. **No base game, no saves.**
-- PC serves packs over HTTP; the Steam Machine pulls with a local agent.
-- The agent serves a dashboard on the TV at `127.0.0.1:8788`; add it to Steam as
-  a non-Steam game.
-- Deploy/update, rollback, launch, verify. No save sync.
-- Steam Cloud continues to handle the vanilla save. The mod save stays local on
-  each machine.
-- ReShade is skipped on SteamOS; the in-game mod changes still apply.
-- Game-specific launchers handle their own loader: me3 waits for ELDEN RING and
-  exits, BG3 applies its mods and starts through Steam.
+The first packs are **ELDEN RING + Graceborne** and **Baldur's Gate 3**. The
+core is game-agnostic: a pack manifest, a game driver, and platform decorators.
+Skyrim and BG2 are added as drivers/packs later.
 
 ## Quick start (PC)
 
@@ -33,7 +19,7 @@ node bin/modsync.js init
 # Build a pack from the working install. Hardlinks the 7.3 GB payload.
 node bin/modsync.js pack
 
-# Serve it on the LAN. Prints the TV bootstrap one-liner and the current URL.
+# Serve it on the LAN. Prints the TV install one-liner and the current URL.
 node bin/modsync.js serve --lan --packs packs --port 8787
 ```
 
@@ -47,8 +33,8 @@ The planned PC pack-builder app uses the same source/output fields.
 prints the URL/token the TV needs; `--host <ip>` picks a specific interface.
 The server is token-protected and never binds `0.0.0.0`.
 
-`serve` builds `state/bootstrap.tar.gz` on first run (agent + Linux Node).
-The TV does **not** need Node or SSH; it pulls over HTTP.
+The TV installs a self-contained AppImage. It does **not** need Node, a browser
+kiosk, or SSH; the PC only serves the installer and pack files over HTTP.
 
 ## Quick start (Steam Machine)
 
@@ -105,7 +91,7 @@ Rollback does **not** roll back saves. Saves are out of v1; the TV save stays
 where it is. If you need the save from before an update, copy it manually while
 the game is closed.
 
-## What the agent does
+## What the TV app does
 
 - Reads the pack manifest from the PC, shows its notes, and evaluates its
   structured preconditions (game installed/build, prefix, disk, DLC files).
@@ -114,15 +100,15 @@ the game is closed.
 - Downloads each file with SHA-256 verification; writes to a staging version.
 - Writes the loader artifacts the pack declares: an me3 profile for ELDEN RING,
   or `modsettings.lsx` plus BG3 Script Extender for Baldur's Gate 3.
-- Writes a Linux launcher and a `.desktop` shortcut.
-- Optionally registers the shortcuts in Steam (restart Steam afterwards).
+- Writes a launcher and adds a Steam shortcut for loader/alternate-exe packs.
+  Default-exe packs use the regular Steam game link.
 
 ## Save boundary (v1)
 
 - The pack never contains saves.
 - The installer never writes the save directory.
-- Steam Cloud syncs only the vanilla `ER0000.sl2`.
-- Graceborne's `ER0000.graceborne.sl2` stays local to each machine.
+- Steam Cloud handles the vanilla save where the game supports it.
+- Mod saves stay local to each machine.
 - Save sync is a separate **v2** module with per-game parsers/semantics.
 
 ## Docs

@@ -175,8 +175,6 @@ async function cmdServe(values) {
     if (!fs.existsSync(bootstrapTar)) console.log("WARNING: bootstrap.tar.gz is missing; TV bootstrap will 404.");
     console.log("\nSteam Machine (Desktop Mode):");
     console.log(`curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' | bash -s -- --pc '${baseUrl}' --token '${token}'`);
-    console.log("\nLegacy browser agent:");
-    console.log(`curl -fsSL '${baseUrl}/bootstrap.sh?token=${token}' | bash`);
     console.log("\nFirewall (admin PowerShell, once; local subnet only):");
     console.log(`New-NetFirewallRule -DisplayName "ModSync HTTP ${port}" -Direction Inbound -Action Allow -Protocol TCP -LocalPort ${port} -RemoteAddress LocalSubnet -Profile Any`);
     console.log("\nDo not port-forward this port or enable UPnP. Keep it on the LAN.");
