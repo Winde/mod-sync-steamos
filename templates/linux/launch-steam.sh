@@ -7,14 +7,25 @@ GAME="{{GAME}}"
 PREFIX="{{PREFIX}}"
 DATA_DIR="{{DATA_DIR}}"
 STEAM_APP_ID="{{STEAM_APP_ID}}"
-GAME_PROCESS="{{GAME_PROCESS}}"
+GAME_PROCESSES="{{GAME_PROCESSES}}"
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/launch-$MOD-$(date +%Y%m%d-%H%M%S).log"
 
-if command -v pgrep >/dev/null 2>&1 && pgrep -x "$GAME_PROCESS" >/dev/null 2>&1; then
-  echo "$GAME_PROCESS is already running." >>"$LOG"
+game_running() {
+  for process in $GAME_PROCESSES; do
+    if command -v pgrep >/dev/null 2>&1; then
+      pgrep -x "$process" >/dev/null 2>&1 && return 0
+    else
+      ps -eo comm= 2>/dev/null | grep -qx "$process" && return 0
+    fi
+  done
+  return 1
+}
+
+if game_running; then
+  echo "The game is already running." >>"$LOG"
   exit 0
 fi
 

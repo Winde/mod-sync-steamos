@@ -54,6 +54,8 @@ export function writeLauncher({
     DATA_HOME: paths.contextFor(game).dataHome,
     STEAM_APP_ID: pack.launch.steamAppId,
     GAME_PROCESS: target.gameProcess,
+    GAME_PROCESSES: target.processes.join(" "),
+    PROFILE_PATTERN: pack.profilePattern || "",
     EXE: target.exe,
     SAVE_FILE: pack.loader?.saveFile || "",
     LOADER: target.loader ? path.join(packRoot, target.loader) : "",

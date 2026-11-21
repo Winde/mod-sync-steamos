@@ -5,18 +5,25 @@ ROOT="{{ROOT}}"
 MOD="{{MOD}}"
 GAME="{{GAME}}"
 EXE="{{EXE}}"
-GAME_PROCESS="{{GAME_PROCESS}}"
+GAME_PROCESSES="{{GAME_PROCESSES}}"
 STEAM_APP_ID="{{STEAM_APP_ID}}"
 SAVE_FILE="{{SAVE_FILE}}"
 ME3="{{LOADER}}"
 WIN64="{{LOADER_SUPPORT}}"
 LOADER_REL="{{LOADER_REL}}"
 LOADER_SUPPORT_REL="{{LOADER_SUPPORT_REL}}"
+PROFILE_PATTERN="{{PROFILE_PATTERN}}"
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
 VER="$(cat "$ROOT/mods/$MOD/current.txt" 2>/dev/null || true)"
-PROFILE="$ROOT/profiles/$MOD-$VER.me3"
+if [ -n "$PROFILE_PATTERN" ]; then
+  PROFILE_REL="${PROFILE_PATTERN//\{mod\}/$MOD}"
+  PROFILE_REL="${PROFILE_REL//\{version\}/$VER}"
+  PROFILE="$ROOT/$PROFILE_REL"
+else
+  PROFILE="$ROOT/profiles/$MOD-$VER.me3"
+fi
 
 # Prefer the loader snapshot that belongs to the selected version. Packs
 # installed before snapshots existed fall back to the shared root runtime.
@@ -47,11 +54,14 @@ if [ ! -f "$PROFILE" ]; then
 fi
 
 game_running() {
-  if command -v pgrep >/dev/null 2>&1; then
-    pgrep -x "$GAME_PROCESS" >/dev/null 2>&1
-  else
-    ps -eo comm= 2>/dev/null | grep -qx "$GAME_PROCESS"
-  fi
+  for process in $GAME_PROCESSES; do
+    if command -v pgrep >/dev/null 2>&1; then
+      pgrep -x "$process" >/dev/null 2>&1 && return 0
+    else
+      ps -eo comm= 2>/dev/null | grep -qx "$process" && return 0
+    fi
+  done
+  return 1
 }
 
 "$ME3" --windows-binaries-dir "$WIN64" launch \

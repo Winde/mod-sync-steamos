@@ -6,7 +6,7 @@ MOD="{{MOD}}"
 GAME="{{GAME}}"
 BG3LE="{{DATA_HOME}}/bg3le"
 STEAM_APP_ID="{{STEAM_APP_ID}}"
-GAME_PROCESS="{{GAME_PROCESS}}"
+GAME_PROCESSES="{{GAME_PROCESSES}}"
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
@@ -15,7 +15,14 @@ VER="$(cat "$ROOT/mods/$MOD/current.txt" 2>/dev/null || true)"
 BG3LE_SRC="$ROOT/mods/$MOD/versions/$VER/tools/bg3le"
 [ -d "$BG3LE_SRC" ] || BG3LE_SRC="$ROOT/tools/bg3le"
 
-if pgrep -x "$GAME_PROCESS" >/dev/null 2>&1 || pgrep -x bg3 >/dev/null 2>&1; then
+game_running() {
+  for process in $GAME_PROCESSES; do
+    pgrep -x "$process" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
+if game_running; then
   echo "Baldur's Gate 3 is already running." >>"$LOG"
   exit 0
 fi
