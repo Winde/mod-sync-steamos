@@ -1,0 +1,63 @@
+appId: tv.modsync.server
+productName: ModSync Server
+copyright: ModSync
+artifactName: ModSync-Server-${version}-${arch}.${ext}
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - dist/**
+  - web/pc/**
+  - web/pc.html
+  - web/icon.png
+  - web/modsync-grid.png
+  - web/modsync-header.png
+  - web/modsync-hero.png
+  - web/modsync-logo.png
+  - web/modsync-portrait.png
+  - recipes/**
+  - package.json
+
+extraFiles:
+  - from: LICENSE
+    to: LICENSE
+  - from: THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.md
+  - from: licenses
+    to: licenses
+
+extraMetadata:
+  main: dist/electron/server-main.js
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ModSync Server
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  executableName: modsync-server
+  synopsis: Mod pack server for ModSync
+  description: Build, serve, update, and remove mod packs for ModSync clients.
+  desktop:
+    entry:
+      Name: ModSync Server
+      Comment: Mod pack server for ModSync
+      Categories: Utility;Game;
+      Keywords: mods;steamos;steam;pack;server;

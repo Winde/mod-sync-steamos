@@ -265,14 +265,14 @@ test("the agent serves the dashboard assets", { timeout: 60000 }, async (t) => {
 
   const index = await request(agent.base, "/");
   assert.equal(index.status, 200);
-  assert.match(index.text, /MODSYNC/);
-  assert.match(index.text, /\/app\.js/);
+  assert.match(index.text, /ModSync/);
+  assert.match(index.text, /\/tv\/app\.js/);
 
-  const script = await request(agent.base, "/app.js");
+  const script = await request(agent.base, "/tv/app.js");
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /javascript/);
 
-  const style = await request(agent.base, "/style.css");
+  const style = await request(agent.base, "/tv/app.css");
   assert.equal(style.status, 200);
   assert.match(style.headers.get("content-type"), /text\/css/);
 

@@ -17,13 +17,31 @@ Two machines, two different jobs:
    ```powershell
    npm start -- pack
    ```
+   Or open the Server console (`npm run dev:server`) and press **Rebuild** on the pack.
 4. Allow the LAN port once (admin PowerShell):
    ```powershell
    New-NetFirewallRule -DisplayName "ModSync HTTP 8787" -Direction Inbound `
      -Action Allow -Protocol TCP -LocalPort 8787 -RemoteAddress LocalSubnet -Profile Any
    ```
-4. If NordVPN is active, enable **Allow LAN** and keep the LAN out of the tunnel.
-5. Do not port-forward 8787 or enable UPnP.
+5. If NordVPN is active, enable **Allow LAN** and keep the LAN out of the tunnel.
+6. Do not port-forward 8787 or enable UPnP.
+
+## Server: the console
+
+`npm run dev:server` opens the Server console. It owns the pack server and the
+pack library. The console UI is loopback only; the LAN server is a separate
+listener. See [`SERVER-CONSOLE.md`](SERVER-CONSOLE.md) for every control.
+
+The useful flow is:
+
+1. **Pack library → Rebuild** after the working install changes. The old pack
+   stays in place until the new build succeeds.
+2. **Pack server → Start server**.
+3. Run the Client installer/update.
+4. **Pack server → Stop server**.
+
+The token in **Settings** is the live token. Change or generate it there; a
+running server restarts and the install one-liner updates.
 
 ## Steam Machine: one-time setup
 
@@ -45,19 +63,21 @@ Two machines, two different jobs:
 
 ## Every install or update
 
-On the PC:
+On the server, open the console (`npm run dev:server`) and press **Pack server → Start
+server**. Leave it running while the TV downloads. The CLI form still works:
 
 ```powershell
 cd D:\source\mod-sync-steamos
 npm start -- serve --lan --packs packs --port 8787 --token <token>
 ```
 
-Keep that terminal open while the TV downloads. On the Steam Machine:
+On the Steam Machine:
 
 1. Start **ModSync** from Steam.
 2. **Games → game → pack → Install/Update**.
 3. Wait for “Installed …”.
-4. Stop the PC server with `Ctrl+C`; it is not needed after the download.
+4. Press **Stop server** in the console (or `Ctrl+C` in the CLI); it is not
+   needed after the download.
 
 ## Every play session
 
@@ -72,9 +92,9 @@ need the PC either just to play an installed pack.
 
 ## When a new mod version comes out
 
-On the PC: update the working install, rebuild the pack, start `serve --lan`.
-On the TV: open ModSync, press **Update**, then play. The previous version stays
-on disk for rollback.
+On the PC: update the working install, press **Rebuild** in the console, then
+**Start server**. On the TV: open ModSync, press **Update**, then play. The
+previous version stays on disk for rollback.
 
 ## Rollback
 
@@ -97,14 +117,15 @@ The base game and saves are never touched.
 | Time | PC server | Steam Machine |
 |---|---|---|
 | Playing an installed pack | not needed | game shortcut → loader |
-| Installing/updating | `serve --lan` must run | ModSync → download |
+| Installing/updating | console → **Start server** | ModSync → download |
 | Rolling back | not needed (target) | ModSync → Roll back |
 | Clearing storage | not needed | ModSync → Storage |
-| Building a new pack | `pack`, then `serve` | nothing |
+| Building a new pack | console → **Rebuild**, then **Start server** | nothing |
 
 The PC server is a temporary sync service, not a Windows service. Start it when
-the TV needs bytes; stop it afterwards. It binds one private LAN address, needs
-a token, and is scoped to the local subnet.
+the TV needs bytes; stop it afterwards. The console can start it with Windows
+sign-in, or you can start it by hand. It binds one private LAN address, needs a
+token, and is scoped to the local subnet.
 
 ## Interim vs target
 

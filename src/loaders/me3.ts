@@ -80,6 +80,13 @@ export function contentsFor({ recipe, source, version }: ContentsInput): Content
     source: "me3 profile",
     generatedAt: new Date().toISOString(),
     count: packages.length,
+    itemsLabel: "Included packages",
+    items: packages.map((entry) => ({
+      label: entry.label,
+      path: entry.path,
+      active: entry.enabled,
+    })),
+    inactive: [],
     packages,
     natives,
   };

@@ -1,0 +1,593 @@
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { desktopBridge, formatBytes, formatDate, maskToken, platformName } from "./api";
+import type {
+  BuildFormState,
+  BuildJobState,
+  ConsoleState,
+  PackState,
+  SettingsDraft,
+  ToastItem,
+} from "./types";
+
+export function Header({ data, busy, onToggleServer }: {
+  data: ConsoleState | null;
+  busy: boolean;
+  onToggleServer: () => void;
+}) {
+  const running = !!data?.server.running;
+  const error = !!data?.server.error;
+  const valid = data?.packs.filter((pack) => pack.valid).length || 0;
+  const loopback = running ? data?.server.host === "127.0.0.1" : data?.settings.bind === "loopback";
+  return (
+    <header className="top">
+      <div className="brand">
+        <img className="appicon" src="/icon.png" alt="" />
+        <div className="brandtext">
+          <div className="word">MODSYNC</div>
+          <div className="sub">Server console</div>
+        </div>
+      </div>
+      <div className="topright">
+        <div id="server-pill" className={`pill${running ? " online" : error ? " error" : ""}`}>
+          <span className="dot" />
+          <span id="server-pill-text">
+            {running ? `Serving ${valid} pack${valid === 1 ? "" : "s"}${loopback ? " · loopback" : ""}` : error ? "Server error" : "Server stopped"}
+          </span>
+        </div>
+        <button
+          id="start-stop"
+          className={`btn ${running ? "danger" : "primary"}`}
+          data-action="toggle-server"
+          data-focusable
+          data-key="server-toggle"
+          disabled={busy}
+          onClick={onToggleServer}
+        >
+          {running ? "Stop server" : "Start server"}
+        </button>
+      </div>
+    </header>
+  );
+}
+
+export function PackArt({ pack }: { pack: PackState }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [pack.artUrl]);
+  const initial = (pack.name || "?").slice(0, 2).toUpperCase();
+  return (
+    <div className="art">
+      {pack.valid && pack.artUrl && !failed
+        ? <img src={pack.artUrl} alt="" onError={() => setFailed(true)} />
+        : <div className="artph">{initial}</div>}
+    </div>
+  );
+}
+
+export function BuildBanner({ job, name, onShow }: {
+  job: BuildJobState | null;
+  name: string;
+  onShow: () => void;
+}) {
+  if (!job || job.status !== "running") return null;
+  return (
+    <div id="build-banner" className="buildbanner">
+      <span className="spinner" />
+      <span>Building <b>{name}</b> · {job.percent}%</span>
+      <span className="spacer" />
+      <button className="btn small" data-action="show-build" onClick={onShow}>Show progress</button>
+    </div>
+  );
+}
+
+export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onShowBuild }: {
+  data: ConsoleState | null;
+  error: string | null;
+  job: BuildJobState | null;
+  onRefresh: () => void;
+  onBuildNew: () => void;
+  onRebuild: (pack: PackState) => void;
+  onReveal: (id: string) => void;
+  onRemove: (pack: PackState) => void;
+  onShowBuild: () => void;
+}) {
+  const valid = data?.packs.filter((pack) => pack.valid) || [];
+  const bytes = valid.reduce((sum, pack) => sum + pack.totalBytes, 0);
+  const summary = data
+    ? `${valid.length} pack${valid.length === 1 ? "" : "s"} · ${formatBytes(bytes)} · ${data.settings.packsDir}`
+    : "Loading packs…";
+  const buildName = data && job ? data.recipes.find((recipe) => recipe.id === job.recipeId)?.name || job.packId : "";
+
+  return (
+    <section className="panel library">
+      <div className="panelhead">
+        <div>
+          <h1>Pack library</h1>
+          <p id="packs-summary" className="muted">{summary}</p>
+        </div>
+        <div className="headactions">
+          <button className="btn small" data-action="refresh" onClick={onRefresh}>Refresh</button>
+          <button className="btn primary" data-action="build-new" onClick={onBuildNew}>Build a pack</button>
+        </div>
+      </div>
+      <div id="notice">
+        {error ? <div className="callout error"><b>The server console could not refresh.</b><br />{error}</div> : null}
+      </div>
+      <BuildBanner job={job} name={buildName} onShow={onShowBuild} />
+      <div id="packs" className="packlist">
+        {!data ? <div className="empty"><strong>Connecting to the console…</strong></div> : null}
+        {data && !data.packs.length ? (
+          <div className="empty">
+            <strong>No packs in this folder</strong>
+            <span>Build one from a recipe, or point Settings at an existing packs folder.</span>
+            <code>{data.settings.packsDir}</code>
+            <button className="btn primary" data-action="build-new" onClick={onBuildNew}>Build a pack</button>
+          </div>
+        ) : null}
+        {data?.packs.map((pack) => {
+          const recipe = data.recipes.find((entry) => entry.id === pack.recipeId);
+          return (
+          <article key={pack.id} className={`packcard${pack.valid ? "" : " invalid"}`}>
+            <PackArt pack={pack} />
+            <div className="packbody">
+              <div className="packhead">
+                <div>
+                  <div className="packtitle">{pack.valid ? pack.name : `${pack.name} — invalid pack`}</div>
+                  <div className="packgame">
+                    {pack.valid
+                      ? `${pack.game.title}${pack.game.version ? ` · ${pack.game.version}` : ""}${pack.game.build ? ` · build ${pack.game.build}` : ""}`
+                      : "pack.json could not be read"}
+                  </div>
+                </div>
+                <span className={`badge${pack.valid ? "" : " red"}`}>{pack.valid ? pack.mod.version : "invalid"}</span>
+              </div>
+              {pack.valid ? (
+                <div className="meta">
+                  <span className="badge">{formatBytes(pack.totalBytes)}</span>
+                  <span className="badge">{pack.files} files</span>
+                  <span className="badge">{pack.platforms.map(platformName).join(" · ")}</span>
+                  {pack.modifiedAt ? <span className="badge">built {formatDate(pack.modifiedAt)}</span> : null}
+                </div>
+              ) : null}
+              {!pack.valid ? <div className="callout error">{pack.error || "Invalid pack folder."}</div> : null}
+              <div className="packpath" title={pack.root}>{pack.root}</div>
+              {pack.recipeId ? (
+                <div className="packsource" title={recipe?.source || undefined}>
+                  Rebuilds from {recipe?.source || "the working install you choose"}
+                </div>
+              ) : null}
+              <div className="packactions">
+                {pack.recipeId ? (
+                  <button className="btn primary small" data-action="build" data-id={pack.id} onClick={() => onRebuild(pack)}>
+                    Rebuild from install
+                  </button>
+                ) : null}
+                <button className="btn small" data-action="reveal" data-id={pack.id} onClick={() => onReveal(pack.id)}>Open folder</button>
+                <button className="btn small danger" data-action="remove" data-id={pack.id} onClick={() => onRemove(pack)}>Remove</button>
+              </div>
+            </div>
+          </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function ServerPanel({ data, tokenVisible, onToggleToken, onCopyUrl, onCopyToken, onOpenUrl, onGoToSettings }: {
+  data: ConsoleState | null;
+  tokenVisible: boolean;
+  onToggleToken: () => void;
+  onCopyUrl: () => void;
+  onCopyToken: () => void;
+  onOpenUrl: () => void;
+  onGoToSettings: () => void;
+}) {
+  if (!data) {
+    return (
+      <section className="panel servercard">
+        <div className="panelhead compact">
+          <div><h2>Pack server</h2><p className="muted">The only LAN listener. Stop it when the TV is done downloading.</p></div>
+        </div>
+        <div id="server-body" className="serverbody"><p className="muted">Loading server status…</p></div>
+      </section>
+    );
+  }
+  const server = data.server;
+  const error = server.error
+    ? <div className="callout error"><b>{server.running ? "Server error" : "Could not start the server"}</b><br />{server.error}</div>
+    : null;
+  const bind = data.settings.bind === "loopback" ? "loopback only" : data.settings.bind === "host" ? data.settings.host || "specific address" : "LAN";
+  const loopback = server.running ? server.host === "127.0.0.1" : data.settings.bind === "loopback";
+  return (
+    <section className="panel servercard">
+      <div className="panelhead compact">
+        <div><h2>Pack server</h2><p className="muted">The only LAN listener. Stop it when the TV is done downloading.</p></div>
+      </div>
+      <div id="server-body" className="serverbody">
+        {server.running ? (
+          <>
+            <div className="statusline">
+              <div>
+                <div className="bigstatus"><span className="green">Serving</span></div>
+                <div className="servermeta">{bind} · since {new Date(server.startedAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+              </div>
+            </div>
+            {loopback ? (
+              <div className="callout">
+                Loopback only — the SteamOS client cannot reach this server.
+                <div className="actions" style={{ marginTop: 8 }}>
+                  <button className="btn small" data-action="goto-settings" onClick={onGoToSettings}>Change Bind to LAN</button>
+                </div>
+              </div>
+            ) : null}
+            <div className="copyrow">
+              <span className="label">URL</span>
+              <span className="value">{server.url}</span>
+              <button className="btn small" data-action="open-url" onClick={onOpenUrl}>Open</button>
+              <button className="btn small" data-action="copy-url" onClick={onCopyUrl}>Copy</button>
+            </div>
+            <div className="copyrow">
+              <span className="label">Token</span>
+              <span className="value">{tokenVisible ? data.settings.token : "••••••••••••••••"}</span>
+              <button className="btn small" data-action="toggle-token" onClick={onToggleToken}>{tokenVisible ? "Hide" : "Show"}</button>
+              <button className="btn small" data-action="copy-token" onClick={onCopyToken}>Copy</button>
+              <button className="btn small ghost" data-action="goto-settings" onClick={onGoToSettings}>Change</button>
+            </div>
+            {error}
+          </>
+        ) : (
+          <>
+            <div className="statusline">
+              <div>
+                <div className="bigstatus">Server stopped</div>
+                <div className="servermeta">Will bind {data.settings.bind === "loopback" ? "127.0.0.1" : server.host || data.lan.detected}:{server.port} · {bind}</div>
+              </div>
+            </div>
+            {loopback ? (
+              <div className="callout">
+                Loopback only — the SteamOS client cannot reach this server.
+                <div className="actions" style={{ marginTop: 8 }}>
+                  <button className="btn small" data-action="goto-settings" onClick={onGoToSettings}>Change Bind to LAN</button>
+                </div>
+              </div>
+            ) : null}
+            {data.lan.detected === "127.0.0.1" && data.settings.bind === "lan"
+              ? <div className="callout">No private LAN IPv4 was found. Switch Bind to loopback, or connect to the LAN.</div>
+              : null}
+            {error}
+            <p className="hint">Use the Start server button above when the SteamOS client needs to install or update a pack.</p>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export function SettingsPanel({ draft, data, saving, saved, onChange, onBrowsePacks, onRevealPacks, onGenerateToken, onSave }: {
+  draft: SettingsDraft;
+  data: ConsoleState;
+  saving: boolean;
+  saved: string;
+  onChange: (patch: Partial<SettingsDraft>) => void;
+  onBrowsePacks: () => void;
+  onRevealPacks: () => void;
+  onGenerateToken: () => void;
+  onSave: () => void;
+}) {
+  const [showToken, setShowToken] = useState(false);
+  useEffect(() => setShowToken(false), [draft.token]);
+  const bindHint = draft.bind === "lan"
+    ? data.lan.detected === "127.0.0.1"
+      ? "No private LAN IPv4 found. Connect to the LAN or use a specific address."
+      : `Detected ${data.lan.detected}. Use a specific address if this PC has more than one LAN interface.`
+    : draft.bind === "loopback"
+      ? "Only this server can reach itself. Useful for testing."
+      : data.lan.addresses.length
+        ? `Addresses: ${data.lan.addresses.map((entry) => `${entry.address} (${entry.name})`).join(", ")}`
+        : "Enter a LAN IPv4 address owned by this server.";
+  const supported = data.app.loginItem.supported;
+  return (
+    <section className="panel">
+      <div className="panelhead compact">
+        <div><h2>Settings</h2><p className="muted">Saved on this server. Changes apply immediately.</p></div>
+      </div>
+      <form id="settings-form" className="settingsform" autoComplete="off" onSubmit={(event) => { event.preventDefault(); onSave(); }}>
+        <div className="field">
+          <label htmlFor="packs-dir">Packs folder</label>
+          <div className="inputrow">
+            <input id="packs-dir" className="input" type="text" spellCheck={false} value={draft.packsDir} onChange={(event) => onChange({ packsDir: event.target.value })} />
+            <button id="packs-browse" className="btn small" type="button" disabled={!desktopBridge()?.pickFolder} onClick={onBrowsePacks}>Browse</button>
+            <button className="btn small" type="button" data-action="reveal-packs" onClick={onRevealPacks}>Open</button>
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="bind-mode">Bind</label>
+          <select id="bind-mode" className="input" value={draft.bind} onChange={(event) => onChange({ bind: event.target.value as SettingsDraft["bind"] })}>
+            <option value="lan">LAN — automatic private address</option>
+            <option value="loopback">This server only — loopback</option>
+            <option value="host">Specific address</option>
+          </select>
+          <div id="bind-host-row" className={draft.bind === "host" ? "" : "hidden"}>
+            <input id="bind-host" className="input" list="lan-addresses" placeholder="192.168.1.20" spellCheck={false} value={draft.host} onChange={(event) => onChange({ host: event.target.value })} />
+          </div>
+          <datalist id="lan-addresses">
+            {data.lan.addresses.map((entry) => <option key={entry.address} value={entry.address}>{entry.name}</option>)}
+          </datalist>
+          <p id="bind-hint" className="hint">{bindHint}</p>
+        </div>
+        <div className="field two">
+          <div>
+            <label htmlFor="server-port">Port</label>
+            <input id="server-port" className="input" type="number" min="1" max="65535" step="1" value={draft.port} onChange={(event) => onChange({ port: event.target.value })} />
+          </div>
+          <div>
+            <label htmlFor="server-token">Token</label>
+            <div className="inputrow">
+              <input id="server-token" className="input" type={showToken ? "text" : "password"} spellCheck={false} value={draft.token} onChange={(event) => onChange({ token: event.target.value })} />
+              <button id="token-toggle" className="btn small" type="button" onClick={() => setShowToken((value) => !value)}>{showToken ? "Hide" : "Show"}</button>
+            </div>
+          </div>
+        </div>
+        <div className="actions">
+          <button id="token-generate" className="btn small" type="button" onClick={onGenerateToken}>New token</button>
+          <span className="hint">
+            {data.app.tokenStorage === "protected" ? "Saved with OS user protection." : "Saved in the console config file."}{" "}
+            A running server restarts when the token changes.
+          </span>
+        </div>
+        <label className="check">
+          <input id="auto-start" type="checkbox" checked={draft.autoStart} onChange={(event) => onChange({ autoStart: event.target.checked })} />
+          Start the pack server when ModSync starts
+        </label>
+        <label className="check">
+          <input id="launch-login" type="checkbox" checked={draft.launchAtLogin} disabled={!supported} onChange={(event) => onChange({ launchAtLogin: event.target.checked })} />
+          Start ModSync Server when I sign in
+        </label>
+        <p id="login-hint" className="hint">
+          {data.app.loginItem.error || (supported
+            ? "Starts hidden in the tray at sign-in. The pack server follows its own setting."
+            : "Sign-in startup is only available in the desktop app.")}
+        </p>
+        <div className="actions">
+          <button className="btn primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button>
+          <span id="settings-status" className="hint">{saved}</span>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+export function GuidePanel({ data, tokenVisible, onCopyInstall, onCopyFirewall }: {
+  data: ConsoleState | null;
+  tokenVisible: boolean;
+  onCopyInstall: () => void;
+  onCopyFirewall: () => void;
+}) {
+  const installCommand = data ? maskToken(data.guide.installCommand, data.settings.token) : "";
+  return (
+    <details className="panel help">
+      <summary>
+        <div>
+          <h2>SteamOS client setup</h2>
+          <p className="muted">Install the TV app and allow the LAN port.</p>
+        </div>
+        <span className="chevron" aria-hidden="true">›</span>
+      </summary>
+      <div id="guide-body" className="guide">
+        {!data ? <p className="muted">Loading…</p> : (
+          <>
+            {data.settings.bind === "loopback" ? <div className="callout">Loopback mode is for testing on this server. The SteamOS client cannot reach a loopback server.</div> : null}
+            <h3>1. Install the app on the TV</h3>
+            <pre className="codeblock">{installCommand}</pre>
+            <div className="actions">
+              <button className="btn small" data-action="copy-install" onClick={onCopyInstall}>Copy</button>
+              {data.settings.bind !== "loopback" && !tokenVisible ? <span className="hint">Copying includes the token.</span> : null}
+            </div>
+            <h3>2. Let the client reach this server</h3>
+            <p className="hint">Allow the port once from an admin PowerShell. Local subnet only.</p>
+            <pre className="codeblock">{data.guide.firewallCommand}</pre>
+            <div className="actions"><button className="btn small" data-action="copy-firewall" onClick={onCopyFirewall}>Copy</button></div>
+            <ol>
+              <li>Start the server, then run the install one-liner on the SteamOS client.</li>
+              <li>Stop the server after the pack has downloaded.</li>
+              <li>Do not port-forward this port or enable UPnP.</li>
+            </ol>
+          </>
+        )}
+      </div>
+    </details>
+  );
+}
+
+export function Modal({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="modal" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="modal-card" onMouseDown={(event) => event.stopPropagation()}>{children}</div>
+    </div>
+  );
+}
+
+function recipeFor(data: ConsoleState, id?: string) {
+  return data.recipes.find((recipe) => recipe.id === id)
+    || data.recipes.find((recipe) => !recipe.packExists)
+    || data.recipes[0]
+    || null;
+}
+
+export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart, onClose, onReveal, onBuildAnother }: {
+  data: ConsoleState;
+  job: BuildJobState | null;
+  viewJob: boolean;
+  initialRecipeId?: string;
+  busy: boolean;
+  onStart: (form: BuildFormState) => void;
+  onClose: () => void;
+  onReveal: (id: string) => void;
+  onBuildAnother: () => void;
+}) {
+  const initialRecipe = recipeFor(data, initialRecipeId);
+  const [form, setForm] = useState<BuildFormState>({
+    recipeId: initialRecipe?.id || "",
+    source: initialRecipe?.source || "",
+    version: "",
+    copy: false,
+  });
+  const recipe = data.recipes.find((entry) => entry.id === form.recipeId) || initialRecipe;
+  const jobName = data.recipes.find((entry) => entry.id === job?.recipeId)?.name || job?.packId || "";
+
+  if (viewJob && job) {
+    const done = job.status === "done";
+    const failed = job.status === "error";
+    const status = job.status === "running"
+      ? `${job.phase === "hashing" ? "Hashing files" : job.phase === "copying" ? "Copying payload" : "Preparing"} · ${job.percent}%`
+      : done && job.result
+        ? `${job.result.version} · ${job.result.files} files · ${formatBytes(job.result.totalBytes)}`
+        : failed ? "Build failed" : "Finished";
+    return (
+      <Modal onClose={onClose}>
+        <div className="modalhead">
+          <div>
+            <h2>{done ? "Pack built" : failed ? "Build failed" : `Building ${jobName}`}</h2>
+            <p className="muted">{status}</p>
+          </div>
+          {job.status === "running" ? null : <button className="btn small" data-action="close-modal" onClick={onClose}>Close</button>}
+        </div>
+        <div className="progresswrap">
+          <div className="progress"><div className="fill" style={{ width: `${Math.max(0, Math.min(100, job.percent))}%` }} /></div>
+          <div className="progressmeta"><span>{job.phase}</span><span>{job.percent}%</span></div>
+          {failed ? <div className="callout error">{job.error || "The build stopped."}</div> : null}
+          <pre className="log">{job.log.join("\n")}</pre>
+          <div className="actions">
+            {job.status === "running" ? (
+              <>
+                <button className="btn small" data-action="close-modal" onClick={onClose}>Hide</button>
+                <span className="hint">The build keeps running.</span>
+              </>
+            ) : (
+              <>
+                <button className="btn small primary" data-action="close-modal" onClick={onClose}>Done</button>
+                {done ? <button className="btn small" data-action="reveal" data-id={job.packId} onClick={() => onReveal(job.packId)}>Open folder</button> : null}
+                <button className="btn small" data-action="build-another" onClick={onBuildAnother}>Build another</button>
+              </>
+            )}
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (!recipe) {
+    return (
+      <Modal onClose={onClose}>
+        <div className="modalhead"><div><h2>Build or rebuild a pack</h2><p className="muted">No recipes found. Add one under recipes/.</p></div><button className="btn small" onClick={onClose}>Close</button></div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="modalhead">
+        <div><h2>Build or rebuild a pack</h2><p className="muted">The current pack stays in place until the new build succeeds.</p></div>
+        <button className="btn small" data-action="close-modal" onClick={onClose}>Close</button>
+      </div>
+      <form
+        id="build-form"
+        className="modalform"
+        autoComplete="off"
+        onSubmit={(event) => { event.preventDefault(); onStart(form); }}
+      >
+        {data.server.running ? <div className="callout">The pack server is running. Stop it first if the SteamOS client is downloading this pack.</div> : null}
+        <div className="field">
+          <label htmlFor="build-recipe">Recipe</label>
+          <select
+            id="build-recipe"
+            className="input"
+            value={form.recipeId}
+            onChange={(event) => {
+              const next = recipeFor(data, event.target.value);
+              setForm((value) => ({ ...value, recipeId: event.target.value, source: next?.source || value.source }));
+            }}
+          >
+            {data.recipes.map((entry) => (
+              <option key={entry.id} value={entry.id}>{entry.name} — {entry.gameTitle}{entry.packExists ? " (installed)" : ""}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="build-source">Working install</label>
+          <div className="inputrow">
+            <input id="build-source" className="input" type="text" spellCheck={false} value={form.source} onChange={(event) => setForm((value) => ({ ...value, source: event.target.value }))} />
+            <button
+              id="build-browse"
+              className="btn small"
+              type="button"
+              disabled={!desktopBridge()?.pickFolder}
+              onClick={async () => {
+                const picked = await desktopBridge()?.pickFolder?.("Choose the working install");
+                if (picked) setForm((value) => ({ ...value, source: picked }));
+              }}
+            >
+              Browse
+            </button>
+          </div>
+          <p className="hint">The folder ModSync reads the installed mod from. It is not modified.</p>
+        </div>
+        <div className="field two">
+          <div>
+            <label htmlFor="build-version">Version (optional)</label>
+            <input id="build-version" className="input" type="text" spellCheck={false} placeholder={recipe.version || "automatic"} value={form.version} onChange={(event) => setForm((value) => ({ ...value, version: event.target.value }))} />
+          </div>
+          <label className="check" style={{ alignSelf: "end", paddingBottom: 7 }}>
+            <input id="build-copy" type="checkbox" checked={form.copy} onChange={(event) => setForm((value) => ({ ...value, copy: event.target.checked }))} />
+            Copy payload instead of hardlinks
+          </label>
+        </div>
+        <div className="actions">
+          <button className="btn primary" type="submit" disabled={busy}>{busy ? "Starting…" : "Build pack"}</button>
+          <button className="btn small" type="button" data-action="close-modal" onClick={onClose}>Cancel</button>
+          <span className="hint">Output: <span className="mono">{recipe.out}</span></span>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function RemoveModal({ pack, busy, onConfirm, onClose }: {
+  pack: PackState;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal onClose={onClose}>
+      <div className="modalhead">
+        <div>
+          <h2>Remove {pack.name || pack.id}?</h2>
+          <p className="muted">{pack.game.title || "Pack"} · {pack.mod.version || "invalid pack"}</p>
+        </div>
+        <button className="btn small" data-action="close-modal" onClick={onClose}>Cancel</button>
+      </div>
+      <div className="callout error">
+        This deletes the pack folder and all of its payload, tools, profiles, and art. The working mod install is not touched.
+        The server stops serving this pack immediately.
+      </div>
+      <p className="packpath" style={{ margin: "14px 0" }}>{pack.root}</p>
+      <div className="actions">
+        <button className="btn danger" data-action="confirm-remove" data-id={pack.id} disabled={busy} onClick={onConfirm}>Remove pack</button>
+        <button className="btn small" data-action="close-modal" onClick={onClose}>Keep it</button>
+      </div>
+    </Modal>
+  );
+}
+
+export function Toasts({ items }: { items: ToastItem[] }) {
+  return <div id="toasts" className="toasts" aria-live="polite">{items.map((item) => <div key={item.id} className={`toast ${item.tone}`}>{item.message}</div>)}</div>;
+}

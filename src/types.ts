@@ -155,10 +155,22 @@ export interface PackageContentsEntry {
   [key: string]: unknown;
 }
 
+export interface ContentsItem {
+  label: string;
+  path?: string;
+  active?: boolean;
+  optional?: boolean;
+}
+
 export interface ContentsSummary {
+  /** Legacy display shape; new renderers should use `items` and `itemsLabel`. */
   kind: string;
   count: number;
   source?: string;
+  itemsLabel?: string;
+  items?: ContentsItem[];
+  inactive?: string[];
+  /** Legacy game-shaped fields kept for the current TV renderer. */
   mods?: ModContentsEntry[];
   packages?: PackageContentsEntry[];
   inactivePaks?: string[];

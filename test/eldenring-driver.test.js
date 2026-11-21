@@ -76,6 +76,9 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     });
     assert.equal(contents.kind, "packages");
     assert.equal(contents.count, 1);
+    assert.equal(contents.itemsLabel, "Included packages");
+    assert.equal(contents.items[0].label, "Graceborne");
+    assert.match(contents.items[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
     assert.match(contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
     assert.equal(grace.pack.platforms.windows.loader, "tools/me3-win/bin/me3.exe");
     assert.equal(grace.pack.platforms["linux-proton"].loaderSupport, "tools/me3-win/bin");

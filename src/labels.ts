@@ -1,4 +1,4 @@
-// User-facing Node/CLI/server text. Browser UI text lives in web/labels.ts.
+// User-facing Node/CLI/server text. Browser UI text lives in web-tv/src/labels.ts.
 // Keep new terminal or HTTP-page strings here so a locale can replace one file.
 
 interface ServeLabels {

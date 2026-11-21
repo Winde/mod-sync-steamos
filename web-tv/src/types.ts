@@ -1,13 +1,6 @@
-/**
- * Browser-only view types. The agent API is JSON, so these describe the
- * payloads the renderer relies on; unknown extra fields are allowed.
- */
+/** TV renderer view types. The agent API is JSON; extra fields are allowed. */
 
-interface BrowserLabels {
-  [key: string]: any;
-}
-
-interface UpdateInfo {
+export interface UpdateInfo {
   current: string;
   latest: string;
   available: boolean;
@@ -15,19 +8,15 @@ interface UpdateInfo {
   error?: string;
 }
 
-interface ModsyncDesktop {
+export interface ModsyncDesktop {
   version(): Promise<string>;
   checkUpdate(): Promise<UpdateInfo | null>;
   installUpdate(): Promise<void>;
   openReleases(): Promise<void>;
+  pickFolder?(title?: string): Promise<string | null>;
 }
 
-interface Window {
-  MODSYNC_LABELS: BrowserLabels;
-  modsyncDesktop?: ModsyncDesktop;
-}
-
-interface GameView {
+export interface GameView {
   id: string;
   title?: string;
   version?: string;
@@ -36,18 +25,18 @@ interface GameView {
   [key: string]: unknown;
 }
 
-interface ModView {
+export interface ModView {
   id: string;
   version: string;
 }
 
-interface NoteView {
+export interface NoteView {
   title?: string;
   body: string;
   tone?: string;
 }
 
-interface CheckView {
+export interface CheckView {
   id: string;
   type: string;
   title: string;
@@ -59,13 +48,13 @@ interface CheckView {
   blocked: boolean;
 }
 
-interface PreconditionsView {
+export interface PreconditionsView {
   checks: CheckView[];
   blocked: boolean;
   failedRequired: CheckView[];
 }
 
-interface ContentsView {
+export interface ContentsView {
   kind: string;
   count: number;
   source?: string;
@@ -75,7 +64,7 @@ interface ContentsView {
   [key: string]: unknown;
 }
 
-interface LaunchView {
+export interface LaunchView {
   type?: string;
   mode?: string;
   exe?: string;
@@ -83,17 +72,17 @@ interface LaunchView {
   [key: string]: unknown;
 }
 
-interface LoaderView {
+export interface LoaderView {
   type?: string;
   profile?: string;
 }
 
-interface InstallView {
+export interface InstallView {
   label?: string;
   type?: string;
 }
 
-interface PackView {
+export interface PackView {
   id: string;
   name: string;
   description?: string;
@@ -123,7 +112,7 @@ interface PackView {
   [key: string]: unknown;
 }
 
-interface JobView {
+export interface JobView {
   id?: string;
   packId?: string;
   status?: string;
@@ -138,7 +127,7 @@ interface JobView {
   [key: string]: unknown;
 }
 
-interface AgentStateView {
+export interface AgentStateView {
   agent?: { version?: string; root?: string; port?: number };
   pc?: { url?: string; online?: boolean; error?: string | null };
   packs?: PackView[];
@@ -146,13 +135,13 @@ interface AgentStateView {
   job?: JobView | null;
 }
 
-interface StorageVersionView {
+export interface StorageVersionView {
   version: string;
   bytes: number;
   current: boolean;
 }
 
-interface StoragePackView {
+export interface StoragePackView {
   id: string;
   name: string;
   installed: boolean;
@@ -164,7 +153,7 @@ interface StoragePackView {
   versions: StorageVersionView[];
 }
 
-interface StorageView {
+export interface StorageView {
   loading?: boolean;
   error?: string;
   freeBytes?: number | null;
@@ -175,7 +164,7 @@ interface StorageView {
   packs?: StoragePackView[];
 }
 
-interface ConfirmView {
+export interface ConfirmView {
   title: string;
   message: string;
   busy?: boolean;
@@ -188,7 +177,7 @@ interface ConfirmView {
   warnings?: string[];
 }
 
-interface GameGroup {
+export interface GameGroup {
   id: string;
   title: string;
   version: string;
@@ -196,12 +185,12 @@ interface GameGroup {
   packs: PackView[];
 }
 
-interface WakeLockLike {
+export interface WakeLockLike {
   release(): Promise<void>;
   addEventListener(type: "release", listener: () => void): void;
 }
 
-interface AppState {
+export interface AppViewState {
   data: AgentStateView | null;
   selected: string | null;
   selectedGame: string | null;
@@ -215,9 +204,10 @@ interface AppState {
   download: { packId: string } | null;
   storage: StorageView | null;
   update: UpdateInfo | null;
-  wakeLock: WakeLockLike | null;
-  rate: Array<{ t: number; b: number }>;
-  polling: boolean;
-  focusKey: string | null;
-  lastRefresh: number;
+}
+
+declare global {
+  interface Window {
+    modsyncDesktop?: ModsyncDesktop;
+  }
 }

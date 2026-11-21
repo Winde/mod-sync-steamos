@@ -139,15 +139,24 @@ function contentsFrom(source: string, paks: string[]): ContentsSummary {
       used.add(file);
     }
   }
+  const inactive = paks.filter((name) => !used.has(name));
+  const activeMods = mods.filter((mod) => !mod.builtin);
   return {
     kind: "mods",
     source: "modsettings.lsx",
     generatedAt: new Date().toISOString(),
-    count: mods.filter((mod) => !mod.builtin).length,
+    count: activeMods.length,
+    itemsLabel: "Included mods",
+    items: activeMods.map((mod) => ({
+      label: mod.name,
+      path: mod.file,
+      active: true,
+    })),
+    inactive,
     modules: mods.length,
     paks: paks.length,
-    inactivePaks: paks.filter((name) => !used.has(name)),
-    mods,
+    inactivePaks: inactive,
+    mods: activeMods,
   };
 }
 

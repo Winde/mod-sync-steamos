@@ -68,8 +68,10 @@ jobs:
       - run: npm ci
       - name: Compile TypeScript
         run: npm run build
-      - name: Build the AppImage
-        run: npx electron-builder --linux AppImage --publish never
+      - name: Build the Server AppImage
+        run: npx electron-builder --config electron-builder.server.yml --linux AppImage --publish never
+      - name: Build the Client AppImage
+        run: npx electron-builder --config electron-builder.client.yml --linux AppImage --publish never
 
       - name: Package the installer and artwork
         run: |
@@ -89,9 +91,35 @@ jobs:
             release/steam-art.zip
           if-no-files-found: error
 
+  build-windows:
+    name: Windows installer
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - name: Compile TypeScript
+        run: npm run build
+      - name: Build the Server installer
+        run: npx electron-builder --config electron-builder.server.yml --win nsis --publish never
+      - name: Build the Client installer
+        run: npx electron-builder --config electron-builder.client.yml --win nsis --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release/*.exe
+          if-no-files-found: error
+
   publish:
     name: Publish
-    needs: [verify, build]
+    needs: [verify, build, build-windows]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     steps:
@@ -102,6 +130,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: release
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
           path: artifacts
 
       - name: Checksums

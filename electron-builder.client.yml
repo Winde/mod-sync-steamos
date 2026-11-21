@@ -1,0 +1,59 @@
+appId: tv.modsync.client
+productName: ModSync Client
+copyright: ModSync
+artifactName: ModSync-${version}-${arch}.${ext}
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - dist/**
+  - web/tv/**
+  - web/index.html
+  - web/icon.png
+  - templates/**
+  - package.json
+
+extraFiles:
+  - from: LICENSE
+    to: LICENSE
+  - from: THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.md
+  - from: licenses
+    to: licenses
+
+extraMetadata:
+  main: dist/electron/client-main.js
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.png
+  artifactName: ModSync-Client-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ModSync Client
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  executableName: modsync
+  synopsis: Mod pack client for ModSync
+  description: Install, update, roll back, and launch ModSync mod packs.
+  desktop:
+    entry:
+      Name: ModSync
+      Comment: Mod pack client for ModSync
+      Categories: Utility;Game;
+      Keywords: mods;steamos;steam;pack;client;

@@ -62,7 +62,8 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.equal(result.pack.contents.inactivePaks.length, 1);
     assert.equal(result.pack.contents.mods[0].name, "Mod A");
     assert.equal(result.pack.contents.mods[0].file, "Mods/ModA_uuid.pak");
-    assert.equal(result.pack.contents.mods[1].builtin, true);
+    assert.equal(result.pack.contents.mods.length, 1);
+    assert.equal(result.pack.contents.modules, 2);
 
     assert.equal(result.pack.platforms["linux-native"].exe, "bin/bg3");
     assert.equal(result.pack.platforms["linux-native"].gameProcess, "bg3.bg3le-real");
@@ -82,6 +83,9 @@ test("the BG3 driver records the active module list in the pack", async () => {
     });
     assert.equal(contents.kind, "mods");
     assert.equal(contents.count, 1);
+    assert.equal(contents.itemsLabel, "Included mods");
+    assert.deepEqual(contents.items.map((item) => item.label), ["Mod A"]);
+    assert.deepEqual(contents.inactive, ["extra.pak"]);
     assert.deepEqual(contents.inactivePaks, ["extra.pak"]);
 
     const loaded = loadPack(out);

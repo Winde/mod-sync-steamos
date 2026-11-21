@@ -24,24 +24,79 @@ npm start -- pack
 npm start -- serve --lan --packs packs --port 8787
 ```
 
-Source lives in `src/*.ts`, `electron/*.ts`, and `web/*.ts`. `npm run build`
-compiles the Node/Electron code to `dist/` and the browser code to `web/*.js`;
-the `npm start`/`npm test`/packaging scripts run it for you. `node bin/modsync.js`
-works after a build. `npm run typecheck` checks without emitting, and
-`npm test` builds and runs the full suite.
+Source lives in `src/*.ts`, `electron/*.ts`, `web-tv/` (the Client React
+renderer), and `web-pc/` (the Server console React renderer). `npm run build`
+compiles the Node/Electron code to `dist/` and bundles both renderers with Vite
+into `web/tv/` and `web/pc/`; the `npm start`/`npm test`/packaging scripts run
+it for you. `node bin/modsync.js` works after a build. `npm run typecheck`
+checks without emitting, and `npm test` builds and runs the full suite.
 
 `init` writes `state/config.json`; after that `pack` needs no arguments. The
 full form is still available: `pack --recipe eldenring-graceborne --source <dir> --out <dir> --version <ver>`.
 Pack identity lives in `recipes/<id>.json` (Graceborne, Convergence, BG3);
 the driver only knows the game's layout and loader.
-The planned PC pack-builder app uses the same source/output fields.
+The Server console uses the same source/output fields.
 
 `serve` binds loopback by default. `--lan` binds the detected LAN IPv4 and
-prints the URL/token the TV needs; `--host <ip>` picks a specific interface.
+prints the URL/token the Client needs; `--host <ip>` picks a specific interface.
 The server is token-protected and never binds `0.0.0.0`.
 
-The TV installs a self-contained AppImage. It does **not** need Node, a browser
-kiosk, or SSH; the PC only serves the installer and pack files over HTTP.
+The Client installs a self-contained AppImage. It does **not** need Node, a
+browser kiosk, or SSH; the Server only serves the installer and pack files over
+HTTP.
+
+## Server and Client apps
+
+There are two separate Electron apps:
+
+- **ModSync Server** — the new app that owns the packs and the LAN server. It
+  lists packs, rebuilds or removes them, controls the server, and manages the
+  token. It runs on Windows or Linux. It is the app on the machine that serves
+  packs.
+- **ModSync Client** — the pre-existing app that installs, updates, rolls back,
+  and launches packs on the machine that plays the game. It runs on SteamOS
+  (AppImage) or Windows (NSIS).
+
+The Server console:
+
+- **Pack library** — lists the packs in the selected folder, shows version,
+  size, file count, and build date. Each card can rebuild the pack from its
+  working install, open the folder, or remove it.
+- **Pack server** — start and stop the LAN server, copy its URL, token, and the
+  Client install one-liner. A server error (busy port, no LAN address) is shown
+  in the same card.
+- **Settings** — packs folder, bind address, port, token (with generate), start
+  the server on launch, and start ModSync Server at sign-in. The app starts
+  hidden in the tray for sign-in starts.
+- **Rebuilds are staged** — the old pack stays in place until the new build is
+  complete, then it is swapped in. A failed build does not destroy the working
+  pack.
+- **Removal** requires confirmation and only deletes the pack folder; the
+  working mod install and game are never touched.
+
+The Server console serves its own UI on `127.0.0.1` only. The LAN pack server
+stays a separate listener with the token you set in the console.
+
+```powershell
+# Development: Server on Windows, Client on Linux by default
+npm run dev
+
+# Explicit development targets
+npm run dev:server
+npm run dev:client
+
+# Installers
+npm run build:server:win     # release/ModSync-Server-<version>-x64.exe
+npm run build:server:linux   # release/ModSync-Server-<version>-x86_64.AppImage
+npm run build:client:win     # release/ModSync-Client-<version>-x64.exe
+npm run build:client:linux   # release/ModSync-<version>-x86_64.AppImage
+```
+
+The first run creates `state/console.json` in a checkout, or
+`%APPDATA%\ModSync Server\console.json` for an installed Server. The packs
+folder defaults to `packs/` in a checkout, `Documents/ModSync/packs` on
+Windows, or `~/ModSync/packs` on Linux. The Client keeps its data under
+`~/ModSync` and its existing AppImage install path.
 
 ## Quick start (Steam Machine)
 
@@ -114,7 +169,8 @@ the game is closed.
 ## Docs
 
 - [`docs/DESIGN.md`](docs/DESIGN.md) — pack/driver/platform model and restrictions
-- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — PC server vs Steam Machine, one-time setup and every use
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) - Server vs Client, one-time setup and every use
+- [`docs/SERVER-CONSOLE.md`](docs/SERVER-CONSOLE.md) - Server app, pack library, token, tray, and sign-in start
 - [`docs/TRANSPORT.md`](docs/TRANSPORT.md) — HTTP pull, token, firewall/VPN
 - [`docs/DRIVERS.md`](docs/DRIVERS.md) — adding Skyrim/BG3/BG2 drivers
 - [`docs/TESTING.md`](docs/TESTING.md) — manual acceptance test (install, resume, rollback)

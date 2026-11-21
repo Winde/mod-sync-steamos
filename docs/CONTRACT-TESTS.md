@@ -56,10 +56,12 @@ Two offline tests wait for the agent's 2.5-second remote-catalog cache to expire
 ## White-box tests
 
 `test/preconditions.test.js`, `test/rollback.test.js`, `test/smoke.test.js`,
-`test/storage.test.js`, and `test/steam.test.js` import the compiled functions
-from `dist/` directly. They are useful characterization tests, but they are tied
-to current module boundaries and will need import updates when those modules are
-split.
+`test/storage.test.js`, `test/steam.test.js`, and `test/console.test.js` import
+the compiled functions from `dist/` directly. They are useful characterization
+tests, but they are tied to current module boundaries and will need import
+updates when those modules are split. `test/web-app.test.js` and
+`test/web-pc.test.js` load the compiled React renderers into jsdom with a stub
+API and assert the visible behavior and actions.
 
 During the refactor:
 
@@ -84,15 +86,11 @@ During the refactor:
 
 ## Not covered yet
 
-- Browser behavior of `web/app.js` (only the served assets and normalized JSON
-  are checked), including the Games, Storage, and contents views.
+- Real Chromium rendering, focus movement, and gamepad input for the React
+  renderers; jsdom covers the visible states and actions but not layout.
 - `serve --lan` interface selection; the loopback default and the refusal to bind
   `0.0.0.0` are covered, but choosing a specific LAN IP is environment-dependent
   and remains part of the manual run.
 - Real Steam shortcut registration and `.desktop` launch on a Steam Machine.
 - Cancel during an active transfer; resume is covered by the `.part` test. A
   storage clear during an install is covered.
-- Rollback of a **changed loader runtime**. Loader binaries currently live once
-  at the pack root, so the two-version test cannot distinguish which runtime the
-  selected version uses. Add a versioned-loader acceptance test when runtime
-  artifacts become version-scoped.

@@ -46,7 +46,8 @@ function main() {
     pack.contents = contents;
     fs.writeFileSync(packFile, JSON.stringify(pack, null, 2) + "\n");
     changed++;
-    console.log(`${pack.id}: ${contents.kind} ${contents.count} (${contents.paks ?? contents.packages?.length ?? 0} files)`);
+    const itemCount = contents.items?.length ?? contents.paks ?? contents.packages?.length ?? 0;
+    console.log(`${pack.id}: ${contents.kind} ${contents.count} (${itemCount} files)`);
   }
   if (!changed) console.log("No packs changed.");
 }

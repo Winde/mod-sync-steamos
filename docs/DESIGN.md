@@ -7,7 +7,12 @@
 2. **Game driver** — knows one game family: source layout, pack metadata, loader,
    launch fields, version/build checks. `drivers/eldenring.js` is v1.
 3. **Platform decorator** — OS paths, permissions, Proton prefix, launchers,
-   shortcuts, art. Windows and SteamOS.
+   shortcuts, art. Windows and SteamOS. The Linux/SteamOS decorator lives in
+   `src/platforms/linux.ts`; the installer and agent call it instead of
+   embedding desktop or shell-launch logic. While Steam is running, the
+   decorator adds shortcuts through Steam's own non-Steam-game flow so they
+   appear immediately; direct `shortcuts.vdf` writes are the fallback and
+   require a Steam restart.
 
 Adding a game means adding a driver and a pack. The core does not change.
 
@@ -15,7 +20,10 @@ Adding a game means adding a driver and a pack. The core does not change.
 
 - **PC** — the pack server is the only LAN listener. It binds one private IPv4
   (`serve --lan` or `--host`), refuses `0.0.0.0`, requires a token, and is scoped
-  to the local subnet. It is never port-forwarded.
+  to the local subnet. It is never port-forwarded. The Windows PC console owns
+  that server and serves its control UI from `127.0.0.1` only, on a separate
+  ephemeral port. The console can start the server with Windows sign-in, start
+  or stop it by hand, and change the token.
 - **Steam Machine** — the Electron app runs the installer in its main process.
   The renderer uses IPC; there is no LAN listener. If a local control API is
   kept for automation, it binds `127.0.0.1` and uses a per-run token.
@@ -75,7 +83,11 @@ A pack never contains the base game or saves.
       "template": "loaders/me3.sh"
     }
   },
-  "loader": { "type": "me3", "profile": "profiles/graceborne-0.2.7.me3" },
+  "loader": {
+    "type": "me3",
+    "profile": "profiles/graceborne-0.2.7.me3",
+    "saveFile": "ER0000.graceborne.sl2"
+  },
   "profilePattern": "profiles/{mod}-{version}.me3",
   "launch": {
     "type": "me3",
@@ -83,9 +95,7 @@ A pack never contains the base game or saves.
     "exe": "Game/eldenring.exe",
     "defaultExe": "Game/eldenring.exe",
     "gameProcess": "eldenring.exe",
-    "steamAppId": 1245620,
-    "profile": "profiles/graceborne-0.2.7.me3",
-    "saveFile": "ER0000.graceborne.sl2"
+    "steamAppId": 1245620
   },
   "art": {
     "grid": "art/graceborne/grid.png",
@@ -162,7 +172,9 @@ before serving a pack to verify profiles, loader coverage, target portability,
 and duplicate storage.
 
 The generic installer has no game or loader names. `install.type` selects an
-adapter in `src/installers/` for game-specific apply/revert work. The launcher
+adapter in `src/installers/` for game-specific apply/revert work. Reversible
+writes into game-owned folders use `src/installers/overlay.ts`; an adapter only
+maps pack files to named roots and adds its own native-loader steps. The launcher
 is a template chosen by `platforms.<variant>.template`; the only built-in
 default is the generic `launch-steam.sh`. Loader templates live under
 `templates/linux/loaders/`, game-specific templates under
@@ -297,14 +309,16 @@ v1 supports overlay packs on SteamOS. Profile/in-place drivers come later.
 
 Installs are versioned:
 
-- `mods/<mod>/versions/<version>/`
+- `mods/<mod>/versions/<version>/`, including a `tools/` snapshot of the
+  selected loader runtime.
 - `profiles/<mod>-<version>.me3` for me3 packs; BG3 keeps its versioned
   `modsettings.lsx` inside the version directory.
 - `mods/<mod>/current.txt`
 
-The launcher reads `current.txt` at launch. Installing a new version keeps the
-previous version and profile. Rollback switches the pointer; the previous
-version and profile are not rebuilt or downloaded again.
+The launcher reads `current.txt` at launch and selects that version's loader
+snapshot. Installing a new version keeps the previous version, profile, and
+runtime. Rollback switches the pointer; the previous version, profile, and
+runtime are not rebuilt or downloaded again.
 
 The installer keeps the version folder; a reinstall of the **same** version
 moves the old copy to `<version>.bak-<timestamp>` and leaves it out of the

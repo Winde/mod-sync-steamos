@@ -57,13 +57,22 @@ generated `pack.json` remains the definition the agent serves.
 
 - `id` — `eldenring`
 - `buildPack({ recipe, source, out, link })` — read the working install and
-  write `pack.json`, `files.json`, payload, profile/tools/art. The recipe owns
-  the pack's name, save file, `notes`, and `preconditions`; they are data, not
-  driver code.
+  write `pack.json`, `files.json`, payload, profile/tools/art. The recipe is
+  required and owns the pack's id, name, save file, `notes`, and
+  `preconditions`; they are data, not driver code.
+- `contentsFor({ recipe, source, version })` — return the normalized contents
+  summary. Every driver exposes the same method, so PC tooling does not branch
+  on the game id. New output includes `items` and `itemsLabel`; the older
+  `mods`/`packages`/`inactivePaks` fields remain until the React TV renderer
+  migrates.
+- Loader helpers live under `src/loaders/` (`me3`, `bg3le`) and own runtime
+  layout, profile parsing, tool platform tags, and executable modes. Drivers
+  supply the game-specific source paths.
 - The agent does not execute driver code; it uses the generic `pack.json` fields:
   - `game` — Steam app id, install dir, build, prefix requirement.
   - `platforms` — per-OS exe, process, loader, and data paths.
-  - `loader` / `launch` — loader type, profile, save file, and legacy defaults.
+  - `loader` — loader type, profile, and save file.
+  - `launch` — launch mode, exe, game process, and Steam app id.
   - `install` — for drivers that apply files outside the pack root (BG3).
   - `files` — the file manifest, optionally tagged per platform.
 

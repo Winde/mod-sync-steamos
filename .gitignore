@@ -8,11 +8,9 @@ logs/
 *.tar.gz
 tools/node-linux/
 
-# Generated browser bundle from web/*.ts
-web/app.js
-web/app.js.map
-web/labels.js
-web/labels.js.map
+# Generated React bundles
+web/pc/
+web/tv/
 
 # Generated packs: commit only the definition JSON, never the mod payload.
 packs/*/payload/

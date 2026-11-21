@@ -4,7 +4,23 @@ You drive this test. It is split so the PC-only part proves install, resume, and
 rollback without touching the game or saves; the Steam Machine part proves the
 Linux launcher and me3.
 
-## 0. Stop old listeners
+## 0. Server console
+
+On the server machine, `npm run dev:server` opens the Server console. Check without touching the game:
+
+1. The pack library lists the packs in `packs/`, with version, size, and path.
+2. **Pack server → Start server** shows a URL and token; **Stop server** closes
+   it. If port 8787 is busy, stop the old CLI `serve` or change the port.
+3. **Show**, **Copy**, and **New token** reveal and replace the token. Save
+   settings; a running server restarts and the install one-liner uses the new
+   token.
+4. **Rebuild** opens the build dialog with the remembered working install.
+   A build log and percentage are shown, and a failed build leaves the old pack
+   in place.
+5. **Remove** asks for confirmation and deletes only the pack folder.
+6. Closing the window hides it to the tray; **Quit** in the tray exits.
+
+## 0b. Stop old listeners
 
 Check for leftovers from preview runs:
 

@@ -86,11 +86,16 @@ load_before = []
   assert.equal(eldenRing.contents.kind, "packages");
   assert.equal(eldenRing.contents.count, 1);
   assert.equal(eldenRing.contents.source, "me3 profile");
+  assert.equal(eldenRing.contents.itemsLabel, "Included packages");
+  assert.equal(eldenRing.contents.items.length, 1);
   assert.equal(eldenRing.contents.packages.length, 1);
 
   const bg3 = readJson(path.join(packsDir, "bg3-modded", "pack.json"));
   assert.equal(bg3.contents.kind, "mods");
   assert.equal(bg3.contents.count, 1);
   assert.equal(bg3.contents.source, "modsettings.lsx");
+  assert.equal(bg3.contents.itemsLabel, "Included mods");
+  assert.equal(bg3.contents.items.length, 1);
+  assert.deepEqual(bg3.contents.inactive, ["Extra.pak"]);
   assert.deepEqual(bg3.contents.inactivePaks, ["Extra.pak"]);
 });
