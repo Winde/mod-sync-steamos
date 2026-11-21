@@ -222,9 +222,13 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
                       type="button"
                       data-action="contents"
                       data-id={pack.id}
-                      title="Show the mods recorded in this pack"
+                      aria-haspopup="dialog"
+                      title={`View the mods recorded in this pack: ${contentsCountLabel(pack.contents)}`}
                       onClick={() => setContentsPack(pack)}
-                    >{contentsCountLabel(pack.contents)}</button>
+                    >
+                      View {contentsCountLabel(pack.contents)}
+                      <span className="badgechev" aria-hidden="true">›</span>
+                    </button>
                   ) : null}
                   <span className="badge">{pack.platforms.map(platformName).join(" · ")}</span>
                   {pack.modifiedAt ? <span className="badge">built {formatDate(pack.modifiedAt)}</span> : null}
@@ -270,9 +274,8 @@ export function ContentsModal({ pack, onClose }: {
         <div>
           <h2>{pack.name || pack.id}</h2>
           <p className="muted">
-            {contents.itemsLabel || "Contents"}
+            {contentsCountLabel(contents)}
             {contents.source ? ` · from ${contents.source}` : ""}
-            {` · ${contentsCountLabel(contents)}`}
           </p>
         </div>
         <button className="btn small" data-action="close-modal" onClick={onClose}>Close</button>

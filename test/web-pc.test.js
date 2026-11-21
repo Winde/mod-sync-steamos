@@ -131,9 +131,15 @@ test("Server console renders packs, settings, and the server control", async () 
     assert.match(doc.querySelector("#packs").textContent, /7\.3 GB/);
     assert.match(doc.querySelector("#packs").textContent, /Windows · Proton/);
     assert.match(doc.querySelector("#packs").textContent, /1 package/);
-    doc.querySelector('[data-action="contents"]').click();
+    const contentsButton = doc.querySelector('[data-action="contents"]');
+    assert.ok(contentsButton);
+    assert.equal(contentsButton.tagName, "BUTTON");
+    assert.equal(contentsButton.getAttribute("aria-haspopup"), "dialog");
+    assert.match(contentsButton.textContent, /View 1 package/);
+    contentsButton.click();
     await waitFor(window, (w) => w.document.querySelector(".modal h2")?.textContent === "Graceborne");
-    assert.match(doc.querySelector(".modal").textContent, /Included packages/);
+    assert.match(doc.querySelector(".modal").textContent, /1 package/);
+    assert.match(doc.querySelector(".modal").textContent, /from me3 profile/);
     assert.match(doc.querySelector(".contentslist").textContent, /Graceborne/);
     assert.match(doc.querySelector(".contentslist").textContent, /mods\/graceborne\/versions\/0\.2\.7\/mod/);
     doc.querySelector('[data-action="close-contents"]').click();
