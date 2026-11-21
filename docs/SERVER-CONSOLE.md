@@ -70,10 +70,14 @@ is empty.
 - **Start ModSync Server when I sign in** — registers the app's login item.
   Sign-in starts open the window hidden in the tray. Use the tray menu to open
   the console, start or stop the server, or quit.
+- **Minimize to the tray instead of the taskbar** — when enabled (the default),
+  minimizing the window hides it to the tray and removes it from the taskbar.
+  Turn it off to keep a normal minimized window.
 
 ## Tray
 
-Closing the window hides it to the tray while the app keeps running. The tray
+Closing the window always hides it to the tray while the app keeps running.
+Minimizing does the same while **Minimize to the tray** is enabled. The tray
 menu has **Open ModSync Server**, **Start/Stop pack server**, **Open packs folder**,
 and **Quit**. Quit is the only action that fully stops the app and its server.
 

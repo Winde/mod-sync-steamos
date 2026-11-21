@@ -344,10 +344,14 @@ export function SettingsPanel({ draft, data, saving, saved, onChange, onBrowsePa
           <input id="launch-login" type="checkbox" checked={draft.launchAtLogin} disabled={!supported} onChange={(event) => onChange({ launchAtLogin: event.target.checked })} />
           Start ModSync Server when I sign in
         </label>
+        <label className="check">
+          <input id="minimize-tray" type="checkbox" checked={draft.minimizeToTray} onChange={(event) => onChange({ minimizeToTray: event.target.checked })} />
+          Minimize to the tray instead of the taskbar
+        </label>
         <p id="login-hint" className="hint">
           {data.app.loginItem.error || (supported
-            ? "Starts hidden in the tray at sign-in. The pack server follows its own setting."
-            : "Sign-in startup is only available in the desktop app.")}
+            ? "Starts hidden in the tray at sign-in. The pack server follows its own setting. Closing the window always hides it to the tray."
+            : "Sign-in startup is only available in the desktop app. Closing the window always hides it to the tray.")}
         </p>
         <div className="actions">
           <button className="btn primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button>

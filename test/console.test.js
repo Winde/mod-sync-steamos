@@ -102,10 +102,12 @@ test("Server console lists, rebuilds, serves, and removes packs", async (t) => {
   assert.equal(service.listPacks().length, 0);
   assert.equal(fs.existsSync(path.join(packsDir, "eldenring-graceborne")), false);
 
-  const toggled = await service.updateSettings({ launchAtLogin: true });
+  const toggled = await service.updateSettings({ launchAtLogin: true, minimizeToTray: false });
   assert.equal(toggled.settings.launchAtLogin, true);
+  assert.equal(toggled.settings.minimizeToTray, false);
   assert.equal(loginCalls, 1);
   assert.equal(h.readJson(configFile).launchAtLogin, true);
+  assert.equal(h.readJson(configFile).minimizeToTray, false);
 });
 
 test("Server console keeps the token out of the config when protected storage is available", async (t) => {

@@ -30,6 +30,7 @@ function fixture(overrides = {}) {
       token: "token-1234",
       autoStart: true,
       launchAtLogin: false,
+      minimizeToTray: true,
       working: {},
     },
     packs: [{
@@ -121,6 +122,7 @@ test("Server console renders packs, settings, and the server control", async () 
     assert.equal(doc.querySelector("#packs-dir").value, "C:\\ModSync\\packs");
     assert.equal(doc.querySelector("#server-port").value, "8787");
     assert.equal(doc.querySelector("#server-token").type, "password");
+    assert.equal(doc.querySelector("#minimize-tray").checked, true);
     assert.match(doc.querySelector("#guide-body").textContent, /Steam Machine|install/i);
   } finally {
     window.close();

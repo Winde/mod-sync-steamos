@@ -66,8 +66,9 @@ The Server console:
   Client install one-liner. A server error (busy port, no LAN address) is shown
   in the same card.
 - **Settings** — packs folder, bind address, port, token (with generate), start
-  the server on launch, and start ModSync Server at sign-in. The app starts
-  hidden in the tray for sign-in starts.
+  the server on launch, start ModSync Server at sign-in, and minimize to the
+  tray instead of the taskbar. The app starts hidden in the tray for sign-in
+  starts.
 - **Rebuilds are staged** — the old pack stays in place until the new build is
   complete, then it is swapped in. A failed build does not destroy the working
   pack.

@@ -187,6 +187,9 @@ function createWindow(url: string): void {
     window.maximize();
     window.show();
   });
+  window.on("minimize", () => {
+    if (consoleService?.config().minimizeToTray) window.hide();
+  });
   window.on("close", (event) => {
     if (quitting) return;
     event.preventDefault();

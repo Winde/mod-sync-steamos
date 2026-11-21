@@ -30,6 +30,7 @@ function toDraft(settings: SettingsState): SettingsDraft {
     token: settings.token,
     autoStart: settings.autoStart,
     launchAtLogin: settings.launchAtLogin,
+    minimizeToTray: settings.minimizeToTray,
   };
 }
 
@@ -130,6 +131,7 @@ export default function App() {
           token: settingsDraft.token.trim(),
           autoStart: settingsDraft.autoStart,
           launchAtLogin: settingsDraft.launchAtLogin,
+          minimizeToTray: settingsDraft.minimizeToTray,
         }),
       });
       setData(next);

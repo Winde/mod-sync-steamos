@@ -36,6 +36,7 @@ export interface ConsoleConfig {
   token: string;
   autoStart: boolean;
   launchAtLogin: boolean;
+  minimizeToTray: boolean;
   working: Record<string, ConsoleWorking>;
 }
 
@@ -259,6 +260,7 @@ function defaultConfig(packsDir: string): ConsoleConfig {
     token: randomToken(),
     autoStart: true,
     launchAtLogin: false,
+    minimizeToTray: true,
     working: {},
   };
 }
@@ -286,6 +288,7 @@ function normalizeConfig(raw: unknown, fallback: ConsoleConfig): ConsoleConfig {
     token,
     autoStart: typeof source.autoStart === "boolean" ? source.autoStart : fallback.autoStart,
     launchAtLogin: typeof source.launchAtLogin === "boolean" ? source.launchAtLogin : fallback.launchAtLogin,
+    minimizeToTray: typeof source.minimizeToTray === "boolean" ? source.minimizeToTray : fallback.minimizeToTray,
     working,
   };
 }
@@ -686,6 +689,7 @@ export function createConsole(options: ConsoleOptions): Console {
     if (input.token != null) next.token = normalizeToken(input.token);
     if (input.autoStart != null) next.autoStart = input.autoStart === true;
     if (input.launchAtLogin != null) next.launchAtLogin = input.launchAtLogin === true;
+    if (input.minimizeToTray != null) next.minimizeToTray = input.minimizeToTray === true;
     if (input.workingSource) {
       const { recipeId, source } = input.workingSource;
       if (!PACK_ID.test(recipeId)) throw new Error("Invalid recipe id.");

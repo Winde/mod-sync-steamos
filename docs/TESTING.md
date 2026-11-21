@@ -18,7 +18,8 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
    A build log and percentage are shown, and a failed build leaves the old pack
    in place.
 5. **Remove** asks for confirmation and deletes only the pack folder.
-6. Closing the window hides it to the tray; **Quit** in the tray exits.
+6. Minimizing the window hides it to the tray while the setting is enabled;
+   closing it always hides it. **Quit** in the tray exits.
 
 ## 0b. Stop old listeners
 

@@ -19,6 +19,7 @@ export interface SettingsState {
   token: string;
   autoStart: boolean;
   launchAtLogin: boolean;
+  minimizeToTray: boolean;
   working: Record<string, { source: string }>;
 }
 
@@ -98,6 +99,7 @@ export interface SettingsDraft {
   token: string;
   autoStart: boolean;
   launchAtLogin: boolean;
+  minimizeToTray: boolean;
 }
 
 export interface BuildFormState {
