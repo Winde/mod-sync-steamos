@@ -10,6 +10,8 @@
   const S = {
     data: null,
     selected: null,
+    selectedGame: null,
+    libraryView: "games",
     view: "home",
     job: null,
     error: null,
@@ -58,7 +60,17 @@
       S.offline = false;
       S.error = null;
       const packs = S.data.packs || [];
-      if (!S.selected || !packs.some((p) => p.id === S.selected)) S.selected = packs[0] ? packs[0].id : null;
+      const list = groupGames(packs);
+      if (!S.selectedGame || !list.some((g) => g.id === S.selectedGame)) {
+        S.selectedGame = list[0] ? list[0].id : null;
+      }
+      if (!S.selected || !packs.some((p) => p.id === S.selected)) {
+        const game = list.find((g) => g.id === S.selectedGame);
+        const pick = (game && (game.packs.find((p) => p.installed) || game.packs[0])) || packs[0];
+        S.selected = pick ? pick.id : null;
+        if (pick) S.selectedGame = pick.game.id;
+      }
+      if (S.libraryView === "packs" && !list.some((g) => g.id === S.selectedGame)) S.libraryView = "games";
       if (S.data.job && S.data.job.status === "running") S.job = await api(`/api/jobs/${S.data.job.id}`);
       else if (!S.polling && S.job && S.job.status === "running") S.job = S.data.job || null;
     } catch (err) {
@@ -72,16 +84,49 @@
     return (S.data?.packs || []).find((p) => p.id === S.selected) || null;
   }
 
-  function gameWarning() {
-    const g = S.data?.game;
-    if (!g) return null;
-    const title = g.title || "This game";
-    if (!g.path) return `${title} was not found on this TV. Install it in Steam, then refresh.`;
-    if (g.expectedBuild && g.build && String(g.build) !== String(g.expectedBuild)) {
-      return `${title} is on build ${g.build}; this pack needs ${g.expectedBuild}.`;
+  function groupGames(packs) {
+    const map = new Map();
+    for (const p of packs) {
+      const id = p.game?.id || p.id;
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          title: p.game?.title || id,
+          version: p.game?.version || "",
+          build: p.game?.build || "",
+          packs: [],
+        });
+      }
+      map.get(id).packs.push(p);
     }
-    if (g.prefixReady === false) return `Launch ${title} once from Steam so its Proton prefix exists, then refresh.`;
-    return null;
+    return [...map.values()];
+  }
+
+  function games() {
+    return groupGames(S.data?.packs || []);
+  }
+
+  function currentGame() {
+    return games().find((g) => g.id === S.selectedGame) || games()[0] || null;
+  }
+
+  function openGame(gameId) {
+    const game = games().find((g) => g.id === gameId);
+    if (!game) return;
+    S.selectedGame = game.id;
+    const pick = game.packs.find((p) => p.installed) || game.packs[0];
+    if (pick) S.selected = pick.id;
+    S.libraryView = "packs";
+    render();
+  }
+
+  function selectPack(packId) {
+    const p = (S.data?.packs || []).find((x) => x.id === packId);
+    if (!p) return;
+    S.selected = p.id;
+    S.selectedGame = p.game?.id || S.selectedGame;
+    S.libraryView = "packs";
+    render();
   }
 
   function packState(p) {
@@ -136,9 +181,29 @@
   }
 
   function renderLibrary() {
-    const packs = S.data?.packs || [];
-    if (!packs.length) { library.innerHTML = ""; return; }
-    library.innerHTML = `<div class="libtitle">Library</div>` + packs.map((p) => {
+    const list = games();
+    if (!list.length) { library.innerHTML = ""; return; }
+
+    if (S.libraryView === "games") {
+      library.innerHTML = `<div class="libtitle">Games</div>` + list.map((g) => {
+        const sel = g.id === S.selectedGame ? " sel" : "";
+        const pack = g.packs[0];
+        const installed = g.packs.filter((p) => p.installed).length;
+        const thumb = pack && pack.art && pack.art.grid
+          ? `<img src="${art(pack, "grid")}" alt="" onerror="this.style.display='none'">`
+          : `<div class="ph">${esc(g.title.slice(0, 3).toUpperCase())}</div>`;
+        const sub = `${g.packs.length} pack${g.packs.length === 1 ? "" : "s"}${installed ? ` · ${installed} installed` : ""}`;
+        return `<button class="tile${sel}" data-game="${esc(g.id)}" data-focusable data-key="game-${esc(g.id)}">
+          <div class="art">${thumb}</div>
+          <div class="txt"><div class="name">${esc(g.title)}</div><div class="sub">${esc(sub)}</div></div>
+        </button>`;
+      }).join("");
+      return;
+    }
+
+    const game = currentGame();
+    if (!game) { S.libraryView = "games"; return renderLibrary(); }
+    const packs = game.packs.map((p) => {
       const sel = p.id === S.selected ? " sel" : "";
       const thumb = p.art && p.art.grid
         ? `<img src="${art(p, "grid")}" alt="" onerror="this.style.display='none'">`
@@ -148,14 +213,7 @@
         <div class="txt"><div class="name">${esc(p.name)}</div><div class="sub">${esc(p.installed ? `Installed ${p.installedVersion}` : "Not installed")}</div></div>
       </button>`;
     }).join("");
-    const extra = ["The Convergence", "Skyrim SE", "Baldur’s Gate 3", "Baldur’s Gate II"];
-    // Only show placeholders when there is a single real pack, as a hint of what the driver system supports.
-    if (packs.length === 1) {
-      library.insertAdjacentHTML("beforeend", extra.map((name) => {
-        const code = name === "The Convergence" ? "CNV" : name === "Skyrim SE" ? "SE" : name === "Baldur’s Gate 3" ? "BG3" : "BG2";
-        return `<div class="tile locked"><div class="art"><div class="ph">${code}</div></div><div class="txt"><div class="name">${name}</div><div class="sub">No pack yet</div></div></div>`;
-      }).join(""));
-    }
+    library.innerHTML = `<div class="libhead"><div class="libtitle">${esc(game.title)}</div><button class="linkbtn" data-action="all-games" data-focusable data-key="all-games">All games</button></div>` + packs;
   }
 
   function renderOffline() {
@@ -185,13 +243,12 @@
     const p = selectedPack();
     if (!p) return renderNoPacks();
     const st = packState(p);
-    const warn = gameWarning();
     const blocker = firstBlocker(p);
     const job = S.job && (S.job.status === "running" || S.job.status === "error") ? S.job : null;
     if (job) return renderProgress(job, p);
 
     const installed = p.installed;
-    const canAct = !warn && !blocker;
+    const canAct = !blocker;
     const primary = st.primary;
     const primaryHtml = primary
       ? `<button class="btn primary" data-action="${primary.action}" data-pack="${esc(p.id)}" ${canAct ? "" : "disabled"} data-autofocus data-focusable data-key="primary">${primary.label}</button>`
@@ -213,7 +270,6 @@
           <h1>${esc(p.name)}</h1>
           <div class="bigstatus">${installed ? `Installed ${esc(p.installedVersion)}` : "Ready to install"}</div>
           <div class="meta">${esc(st.label)} · ${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</div>
-          ${warn ? `<div class="callout error">${esc(warn)}</div>` : ""}
           ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? ` (+${p.preconditions.failedRequired.length - 1} more)` : ""}</div>` : ""}
           <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${refreshHtml}</div>
           <div class="hint">${installed ? "Saves stay on this TV · Steam Cloud handles the vanilla save" : `${gb(p.totalBytes)} · ${p.files} files · me3 profile included`}</div>
@@ -472,6 +528,11 @@
   }
 
   async function openDetails(packId) {
+    const p = (S.data?.packs || []).find((x) => x.id === packId);
+    if (p) {
+      S.selected = p.id;
+      S.selectedGame = p.game?.id || S.selectedGame;
+    }
     S.view = "details";
     S.details = { logs: "" };
     render();
@@ -511,13 +572,16 @@
   }
 
   app.addEventListener("click", (event) => {
+    const gameTile = event.target.closest("[data-game]");
+    if (gameTile) { openGame(gameTile.getAttribute("data-game")); return; }
     const tile = event.target.closest("[data-select]");
-    if (tile) { S.selected = tile.getAttribute("data-select"); render(); return; }
+    if (tile) { selectPack(tile.getAttribute("data-select")); return; }
     const el = event.target.closest("[data-action]");
     if (!el) return;
     const action = el.getAttribute("data-action");
     const packId = el.getAttribute("data-pack") || S.selected;
-    if (action === "download") requestDownload(packId);
+    if (action === "all-games") { S.libraryView = "games"; render(); }
+    else if (action === "download") requestDownload(packId);
     else if (action === "start-download") startInstall(packId);
     else if (action === "cancel-download") cancelDownload();
     else if (action === "dismiss-job") { S.job = null; S.view = "home"; render(); }
@@ -562,6 +626,7 @@
     if (S.confirm) { S.confirm = null; render(); return; }
     if (S.download) { S.download = null; render(); return; }
     if (S.view === "details") { S.view = "home"; render(); return; }
+    if (S.libraryView === "packs") { S.libraryView = "games"; render(); return; }
   }
 
   window.addEventListener("keydown", (event) => {
@@ -569,6 +634,7 @@
     else if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); moveFocus(-1); }
     else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(); }
     else if (event.key === "Escape" || event.key === "Backspace") { event.preventDefault(); back(); }
+    else if (event.key.toLowerCase() === "b") { back(); }
     else if (event.key.toLowerCase() === "d") { if (S.selected) openDetails(S.selected); }
     else if (event.key.toLowerCase() === "r") refresh();
   });

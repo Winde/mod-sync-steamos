@@ -199,7 +199,9 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   writeText(launcher, launcherText, 0o755);
 
   const icon = path.join(packRoot, pack.art.icon);
-  const desktopText = `[Desktop Entry]
+  let desktopFile = null;
+  if (process.platform === "linux") {
+    const desktopText = `[Desktop Entry]
 Type=Application
 Name=${pack.name}
 Comment=${pack.description || "Modded " + pack.game.title}
@@ -209,28 +211,31 @@ Icon=${icon}
 Terminal=false
 Categories=Game;
 `;
-  const apps = path.join(os.homedir(), ".local", "share", "applications");
-  const desktopFile = path.join(apps, `${pack.mod.id}.desktop`);
-  writeText(desktopFile, desktopText);
-  const userDesktop = path.join(os.homedir(), "Desktop", `${pack.mod.id}.desktop`);
-  try { writeText(userDesktop, desktopText); } catch { /* Desktop may not exist */ }
+    const apps = path.join(os.homedir(), ".local", "share", "applications");
+    desktopFile = path.join(apps, `${pack.mod.id}.desktop`);
+    writeText(desktopFile, desktopText);
+    const userDesktop = path.join(os.homedir(), "Desktop", `${pack.mod.id}.desktop`);
+    try { writeText(userDesktop, desktopText); } catch { /* Desktop may not exist */ }
 
-  log(`Launcher: ${launcher}`);
-  log(`Shortcut: ${desktopFile}`);
-  try {
-    const shortcut = await steam.registerShortcut({
-      exePath: launcher,
-      name: pack.name,
-      icon,
-      art: {
-        grid: path.join(packRoot, pack.art.grid),
-        hero: path.join(packRoot, pack.art.hero),
-        logo: path.join(packRoot, pack.art.logo),
-      },
-    });
-    log(`Steam shortcut added: app ${shortcut.appId}. Restart Steam if it is not visible.`);
-  } catch (err) {
-    log(`Steam shortcut was not added automatically: ${err.message}`);
+    log(`Launcher: ${launcher}`);
+    log(`Shortcut: ${desktopFile}`);
+    try {
+      const shortcut = await steam.registerShortcut({
+        exePath: launcher,
+        name: pack.name,
+        icon,
+        art: {
+          grid: path.join(packRoot, pack.art.grid),
+          hero: path.join(packRoot, pack.art.hero),
+          logo: path.join(packRoot, pack.art.logo),
+        },
+      });
+      log(`Steam shortcut added: app ${shortcut.appId}. Restart Steam if it is not visible.`);
+    } catch (err) {
+      log(`Steam shortcut was not added automatically: ${err.message}`);
+    }
+  } else {
+    log(`Launcher: ${launcher} (Linux integration skipped on ${process.platform}.)`);
   }
   progress({ phase: "done" });
   return { version, packRoot, launcher, desktopFile, files: files.length, totalBytes };

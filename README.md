@@ -30,9 +30,13 @@ npm install
 # Build a pack from the working install. Hardlinks the 7.3 GB payload.
 node bin/modsync.js pack --source "D:\EldenRingMods" --out packs\eldenring-graceborne
 
-# Serve it on the LAN. Prints the TV bootstrap one-liner and a token.
-node bin/modsync.js serve --packs packs --port 8787
+# Serve it on the LAN. Prints the TV bootstrap one-liner and the current URL.
+node bin/modsync.js serve --lan --packs packs --port 8787
 ```
+
+`serve` binds loopback by default. `--lan` binds the detected LAN IPv4 and
+prints the URL/token the TV needs; `--host <ip>` picks a specific interface.
+The server is token-protected and never binds `0.0.0.0`.
 
 `serve` builds `state/bootstrap.tar.gz` on first run (agent + Linux Node).
 The TV does **not** need Node or SSH; it pulls over HTTP.
@@ -43,27 +47,31 @@ The TV does **not** need Node or SSH; it pulls over HTTP.
    exists. Pack-specific prerequisites live in `docs/packs/<pack-id>.md`.
 2. In Desktop Mode, run the one-liner printed by `serve`:
    ```bash
-   curl -fsSL 'http://192.168.1.98:8787/bootstrap.sh?token=...' | bash
+   curl -fsSL 'http://<PC-LAN-IP>:8787/bootstrap.sh?token=<token>' | bash
    ```
 3. Add `~/Desktop/ModSync.desktop` to Steam as a non-Steam game.
 4. Open ModSync and install the pack. The agent writes a launch shortcut for the
    pack (`~/Desktop/<Pack>.desktop`); add it to Steam if it is not there.
 5. Launch from Game Mode. Saves stay local to each machine in v1.
 
-## Network (one-time)
+## Network (one-time, generic)
 
-The PC is on `192.168.1.98/24` with a **Public** Windows profile and NordVPN
-active. The TV pulls from port 8787:
+The PC pack server is the only LAN listener. The TV-side Electron app has no
+public server; it runs the installer in-process and talks to its renderer over
+IPC. Any local HTTP control API stays on `127.0.0.1`.
 
+- Let `serve --lan` print the current PC IPv4. If the PC has multiple
+  interfaces (VPN, virtual adapters), choose one with `--host <ip>`.
 - Add a scoped inbound rule (admin PowerShell):
   ```powershell
   New-NetFirewallRule -DisplayName "ModSync HTTP 8787" -Direction Inbound `
-    -Action Allow -Protocol TCP -LocalPort 8787 -RemoteAddress 192.168.1.0/24 -Profile Any
+    -Action Allow -Protocol TCP -LocalPort 8787 -RemoteAddress LocalSubnet -Profile Any
   ```
-- NordVPN: enable **Allow LAN** / disable **Invisibility on LAN**, and exclude
-  `192.168.1.0/24` from the tunnel.
-- Reserve `192.168.1.98` for the PC in the router (DHCP reservation).
-- Test from the TV: `curl http://192.168.1.98:8787/api/health`.
+- Do **not** port-forward 8787 or enable UPnP. The server is for the LAN only.
+- NordVPN: enable **Allow LAN** / disable **Invisibility on LAN**, and keep the
+  LAN subnet out of the tunnel.
+- DHCP reservation is optional; `--lan` always prints the current address.
+- Test from the TV: `curl http://<PC-LAN-IP>:8787/api/health`.
 
 No SSH. No port forwarding. LAN only.
 
@@ -110,4 +118,5 @@ the game is closed.
 - [`docs/DESIGN.md`](docs/DESIGN.md) — pack/driver/platform model and restrictions
 - [`docs/TRANSPORT.md`](docs/TRANSPORT.md) — HTTP pull, token, firewall/VPN
 - [`docs/DRIVERS.md`](docs/DRIVERS.md) — adding Skyrim/BG3/BG2 drivers
+- [`docs/TESTING.md`](docs/TESTING.md) — manual acceptance test (install, resume, rollback)
 - [`docs/packs/eldenring-graceborne.md`](docs/packs/eldenring-graceborne.md) — pack-specific setup

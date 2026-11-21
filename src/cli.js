@@ -30,7 +30,8 @@ pack:
 
 serve:
   --packs <dir>     Packs directory (default: packs)
-  --host <ip>       Bind host (default: LAN IPv4)
+  --lan             Bind the detected LAN IPv4 (needed by the TV)
+  --host <ip>       Bind a specific address (default: 127.0.0.1)
   --port <n>        Port (default: 8787)
   --token <token>   Fixed token (default: random per run)
   --rebuild-bootstrap
@@ -67,11 +68,17 @@ async function cmdPack(values) {
 
 async function cmdServe(values) {
   const packsDir = path.resolve(values.packs || path.join(repoRoot, "packs"));
-  const host = values.host || util.detectLanIp();
-  const publicHost = host === "0.0.0.0" ? util.detectLanIp() : host;
+  const loopback = !values.lan && !values.host;
+  const host = values.host || (values.lan ? util.detectLanIp() : "127.0.0.1");
+  if (host === "0.0.0.0") {
+    fail("Refusing to bind all interfaces. Use --lan, or --host with one LAN IPv4.");
+  }
+  if (values.lan && host === "127.0.0.1") {
+    fail("No private LAN IPv4 found. Connect to the LAN or pass --host.");
+  }
   const port = Number(values.port || 8787);
   const token = values.token || util.randomToken();
-  const baseUrl = `http://${publicHost}:${port}`;
+  const baseUrl = `http://${host}:${port}`;
   const bootstrapTar = path.join(repoRoot, "state", "bootstrap.tar.gz");
   if (!values["skip-bootstrap"] && (values["rebuild-bootstrap"] || !fs.existsSync(bootstrapTar))) {
     await buildBootstrap(repoRoot, bootstrapTar, (m) => console.log(m));
@@ -90,13 +97,25 @@ async function cmdServe(values) {
   });
   server.listen(port, host, () => {
     console.log(`\nModSync repository: ${baseUrl}/`);
+    console.log(`Bind: ${host}${loopback ? " (loopback only)" : ""}`);
+    console.log(`Token: ${token}`);
     console.log(`Packs: ${packs.map((p) => `${p.name} ${p.mod.version}`).join(", ") || "none"}`);
+    if (loopback) {
+      console.log("\nOnly this PC can reach the server. Use --lan when the Steam Machine is ready.");
+      return;
+    }
+    const candidates = util.lanAddresses();
+    if (candidates.length > 1) {
+      console.log(`LAN interfaces: ${candidates.map((c) => `${c.address} (${c.name})`).join(", ")}`);
+      console.log(`Using ${host}. Pass --host <ip> if that is the wrong interface.`);
+    }
     if (!fs.existsSync(bootstrapTar)) console.log("WARNING: bootstrap.tar.gz is missing; TV bootstrap will 404.");
     console.log("\nSteam Machine (Desktop Mode):");
     console.log(`curl -fsSL '${baseUrl}/bootstrap.sh?token=${token}' | bash`);
-    console.log("\nFirewall (admin PowerShell, once):");
-    console.log(`New-NetFirewallRule -DisplayName "ModSync HTTP ${port}" -Direction Inbound -Action Allow -Protocol TCP -LocalPort ${port} -RemoteAddress 192.168.1.0/24 -Profile Any`);
-    console.log("\nKeep this process running while the TV installs/updates.");
+    console.log("\nFirewall (admin PowerShell, once; local subnet only):");
+    console.log(`New-NetFirewallRule -DisplayName "ModSync HTTP ${port}" -Direction Inbound -Action Allow -Protocol TCP -LocalPort ${port} -RemoteAddress LocalSubnet -Profile Any`);
+    console.log("\nDo not port-forward this port or enable UPnP. Keep it on the LAN.");
+    console.log("Keep this process running while the TV installs/updates.");
   });
 }
 
@@ -163,7 +182,7 @@ async function main(argv) {
     allowPositionals: true,
     options: {
       source: { type: "string" }, out: { type: "string" }, version: { type: "string" },
-      copy: { type: "boolean" }, packs: { type: "string" }, host: { type: "string" },
+      copy: { type: "boolean" }, packs: { type: "string" }, host: { type: "string" }, lan: { type: "boolean" },
       port: { type: "string" }, token: { type: "string" }, config: { type: "string" },
       "rebuild-bootstrap": { type: "boolean" }, "skip-bootstrap": { type: "boolean" },
       exe: { type: "string" }, name: { type: "string" }, icon: { type: "string" },

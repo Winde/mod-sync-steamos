@@ -11,6 +11,23 @@
 
 Adding a game means adding a driver and a pack. The core does not change.
 
+## Process model and exposure
+
+- **PC** — the pack server is the only LAN listener. It binds one private IPv4
+  (`serve --lan` or `--host`), refuses `0.0.0.0`, requires a token, and is scoped
+  to the local subnet. It is never port-forwarded.
+- **Steam Machine** — the Electron app runs the installer in its main process.
+  The renderer uses IPC; there is no LAN listener. If a local control API is
+  kept for automation, it binds `127.0.0.1` and uses a per-run token.
+- **Discovery** — no hardcoded PC address. The client discovers `_modsync._tcp`
+  over mDNS or stores the URL printed by `serve --lan`, and can re-pair when the
+  address changes.
+
+Multiple people can run this project on different LANs without editing code:
+the bind address is detected or passed explicitly, and the firewall rule uses
+`LocalSubnet`.
+
+
 ## Pack
 
 ```

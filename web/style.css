@@ -106,6 +106,13 @@ h1 { margin: 0; font-size: clamp(38px, 4.7vw, 100px); line-height: .96; font-wei
 .btn.small { font-size: clamp(10px, .85vw, 16px); padding: .35em .8em; }
 .library { display: flex; flex-direction: column; gap: 1vh; min-height: 0; overflow: auto; padding-right: .3vw; }
 .libtitle { font-size: clamp(10px, .85vw, 16px); letter-spacing: .18em; color: #8b96a8; text-transform: uppercase; margin: 0 0 .4vh .2vw; }
+.libhead { display: flex; align-items: center; justify-content: space-between; gap: 1vw; margin: 0 0 .4vh .2vw; }
+.libhead .libtitle { margin: 0; }
+.linkbtn {
+  font: inherit; font-size: clamp(10px, .85vw, 16px); color: #9ec9e8;
+  background: transparent; border: 0; padding: .25em .4em; border-radius: .3em; cursor: pointer;
+}
+.linkbtn:focus { outline: .18em solid #ffb4a8; outline-offset: .18em; }
 .tile {
   display: flex; align-items: center; gap: .8vw; padding: .5vh .7vw;
   border-radius: .5vw; border: 1px solid transparent; background: rgba(8,11,16,.5);
@@ -124,13 +131,7 @@ h1 { margin: 0; font-size: clamp(38px, 4.7vw, 100px); line-height: .96; font-wei
 .tile.sel { background: rgba(20,27,38,.92); border-color: rgba(255,255,255,.34); box-shadow: 0 0 0 .12em rgba(255,255,255,.12); }
 .tile.locked { opacity: .5; }
 .tile:focus { background: rgba(28,37,50,.96); }
-.footer { display: flex; align-items: center; justify-content: space-between; gap: 2vw; }
-.keys { display: flex; gap: 1.4vw; align-items: center; font-size: clamp(9px, .82vw, 15px); color: #8b96a8; }
-.keys b {
-  display: inline-grid; place-items: center; min-width: 1.8em; height: 1.8em;
-  padding: 0 .3em; margin-right: .35em; border-radius: .3em;
-  border: 1px solid var(--line); background: rgba(15,20,29,.8); color: #dbe3ef; font-size: .85em;
-}
+.footer { display: flex; align-items: center; justify-content: flex-end; gap: 2vw; }
 .note { font-size: clamp(9px, .78vw, 14px); color: #6f7b8f; }
 .overlay {
   position: fixed; inset: 0; background: rgba(2,4,7,.9); z-index: 10;
@@ -170,7 +171,7 @@ pre.log { margin: 0; font-family: ui-monospace, monospace; }
   .poster { height: 42vh; }
   h1 { font-size: clamp(30px, 9vw, 54px); }
   .bigstatus { font-size: 18px; }
-  .meta, .kicker, .hint, .callout, .keys, .note { font-size: 13px; }
+  .meta, .kicker, .hint, .callout, .note { font-size: 13px; }
   .btn { font-size: 15px; }
   .empty { max-width: 90vw; }
   .panel h2 { font-size: 24px; }

@@ -88,16 +88,21 @@ function randomToken() {
   return crypto.randomBytes(12).toString("hex");
 }
 
-function detectLanIp() {
-  const candidates = [];
+function lanAddresses() {
+  const out = [];
   for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
     for (const a of addrs || []) {
       if (a.family !== "IPv4" || a.internal) continue;
       if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address)) {
-        candidates.push({ name, address: a.address });
+        out.push({ name, address: a.address });
       }
     }
   }
+  return out;
+}
+
+function detectLanIp() {
+  const candidates = lanAddresses();
   const preferred = candidates.find((c) => c.address.startsWith("192.168."))
     || candidates.find((c) => c.address.startsWith("192."))
     || candidates.find((c) => c.address.startsWith("10."))
@@ -193,7 +198,7 @@ async function fetchToFile(url, dest, options = {}) {
 module.exports = {
   ensureDir, readJson, writeJson, readText, writeText,
   sha256File, walkFiles, safeJoin, relPosix, formatBytes,
-  nowStamp, randomToken, detectLanIp, isGameRunning, mapLimit,
+  nowStamp, randomToken, detectLanIp, lanAddresses, isGameRunning, mapLimit,
   materialize, modeFor, tailText, tailFile, fetchJson, fetchToFile,
   freeBytes, fsp,
 };

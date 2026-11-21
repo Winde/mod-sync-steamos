@@ -9,7 +9,9 @@
   },
   "scripts": {
     "start": "node bin/modsync.js",
-    "test": "node --test"
+    "test": "node --test",
+    "e2e": "node scripts/e2e-factory.js",
+    "verify-install": "node scripts/e2e-factory.js --verify-only"
   },
   "dependencies": {
     "steam-shortcut-editor": "^3.1.3"
