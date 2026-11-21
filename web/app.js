@@ -10,6 +10,7 @@
   const updateBtn = $("#update-btn");
   const content = $(".content");
   const desktop = typeof window !== "undefined" ? window.modsyncDesktop : null;
+  const labels = window.MODSYNC_LABELS;
 
   const S = {
     data: null,
@@ -38,17 +39,17 @@
   const gb = (n) => (n / 1024 / 1024 / 1024).toFixed(2);
   const fmtBytes = (n) => {
     let v = Number(n) || 0;
-    const units = ["B", "KB", "MB", "GB", "TB"];
+    const units = labels.bytesUnits;
     let i = 0;
     while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
     return `${v.toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
   };
   const fmtDuration = (sec) => {
-    if (sec == null || !Number.isFinite(sec)) return "—";
+    if (sec == null || !Number.isFinite(sec)) return labels.durationDash;
     const s = Math.max(0, Math.round(sec));
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
-    return h ? `${h} h ${m} min` : m ? `${m} min` : `${s} s`;
+    return h ? labels.durationHours(h, m) : m ? labels.durationMinutes(m) : labels.durationSeconds(s);
   };
 
   async function api(path, options = {}) {
@@ -79,8 +80,8 @@
       if (S.libraryView === "packs" && !list.some((g) => g.id === S.selectedGame)) S.libraryView = "games";
       if (storageBtn) {
         storageBtn.textContent = S.data.diskFreeBytes != null
-          ? `Storage · ${gb(S.data.diskFreeBytes)} GB free`
-          : "Storage";
+          ? labels.storageWithFree(gb(S.data.diskFreeBytes))
+          : labels.storage;
       }
       if (S.data.job && S.data.job.status === "running") S.job = await api(`/api/jobs/${S.data.job.id}`);
       else if (!S.polling && S.job && S.job.status === "running") S.job = S.data.job || null;
@@ -141,33 +142,33 @@
   }
 
   function packState(p) {
-    if (!p) return { title: "No pack", detail: "", primary: null };
+    if (!p) return { title: labels.noPack, detail: "", primary: null };
     const state = p.status !== "up-to-date" && p.staging ? "staging" : p.status;
     switch (state) {
       case "up-to-date":
         return {
-          title: `Installed ${p.installedVersion}`,
-          detail: "up to date",
-          primary: { action: "launch", label: "Play" },
+          title: labels.installed(p.installedVersion),
+          detail: labels.upToDate,
+          primary: { action: "launch", label: labels.play },
         };
       case "staging":
         return {
-          title: p.installed ? `Installed ${p.installedVersion}` : "Download paused",
-          detail: p.installed ? `update ${p.mod.version} paused` : "",
-          primary: { action: "download", label: "Resume install" },
+          title: p.installed ? labels.installed(p.installedVersion) : labels.downloadPaused,
+          detail: p.installed ? labels.updatePaused(p.mod.version) : "",
+          primary: { action: "download", label: labels.resumeInstall },
         };
       case "update-available":
         return {
-          title: `Installed ${p.installedVersion}`,
-          detail: `update ${p.mod.version} available`,
-          primary: { action: "download", label: "Update" },
+          title: labels.installed(p.installedVersion),
+          detail: labels.updateAvailable(p.mod.version),
+          primary: { action: "download", label: labels.update },
         };
       case "not-installed":
       default:
         return {
-          title: "Ready to install",
+          title: labels.readyToInstall,
           detail: "",
-          primary: { action: "download", label: "Install" },
+          primary: { action: "download", label: labels.install },
         };
     }
   }
@@ -210,26 +211,24 @@
           ${c.hint ? `<div class="chint">${esc(c.hint)}</div>` : ""}
         </div>
         ${allowConfirm && c.confirmable && c.status !== "pass"
-          ? `<button class="btn ghost small" data-action="confirm-check" data-pack="${esc(p.id)}" data-check="${esc(c.id)}" data-focusable>Confirm</button>`
+          ? `<button class="btn ghost small" data-action="confirm-check" data-pack="${esc(p.id)}" data-check="${esc(c.id)}" data-focusable>${labels.confirm}</button>`
           : ""}
       </div>`).join("")}</div>`;
   }
 
   function packContents(p) {
-    const base = `${gb(p.totalBytes)} · ${p.files} files`;
-    if (p.loader && p.loader.type === "me3") return `${base} · me3 profile included`;
+    const base = labels.stats(gb(p.totalBytes), p.files);
+    if (p.loader && p.loader.type === "me3") return `${base} · ${labels.me3Included}`;
     if (p.loader && p.loader.type === "bg3se") {
-      return p.install && p.install.bg3se
-        ? `${base} · modsettings + BG3SE included`
-        : `${base} · modsettings included`;
+      return `${base} · ${p.install && p.install.bg3se ? labels.bg3seIncluded : labels.modsettingsIncluded}`;
     }
-    return p.loader && p.loader.type ? `${base} · ${p.loader.type} loader included` : base;
+    return p.loader && p.loader.type ? `${base} · ${labels.loaderIncluded(p.loader.type)}` : base;
   }
 
   function renderUpdateButton() {
     if (!updateBtn) return;
     if (S.update && S.update.available) {
-      updateBtn.textContent = `Update ${S.update.latest}`;
+      updateBtn.textContent = labels.updateTo(S.update.latest);
       updateBtn.classList.remove("hidden");
     } else {
       updateBtn.classList.add("hidden");
@@ -253,8 +252,8 @@
       return;
     }
     S.confirm = {
-      title: `Update ModSync to ${S.update.latest}?`,
-      message: "The app downloads the new AppImage, verifies its checksum, then restarts. Packs and saves stay on this TV.",
+      title: labels.updateTitle(S.update.latest),
+      message: labels.updateMessage,
       appUpdate: true,
     };
     render();
@@ -266,7 +265,7 @@
     try {
       await desktop.installUpdate();
     } catch (err) {
-      S.confirm = { title: "Update failed", message: err.message, simple: true };
+      S.confirm = { title: labels.updateFailed, message: err.message, simple: true };
       render();
     }
   }
@@ -281,19 +280,19 @@
       const free = S.data?.diskFreeBytes;
       const side = `
         <div class="sidecard">
-          <div class="libtitle">This TV</div>
-          <div class="meta">${installedCount} pack${installedCount === 1 ? "" : "s"} installed${free != null ? ` · ${gb(free)} GB free` : ""}</div>
-          <div class="actions"><button class="btn ghost small" data-action="storage" data-focusable data-key="side-storage">Manage storage</button></div>
+          <div class="libtitle">${labels.thisTv}</div>
+          <div class="meta">${labels.packsInstalled(installedCount)}${free != null ? ` · ${labels.freeWithGb(gb(free))}` : ""}</div>
+          <div class="actions"><button class="btn ghost small" data-action="storage" data-focusable data-key="side-storage">${labels.manageStorage}</button></div>
         </div>
-        ${offline ? `<div class="sidecard"><div class="libtitle">PC offline</div><div class="meta">Installed packs can play. Start the PC server when you want to check for updates.</div></div>` : ""}`;
-      library.innerHTML = `<div class="libtitle">Games</div>` + list.map((g) => {
+        ${offline ? `<div class="sidecard"><div class="libtitle">${labels.pcOfflineTitle}</div><div class="meta">${labels.pcOfflineBody}</div></div>` : ""}`;
+      library.innerHTML = `<div class="libtitle">${labels.games}</div>` + list.map((g) => {
         const sel = g.id === S.selectedGame ? " sel" : "";
         const pack = g.packs[0];
         const installed = g.packs.filter((p) => p.installed).length;
         const thumb = pack && pack.art && pack.art.grid
           ? `<img src="${art(pack, "grid")}" alt="" onerror="this.style.display='none'">`
           : `<div class="ph">${esc(g.title.slice(0, 3).toUpperCase())}</div>`;
-        const sub = `${g.packs.length} pack${g.packs.length === 1 ? "" : "s"}${installed ? ` · ${installed} installed` : ""}`;
+        const sub = labels.packLine(g.packs.length, installed);
         return `<button class="tile${sel}" data-game="${esc(g.id)}" data-focusable data-key="game-${esc(g.id)}">
           <div class="art">${thumb}</div>
           <div class="txt"><div class="name">${esc(g.title)}</div><div class="sub">${esc(sub)}</div></div>
@@ -311,20 +310,20 @@
         : `<div class="ph">${esc(p.name.slice(0, 3).toUpperCase())}</div>`;
       return `<button class="tile${sel}" data-select="${esc(p.id)}" data-focusable data-key="tile-${esc(p.id)}">
         <div class="art">${thumb}</div>
-        <div class="txt"><div class="name">${esc(p.name)}</div><div class="sub">${esc(p.installed ? `Installed ${p.installedVersion}` : "Not installed")}</div></div>
+        <div class="txt"><div class="name">${esc(p.name)}</div><div class="sub">${esc(p.installed ? labels.installed(p.installedVersion) : labels.notInstalled)}</div></div>
       </button>`;
     }).join("");
-    library.innerHTML = `<div class="libhead"><div class="libtitle">${esc(game.title)}</div><button class="linkbtn" data-action="all-games" data-focusable data-key="all-games">All games</button></div>` + packs;
+    library.innerHTML = `<div class="libhead"><div class="libtitle">${esc(game.title)}</div><button class="linkbtn" data-action="all-games" data-focusable data-key="all-games">${labels.allGames}</button></div>` + packs;
   }
 
   function renderOffline() {
     main.innerHTML = `
       <section class="empty">
-        <div class="kicker">MODSYNC</div>
-        <h1>PC offline</h1>
-        <div class="meta">Start <b>modsync serve</b> on the PC, keep both devices on the same LAN, then retry.</div>
-        <div class="actions"><button class="btn primary" data-action="retry" data-autofocus data-focusable data-key="retry">Retry</button></div>
-        <div class="hint">The TV only pulls over HTTP. No SSH, no USB.</div>
+        <div class="kicker">${labels.appName.toUpperCase()}</div>
+        <h1>${labels.offlineTitle}</h1>
+        <div class="meta">${labels.offlineBody}</div>
+        <div class="actions"><button class="btn primary" data-action="retry" data-autofocus data-focusable data-key="retry">${labels.retry}</button></div>
+        <div class="hint">${labels.offlineHint}</div>
       </section>`;
     library.innerHTML = "";
   }
@@ -332,10 +331,10 @@
   function renderNoPacks() {
     main.innerHTML = `
       <section class="empty">
-        <div class="kicker">MODSYNC</div>
-        <h1>No packs yet</h1>
-        <div class="meta">Build a pack on the PC, keep the server running, then refresh.</div>
-        <div class="actions"><button class="btn primary" data-action="retry" data-autofocus data-focusable data-key="retry">Refresh</button></div>
+        <div class="kicker">${labels.appName.toUpperCase()}</div>
+        <h1>${labels.noPacksTitle}</h1>
+        <div class="meta">${labels.noPacksBody}</div>
+        <div class="actions"><button class="btn primary" data-action="retry" data-autofocus data-focusable data-key="retry">${labels.refresh}</button></div>
       </section>`;
     library.innerHTML = "";
   }
@@ -343,7 +342,7 @@
   function renderHome() {
     const p = selectedPack();
     if (!p) return renderNoPacks();
-    const st = packState(p);
+    const packStatus = packState(p);
     const blocker = firstBlocker(p);
     const job = S.job && (S.job.status === "running" || S.job.status === "error") ? S.job : null;
     if (job) return renderProgress(job, p);
@@ -351,35 +350,35 @@
     const installed = p.installed;
     const offline = S.data?.pc?.online === false;
     const canAct = !blocker;
-    const primary = st.primary;
+    const primary = packStatus.primary;
     const stateText = !installed
       ? null
       : offline
-        ? "PC offline · can't check for updates"
-        : st.detail;
+        ? labels.pcOfflineCheck
+        : packStatus.detail;
     const primaryHtml = primary
       ? `<button class="btn primary" data-action="${primary.action}" data-pack="${esc(p.id)}" ${canAct ? "" : "disabled"} data-autofocus data-focusable data-key="primary">${primary.label}</button>`
       : "";
     const updateHtml = p.status === "update-available" && installed
-      ? `<button class="btn" data-action="launch" data-pack="${esc(p.id)}" ${canAct ? "" : "disabled"} data-focusable data-key="play">Play ${esc(p.installedVersion)}</button>`
+      ? `<button class="btn" data-action="launch" data-pack="${esc(p.id)}" ${canAct ? "" : "disabled"} data-focusable data-key="play">${labels.playVersion(esc(p.installedVersion))}</button>`
       : "";
-    const detailsHtml = `<button class="btn ghost" data-action="details" data-pack="${esc(p.id)}" data-focusable data-key="details">Details</button>`;
-    const refreshHtml = `<button class="btn ghost" data-action="retry" data-focusable data-key="refresh">Refresh</button>`;
+    const detailsHtml = `<button class="btn ghost" data-action="details" data-pack="${esc(p.id)}" data-focusable data-key="details">${labels.details}</button>`;
+    const refreshHtml = `<button class="btn ghost" data-action="retry" data-focusable data-key="refresh">${labels.refresh}</button>`;
     const rollbackHtml = p.canRollback
-      ? `<button class="btn ghost" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">Roll back</button>`
+      ? `<button class="btn ghost" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">${labels.rollBack}</button>`
       : "";
 
     main.innerHTML = `
       <section class="hero">
         <div class="poster">${p.art && p.art.grid ? `<img src="${art(p, "grid")}" alt="" onerror="this.style.display='none'">` : `<div class="ph">${esc(p.name.slice(0, 3).toUpperCase())}</div>`}</div>
         <div class="info">
-          <div class="kicker">${esc(p.game.title)} · ${esc(p.name)}</div>
+          <div class="kicker">${esc(labels.kicker(p.game.title, p.name))}</div>
           <h1>${esc(p.name)}</h1>
-          <div class="bigstatus">${esc(st.title)}</div>
-          <div class="meta">${stateText ? `${esc(stateText)} · ` : ""}${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</div>
-          ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? ` (+${p.preconditions.failedRequired.length - 1} more)` : ""}</div>` : ""}
+          <div class="bigstatus">${esc(packStatus.title)}</div>
+          <div class="meta">${stateText ? `${esc(stateText)} · ` : ""}${esc(p.game.title)} ${esc(p.game.version || "")} · ${labels.buildLabel} ${esc(p.game.build || "")}</div>
+          ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? labels.moreChecks(p.preconditions.failedRequired.length - 1) : ""}</div>` : ""}
           <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${refreshHtml}</div>
-          <div class="hint">${installed ? "Saves stay on this TV · Steam Cloud handles the vanilla save" : packContents(p)}</div>
+          <div class="hint">${installed ? labels.savesHintVanilla : packContents(p)}</div>
         </div>
       </section>`;
     renderLibrary();
@@ -417,22 +416,24 @@
     const percent = job.bytesTotal ? pct(job.bytesDone, job.bytesTotal) : pct(job.done, job.total);
     const rate = failed || verifying ? { speed: 0, eta: null } : rateInfo(job);
     const line = verifying
-      ? "Checking files already on the TV..."
+      ? labels.checkingFiles
       : job.phase === "launcher"
-        ? "Writing launcher, shortcut, and Steam art..."
-        : (job.log && job.log[job.log.length - 1]) || job.phase || "Working";
+        ? labels.launcherPhase
+        : job.phase === "apply"
+          ? labels.applyPhase
+          : (job.log && job.log[job.log.length - 1]) || job.phase || labels.working;
     const status = failed
-      ? `${esc(job.error || "Unknown error")}`
-      : `${fmtBytes(job.bytesDone)} of ${fmtBytes(job.bytesTotal)} · ${job.done || 0}/${job.total || 0} files`;
+      ? `${esc(job.error || labels.error)}`
+      : labels.progressFiles(job.done || 0, job.total || 0, fmtBytes(job.bytesDone), fmtBytes(job.bytesTotal));
     const speed = !failed && !verifying && job.status === "running"
-      ? `<div class="meta">${rate.speed > 0 ? `${fmtBytes(rate.speed)}/s · ${fmtDuration(rate.eta)} left` : "Measuring speed..."}</div>`
+      ? `<div class="meta">${rate.speed > 0 ? labels.speedEta(fmtBytes(rate.speed), fmtDuration(rate.eta)) : labels.measuringSpeed}</div>`
       : "";
     main.innerHTML = `
       <section class="progresswrap">
-        <div class="kicker">${failed ? "INSTALL FAILED" : verifying ? "CHECKING" : "INSTALLING"}</div>
-        <h1>${failed ? "Something went wrong" : `${esc(p ? p.name : "Pack")}`}</h1>
+        <div class="kicker">${failed ? labels.installFailed : verifying ? labels.checking : labels.installing}</div>
+        <h1>${failed ? labels.somethingWrong : `${esc(p ? p.name : labels.packTitle)}`}</h1>
         <div class="progress">
-          <div class="big">${failed ? "ERROR" : percent + "%"}</div>
+          <div class="big">${failed ? labels.error : percent + "%"}</div>
           <div class="bar"><div class="fill" style="width:${failed ? 100 : percent}%"></div></div>
           <div class="small">${status}</div>
           ${speed}
@@ -440,10 +441,10 @@
         </div>
         <div class="actions">
           ${failed
-            ? `<button class="btn primary" data-action="start-download" data-pack="${esc(job.packId)}" data-autofocus data-focusable data-key="primary">Retry</button><button class="btn ghost" data-action="dismiss-job" data-focusable data-key="back">Back</button>`
-            : `<button class="btn" data-action="cancel-download" data-autofocus data-focusable data-key="cancel">Cancel download</button>`}
+            ? `<button class="btn primary" data-action="start-download" data-pack="${esc(job.packId)}" data-autofocus data-focusable data-key="primary">${labels.retry}</button><button class="btn ghost" data-action="dismiss-job" data-focusable data-key="back">${labels.back}</button>`
+            : `<button class="btn" data-action="cancel-download" data-autofocus data-focusable data-key="cancel">${labels.cancelDownload}</button>`}
         </div>
-        <div class="hint">${failed ? "The TV save was not touched. The previous version is still installed." : "You can cancel and resume later. Completed files stay on the TV."}</div>
+        <div class="hint">${failed ? labels.previousKept : labels.keepTv}</div>
       </section>`;
     library.innerHTML = "";
   }
@@ -458,27 +459,27 @@
     const update = !!(p.installed && p.installedVersion && p.installedVersion !== p.mod.version);
     const blocker = firstBlocker(p);
     const notes = noteList(p);
-    const kicker = resume ? "RESUME DOWNLOAD" : update ? "UPDATE" : "INSTALL";
-    const title = resume ? "Resume install" : update ? `Update to ${p.mod.version}` : "Install pack";
+    const kicker = resume ? labels.resumeDownloadKicker : update ? labels.updateKicker : labels.installKicker;
+    const title = resume ? labels.resumeDownload : update ? labels.updateTo(p.mod.version) : labels.installPack;
     overlay.classList.remove("hidden");
     overlay.innerHTML = `<div class="panel" style="width:min(66vw,820px)">
       <div class="kicker">${kicker}</div>
       <h2>${esc(p.name)}</h2>
       <p>${esc(p.description || "")}</p>
-      <div class="row"><span>Download</span><b>${gb(p.totalBytes)} GB · ${p.files} files</b></div>
-      <div class="row"><span>Version</span><b>${esc(p.mod.version)}</b></div>
-      ${update ? `<div class="row"><span>Current</span><b>${esc(p.installedVersion)}</b></div>` : ""}
-      <div class="row"><span>Free on TV</span><b>${free == null ? "unknown" : gb(free) + " GB"}</b></div>
-      <div class="row"><span>Kept</span><b>Previous version and saves stay on this TV</b></div>
-      ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}</div>` : low ? `<div class="callout error">Not enough space: this pack needs about ${gb(need)} GB free.</div>` : ""}
-      ${notes.length ? `<p style="margin-top:2vh"><b>Before you install</b></p>${renderNotes(p)}` : ""}
-      ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>Checks</b></p>${renderChecks(p, true)}` : ""}
+      <div class="row"><span>${labels.downloadSheet}</span><b>${labels.stats(gb(p.totalBytes), p.files)}</b></div>
+      <div class="row"><span>${labels.version}</span><b>${esc(p.mod.version)}</b></div>
+      ${update ? `<div class="row"><span>${labels.current}</span><b>${esc(p.installedVersion)}</b></div>` : ""}
+      <div class="row"><span>${labels.freeOnTv}</span><b>${free == null ? labels.unknown : gb(free) + " GB"}</b></div>
+      <div class="row"><span>${labels.kept}</span><b>${labels.keptValue}</b></div>
+      ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}</div>` : low ? `<div class="callout error">${labels.notEnoughSpace(gb(need))}</div>` : ""}
+      ${notes.length ? `<p style="margin-top:2vh"><b>${labels.beforeInstall}</b></p>${renderNotes(p)}` : ""}
+      ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>${labels.checks}</b></p>${renderChecks(p, true)}` : ""}
       <div class="actions">
-        <button class="btn primary" data-action="start-download" data-pack="${esc(p.id)}" ${low || blocker ? "disabled" : ""} data-autofocus data-focusable data-key="start">${resume ? "Resume download" : update ? "Download update" : "Start download"}</button>
-        ${update ? `<button class="btn" data-action="launch" data-pack="${esc(p.id)}" data-focusable data-key="play">Play ${esc(p.installedVersion)}</button>` : ""}
-        <button class="btn ghost" data-action="close-download" data-focusable data-key="cancel">Not now</button>
+        <button class="btn primary" data-action="start-download" data-pack="${esc(p.id)}" ${low || blocker ? "disabled" : ""} data-autofocus data-focusable data-key="start">${resume ? labels.resumeDownload : update ? labels.downloadUpdate : labels.startDownload}</button>
+        ${update ? `<button class="btn" data-action="launch" data-pack="${esc(p.id)}" data-focusable data-key="play">${labels.playVersion(esc(p.installedVersion))}</button>` : ""}
+        <button class="btn ghost" data-action="close-download" data-focusable data-key="cancel">${labels.notNow}</button>
       </div>
-      <div class="hint">Large pack: you can cancel anytime and resume later. The TV stays awake during the download.</div>
+      <div class="hint">${labels.startDownloadHint}</div>
     </div>`;
   }
 
@@ -491,42 +492,42 @@
     const s = S.storage;
     if (!s || s.loading) {
       main.innerHTML = `<section class="storagewrap">
-        <div class="kicker">STEAM MACHINE</div>
-        <h1>Storage</h1>
-        <div class="meta">Calculating ModSync usage...</div>
-        <div class="actions"><button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">Back</button></div>
+        <div class="kicker">${labels.steamMachine}</div>
+        <h1>${labels.storageTitle}</h1>
+        <div class="meta">${labels.calculating}</div>
+        <div class="actions"><button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">${labels.back}</button></div>
       </section>`;
       return;
     }
     if (s.error) {
       main.innerHTML = `<section class="storagewrap">
-        <div class="kicker">STEAM MACHINE</div>
-        <h1>Storage</h1>
+        <div class="kicker">${labels.steamMachine}</div>
+        <h1>${labels.storageTitle}</h1>
         <div class="callout error">${esc(s.error)}</div>
-        <div class="actions"><button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">Back</button></div>
+        <div class="actions"><button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">${labels.back}</button></div>
       </section>`;
       return;
     }
 
     const packs = s.packs || [];
     const cards = packs.map((p) => {
-      const rows = p.versions.map((v) => `<div class="srow"><span>${esc(v.version)}${v.current ? " · current" : ""}</span><b>${fmtBytes(v.bytes)}</b></div>`).join("");
+      const rows = p.versions.map((v) => `<div class="srow"><span>${esc(v.version)}${v.current ? ` · ${labels.currentVersion}` : ""}</span><b>${fmtBytes(v.bytes)}</b></div>`).join("");
       const staging = p.stagingBytes
-        ? `<div class="srow amber"><span>Partial download</span><b>${fmtBytes(p.stagingBytes)}</b></div>`
+        ? `<div class="srow amber"><span>${labels.partialDownload}</span><b>${fmtBytes(p.stagingBytes)}</b></div>`
         : "";
       const other = p.otherBytes
-        ? `<div class="srow muted"><span>Profiles, tools, art</span><b>${fmtBytes(p.otherBytes)}</b></div>`
+        ? `<div class="srow muted"><span>${labels.profilesToolsArt}</span><b>${fmtBytes(p.otherBytes)}</b></div>`
         : "";
       const actions = [
-        p.stagingBytes ? `<button class="btn" data-action="storage-clear" data-scope="staging" data-pack="${esc(p.id)}" data-bytes="${p.stagingBytes}" data-focusable>Clear partial (${fmtBytes(p.stagingBytes)})</button>` : "",
-        p.oldBytes ? `<button class="btn" data-action="storage-clear" data-scope="old-versions" data-pack="${esc(p.id)}" data-bytes="${p.oldBytes}" data-focusable>Remove old versions (${fmtBytes(p.oldBytes)})</button>` : "",
-        `<button class="btn ghost" data-action="storage-clear" data-scope="pack" data-pack="${esc(p.id)}" data-bytes="${p.totalBytes}" data-focusable>Remove pack (${fmtBytes(p.totalBytes)})</button>`,
+        p.stagingBytes ? `<button class="btn" data-action="storage-clear" data-scope="staging" data-pack="${esc(p.id)}" data-bytes="${p.stagingBytes}" data-focusable>${labels.clearPartial(fmtBytes(p.stagingBytes))}</button>` : "",
+        p.oldBytes ? `<button class="btn" data-action="storage-clear" data-scope="old-versions" data-pack="${esc(p.id)}" data-bytes="${p.oldBytes}" data-focusable>${labels.removeOldVersions(fmtBytes(p.oldBytes))}</button>` : "",
+        `<button class="btn ghost" data-action="storage-clear" data-scope="pack" data-pack="${esc(p.id)}" data-bytes="${p.totalBytes}" data-focusable>${labels.removePack(fmtBytes(p.totalBytes))}</button>`,
       ].filter(Boolean).join("");
       return `<div class="storagecard">
         <div class="shead">
           <div>
             <div class="sname">${esc(p.name)}</div>
-            <div class="ssub">${p.installed ? `Installed ${esc(p.currentVersion)}` : "No installed version"}</div>
+            <div class="ssub">${p.installed ? labels.installed(esc(p.currentVersion)) : labels.noInstalledVersion}</div>
           </div>
           <div class="ssize">${fmtBytes(p.totalBytes)}</div>
         </div>
@@ -536,20 +537,20 @@
     }).join("");
 
     main.innerHTML = `<section class="storagewrap">
-      <div class="kicker">STEAM MACHINE</div>
-      <h1>Storage</h1>
-      <div class="meta">${s.freeBytes == null ? "Free space unknown" : `${fmtBytes(s.freeBytes)} free on this TV`} · ModSync uses ${fmtBytes(s.rootBytes)}</div>
+      <div class="kicker">${labels.steamMachine}</div>
+      <h1>${labels.storageTitle}</h1>
+      <div class="meta">${s.freeBytes == null ? labels.freeUnknown : labels.freeOnTvValue(fmtBytes(s.freeBytes))} · ${labels.modSyncUses(fmtBytes(s.rootBytes))}</div>
       <div class="storagegrid">
-        <div class="stat"><span>Mod packs</span><b>${fmtBytes(s.packsBytes)}</b></div>
-        <div class="stat"><span>Logs</span><b>${fmtBytes(s.logsBytes)}</b></div>
-        <div class="stat"><span>App data</span><b>${fmtBytes(s.otherBytes)}</b></div>
+        <div class="stat"><span>${labels.modPacks}</span><b>${fmtBytes(s.packsBytes)}</b></div>
+        <div class="stat"><span>${labels.logs}</span><b>${fmtBytes(s.logsBytes)}</b></div>
+        <div class="stat"><span>${labels.appData}</span><b>${fmtBytes(s.otherBytes)}</b></div>
       </div>
-      <div class="storagepacks">${cards || `<div class="callout">No packs installed on this TV.</div>`}</div>
+      <div class="storagepacks">${cards || `<div class="callout">${labels.noPacksInstalled}</div>`}</div>
       <div class="actions">
-        <button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">Back</button>
-        ${s.logsBytes ? `<button class="btn ghost" data-action="storage-clear" data-scope="logs" data-bytes="${s.logsBytes}" data-focusable>Clear logs (${fmtBytes(s.logsBytes)})</button>` : ""}
+        <button class="btn primary" data-action="close-storage" data-autofocus data-focusable data-key="storage-back">${labels.back}</button>
+        ${s.logsBytes ? `<button class="btn ghost" data-action="storage-clear" data-scope="logs" data-bytes="${s.logsBytes}" data-focusable>${labels.clearLogs(fmtBytes(s.logsBytes))}</button>` : ""}
       </div>
-      <div class="hint">Removing packs or versions never touches the base game or saves.</div>
+      <div class="hint">${labels.storageHint}</div>
     </section>`;
   }
 
@@ -559,17 +560,17 @@
     let title;
     let message;
     if (scope === "pack") {
-      title = `Remove ${p ? p.name : "pack"}?`;
-      message = `This frees ${amount} and removes the pack from this TV. The base game and saves are not touched.`;
+      title = labels.removePackTitle(p ? p.name : labels.packTitle);
+      message = labels.removePackMessage(amount);
     } else if (scope === "old-versions") {
-      title = "Remove old versions?";
-      message = `This frees ${amount} and removes rollback targets. The current version stays installed.`;
+      title = labels.removeOldVersionsTitle;
+      message = labels.removeOldVersionsMessage(amount);
     } else if (scope === "staging") {
-      title = "Clear partial download?";
-      message = `This frees ${amount} of incomplete download data. The installed version stays.`;
+      title = labels.clearPartialTitle;
+      message = labels.clearPartialMessage(amount);
     } else {
-      title = "Clear logs?";
-      message = `This frees ${amount} of install and agent logs.`;
+      title = labels.clearLogsTitle;
+      message = labels.clearLogsMessage(amount);
     }
     S.confirm = { title, message, storage: { packId, scope } };
     render();
@@ -584,11 +585,11 @@
       });
       if (out.storage) S.storage = out.storage;
       await refresh();
-      S.confirm = { title: "Cleared", message: `Freed ${fmtBytes(out.freedBytes)}.`, simple: true };
+      S.confirm = { title: labels.clearedTitle, message: labels.freedMessage(fmtBytes(out.freedBytes)), simple: true };
       render();
       setTimeout(() => { S.confirm = null; render(); }, 3000);
     } catch (err) {
-      S.confirm = { title: "Could not clear", message: err.message, simple: true };
+      S.confirm = { title: labels.couldNotClear, message: err.message, simple: true };
       render();
     }
   }
@@ -611,7 +612,7 @@
     if (!p) return;
     const d = S.details || {};
     library.innerHTML = "";
-    const versions = (p.versions || []).join(", ") || "—";
+    const versions = (p.versions || []).join(", ") || labels.noVersions;
     const logs = (d.logs || "").split(/\r?\n/).filter(Boolean).slice(-40).join("\n");
     main.innerHTML = "";
     overlay.classList.remove("hidden");
@@ -619,22 +620,22 @@
       <div class="kicker">${esc(p.game.title)}</div>
       <h2>${esc(p.name)}</h2>
       <p>${esc(p.description || "")}</p>
-      <div class="row"><span>Installed</span><b>${p.installed ? esc(p.installedVersion) : "No"}</b></div>
-      <div class="row"><span>Available</span><b>${esc(p.mod.version)}</b></div>
-      <div class="row"><span>Versions kept</span><b>${esc(versions)}</b></div>
-      <div class="row"><span>Game</span><b>${esc(p.game.title)} ${esc(p.game.version || "")} · build ${esc(p.game.build || "")}</b></div>
-      <div class="row"><span>Pack</span><b>${p.files} files · ${gb(p.totalBytes)} GB</b></div>
-      <div class="row"><span>Launcher</span><b>${esc(p.launcher || "not installed")}</b></div>
-      <div class="row"><span>Shortcut</span><b>${esc(p.desktopFile || "add the .desktop to Steam")}</b></div>
-      <div class="row"><span>Saves</span><b>Stay on this TV. Steam Cloud handles the vanilla save.</b></div>
-      ${noteList(p).length ? `<p style="margin-top:2vh"><b>Before you install</b></p>${renderNotes(p)}` : ""}
-      ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>Checks</b></p>${renderChecks(p, true)}` : ""}
-      <p style="margin-top:2vh"><b>Recent log</b></p>
-      <pre class="log" style="white-space:pre-wrap;font-size:.9vw;color:#8b96a8;max-height:18vh;overflow:auto">${esc(logs || "No log yet.")}</pre>
+      <div class="row"><span>${labels.installedRow}</span><b>${p.installed ? esc(p.installedVersion) : labels.noVersion}</b></div>
+      <div class="row"><span>${labels.availableRow}</span><b>${esc(p.mod.version)}</b></div>
+      <div class="row"><span>${labels.versionsKept}</span><b>${esc(versions)}</b></div>
+      <div class="row"><span>${labels.gameRow}</span><b>${esc(p.game.title)} ${esc(p.game.version || "")} · ${labels.buildLabel} ${esc(p.game.build || "")}</b></div>
+      <div class="row"><span>${labels.packRow}</span><b>${labels.stats(gb(p.totalBytes), p.files)}</b></div>
+      <div class="row"><span>${labels.launcherRow}</span><b>${esc(p.launcher || labels.notInstalled)}</b></div>
+      <div class="row"><span>${labels.shortcutRow}</span><b>${esc(p.desktopFile || labels.addDesktop)}</b></div>
+      <div class="row"><span>${labels.savesRow}</span><b>${labels.savesValue}</b></div>
+      ${noteList(p).length ? `<p style="margin-top:2vh"><b>${labels.beforeInstall}</b></p>${renderNotes(p)}` : ""}
+      ${preconditionChecks(p).length ? `<p style="margin-top:2vh"><b>${labels.checks}</b></p>${renderChecks(p, true)}` : ""}
+      <p style="margin-top:2vh"><b>${labels.recentLog}</b></p>
+      <pre class="log" style="white-space:pre-wrap;font-size:.9vw;color:#8b96a8;max-height:18vh;overflow:auto">${esc(logs || labels.noLogYet)}</pre>
       <div class="actions">
-        <button class="btn primary" data-action="close-details" data-autofocus data-focusable data-key="back">Back</button>
-        ${p.canRollback ? `<button class="btn" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">Roll back</button>` : ""}
-        <button class="btn ghost" data-action="open-logs" data-focusable data-key="logs">Refresh log</button>
+        <button class="btn primary" data-action="close-details" data-autofocus data-focusable data-key="back">${labels.back}</button>
+        ${p.canRollback ? `<button class="btn" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">${labels.rollBack}</button>` : ""}
+        <button class="btn ghost" data-action="open-logs" data-focusable data-key="logs">${labels.refreshLog}</button>
       </div>
     </div>`;
   }
@@ -642,8 +643,8 @@
   function renderConfirm() {
     overlay.classList.remove("hidden");
     const buttons = S.confirm.simple
-      ? `<button class="btn primary" data-action="confirm-no" data-autofocus data-focusable data-key="ok">OK</button>`
-      : `<button class="btn primary" data-action="confirm-yes" data-autofocus data-focusable data-key="yes">Confirm</button><button class="btn ghost" data-action="confirm-no" data-focusable data-key="no">Cancel</button>`;
+      ? `<button class="btn primary" data-action="confirm-no" data-autofocus data-focusable data-key="ok">${labels.ok}</button>`
+      : `<button class="btn primary" data-action="confirm-yes" data-autofocus data-focusable data-key="yes">${labels.confirm}</button><button class="btn ghost" data-action="confirm-no" data-focusable data-key="no">${labels.cancel}</button>`;
     overlay.innerHTML = `<div class="panel" style="width:min(60vw,680px)">
       <h2>${esc(S.confirm.title)}</h2>
       <p>${esc(S.confirm.message)}</p>
@@ -656,7 +657,7 @@
     const activeKey = active && active.closest("#main, #overlay") ? active.getAttribute("data-key") : null;
     if (activeKey) S.focusKey = activeKey;
     pc.classList.toggle("online", !!S.data?.pc?.online);
-    pc.querySelector("span:last-child").textContent = S.data?.pc?.online ? "PC online" : "PC offline";
+    pc.querySelector("span:last-child").textContent = S.data?.pc?.online ? labels.pcOnline : labels.pcOffline;
     content.classList.toggle("wide", S.view === "storage");
     renderUpdateButton();
     if (S.confirm) return renderConfirm();
@@ -701,14 +702,14 @@
     try {
       await api(`/api/jobs/${encodeURIComponent(S.job.id)}/cancel`, { method: "POST", body: "{}" });
     } catch (err) {
-      S.confirm = { title: "Could not cancel", message: err.message, simple: true };
+      S.confirm = { title: labels.couldNotCancel, message: err.message, simple: true };
       render();
     }
   }
 
   async function pollJob(id) {
     const pack = selectedPack();
-    const packName = pack?.name || "Pack";
+    const packName = pack?.name || labels.packTitle;
     const packVersion = pack?.mod?.version || "";
     S.polling = true;
     S.rate = [];
@@ -720,7 +721,7 @@
           if (job.status === "done") {
             await releaseWakeLock();
             await refresh();
-            S.confirm = { title: "Installed", message: `${packName} ${packVersion} is ready.`, simple: true };
+            S.confirm = { title: labels.installedTitle, message: labels.installedMessage(packName, packVersion), simple: true };
             render();
             setTimeout(() => { S.confirm = null; render(); }, 3500);
             return;
@@ -734,7 +735,7 @@
             await releaseWakeLock();
             S.job = null;
             await refresh();
-            S.confirm = { title: "Download paused", message: "Completed files stay on the TV. Use Resume install to continue.", simple: true };
+            S.confirm = { title: labels.downloadPausedTitle, message: labels.downloadPausedMessage, simple: true };
             render();
             setTimeout(() => { S.confirm = null; render(); }, 4000);
             return;
@@ -757,11 +758,11 @@
     S.view = "home";
     try {
       await api("/api/launch", { method: "POST", body: JSON.stringify({ packId }) });
-      S.confirm = { title: "Launching", message: `${selectedPack()?.name || "Game"} is starting on this TV. Use the Guide button to return to Steam.`, simple: true };
+      S.confirm = { title: labels.launchingTitle, message: labels.launchingMessage(selectedPack()?.name || labels.packTitle), simple: true };
       render();
       setTimeout(() => { S.confirm = null; refresh(); }, 4000);
     } catch (err) {
-      S.confirm = { title: "Could not launch", message: err.message, simple: true };
+      S.confirm = { title: labels.couldNotLaunch, message: err.message, simple: true };
       render();
     }
   }
@@ -788,11 +789,11 @@
       const out = await api("/api/rollback", { method: "POST", body: JSON.stringify({ packId }) });
       S.view = "home";
       await refresh();
-      S.confirm = { title: "Rolled back", message: `Now on ${out.previous}.`, simple: true };
+      S.confirm = { title: labels.rolledBackTitle, message: labels.rolledBackMessage(out.previous), simple: true };
       render();
       setTimeout(() => { S.confirm = null; render(); }, 3000);
     } catch (err) {
-      S.confirm = { title: "Rollback failed", message: err.message, simple: true };
+      S.confirm = { title: labels.rollbackFailed, message: err.message, simple: true };
       render();
     }
   }
@@ -805,7 +806,7 @@
       });
       await refresh();
     } catch (err) {
-      S.confirm = { title: "Could not confirm", message: err.message, simple: true };
+      S.confirm = { title: labels.couldNotConfirm, message: err.message, simple: true };
       render();
     }
   }
@@ -926,6 +927,14 @@
   setInterval(() => {
     if (!S.confirm && !S.download && !S.polling && S.view !== "details" && S.view !== "storage") refresh();
   }, 3000);
+
+  document.title = labels.appName;
+  $(".brand .word").textContent = labels.appName;
+  $(".brand .chip").textContent = labels.livingRoom;
+  $("#storage-btn").textContent = labels.storage;
+  $("#pc span:last-child").textContent = labels.pc;
+  $(".footer .note").textContent = labels.footer;
+
   refresh();
   if (desktop) setTimeout(checkDesktopUpdate, 1200);
 })();

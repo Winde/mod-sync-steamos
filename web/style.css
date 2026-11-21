@@ -29,7 +29,7 @@ body { font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; overflow: 
   width: clamp(30px, 2.6vw, 48px); height: clamp(30px, 2.6vw, 48px);
   border-radius: .55vw; flex: 0 0 auto;
 }
-.word { font-weight: 780; letter-spacing: .12em; font-size: clamp(13px, 1.35vw, 26px); }
+.word { font-weight: 780; letter-spacing: .12em; font-size: clamp(13px, 1.35vw, 26px); text-transform: uppercase; }
 .chip {
   font-size: clamp(10px, .9vw, 16px); color: #cbd5e1; border: 1px solid var(--line);
   background: rgba(8,11,16,.55); padding: .2em .7em; border-radius: 999px;
