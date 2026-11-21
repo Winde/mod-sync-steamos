@@ -262,6 +262,7 @@
   }
 
   function requestAppUpdate() {
+    if (S.confirm && S.confirm.busy) return;
     if (!S.update || !S.update.available) return;
     if (!S.update.canInstall) {
       if (desktop && desktop.openReleases) desktop.openReleases();
@@ -276,10 +277,24 @@
   }
 
   async function installAppUpdate() {
-    S.confirm = null;
+    if (!S.update || !desktop) return;
+    const latest = S.update.latest;
+    S.confirm = {
+      title: labels.updateInstallingTitle,
+      message: labels.updateInstallingMessage(latest),
+      busy: true,
+    };
     render();
     try {
       await desktop.installUpdate();
+      // The main process holds the window open briefly so this can be read;
+      // Game Mode ends the app's session on quit, so it will not come back.
+      S.confirm = {
+        title: labels.updateClosingTitle,
+        message: labels.updateClosingMessage(latest),
+        busy: true,
+      };
+      render();
     } catch (err) {
       S.confirm = { title: labels.updateFailed, message: err.message, simple: true };
       render();
@@ -383,6 +398,9 @@
     const rollbackHtml = p.canRollback
       ? `<button class="btn ghost" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">${labels.rollBack}</button>`
       : "";
+    const uninstallHtml = p.local
+      ? `<button class="btn ghost" data-action="uninstall" data-pack="${esc(p.id)}" data-focusable data-key="uninstall">${labels.uninstall}</button>`
+      : "";
 
     main.innerHTML = `
       <section class="hero">
@@ -393,7 +411,7 @@
           <div class="bigstatus">${esc(packStatus.title)}</div>
           <div class="meta">${stateText ? `${esc(stateText)} · ` : ""}${esc(p.game.title)} ${esc(p.game.version || "")} · ${labels.buildLabel} ${esc(p.game.build || "")}</div>
           ${blocker ? `<div class="callout error"><b>${esc(blocker.title)}</b> — ${esc(blocker.detail)}${blocker.hint ? ` ${esc(blocker.hint)}` : ""}${p.preconditions?.failedRequired?.length > 1 ? labels.moreChecks(p.preconditions.failedRequired.length - 1) : ""}</div>` : ""}
-          <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${refreshHtml}</div>
+          <div class="actions">${primaryHtml}${updateHtml}${detailsHtml}${rollbackHtml}${uninstallHtml}${refreshHtml}</div>
           <div class="hint">${installed ? labels.savesHintVanilla : packContents(p)}</div>
         </div>
       </section>`;
@@ -505,6 +523,7 @@
   }
 
   function renderStorage() {
+    overlay.classList.add("hidden");
     library.innerHTML = "";
     const s = S.storage;
     if (!s || s.loading) {
@@ -594,6 +613,7 @@
   }
 
   async function clearStorageData({ packId, scope }) {
+    const fromDetails = S.view === "details";
     S.confirm = null;
     try {
       const out = await api("/api/storage/clear", {
@@ -601,14 +621,37 @@
         body: JSON.stringify({ packId, scope }),
       });
       if (out.storage) S.storage = out.storage;
+      if (scope === "pack" && fromDetails) {
+        S.view = "home";
+        S.selected = null;
+      }
       await refresh();
-      S.confirm = { title: labels.clearedTitle, message: labels.freedMessage(fmtBytes(out.freedBytes)), simple: true };
-      render();
-      setTimeout(() => { S.confirm = null; render(); }, 3000);
+      showConfirm({ title: labels.clearedTitle, message: labels.freedMessage(fmtBytes(out.freedBytes)), simple: true }, 3000);
     } catch (err) {
-      S.confirm = { title: labels.couldNotClear, message: err.message, simple: true };
-      render();
+      showConfirm({ title: labels.couldNotClear, message: err.message, simple: true });
     }
+  }
+
+  let confirmTimer = null;
+  function showConfirm(confirm, timeout = 0) {
+    if (confirmTimer) clearTimeout(confirmTimer);
+    confirmTimer = null;
+    S.confirm = confirm;
+    render();
+    if (timeout > 0) {
+      confirmTimer = setTimeout(() => {
+        confirmTimer = null;
+        S.confirm = null;
+        render();
+      }, timeout);
+    }
+  }
+
+  function dismissConfirm() {
+    if (confirmTimer) clearTimeout(confirmTimer);
+    confirmTimer = null;
+    S.confirm = null;
+    render();
   }
 
   async function openStorage() {
@@ -664,6 +707,7 @@
       <div class="actions">
         <button class="btn primary" data-action="close-details" data-autofocus data-focusable data-key="back">${labels.back}</button>
         ${p.canRollback ? `<button class="btn" data-action="rollback" data-pack="${esc(p.id)}" data-focusable data-key="rollback">${labels.rollBack}</button>` : ""}
+        ${p.local ? `<button class="btn ghost" data-action="uninstall" data-pack="${esc(p.id)}" data-focusable data-key="uninstall">${labels.uninstall}</button>` : ""}
         <button class="btn ghost" data-action="open-logs" data-focusable data-key="logs">${labels.refreshLog}</button>
       </div>
     </div>`;
@@ -671,6 +715,13 @@
 
   function renderConfirm() {
     overlay.classList.remove("hidden");
+    if (S.confirm.busy) {
+      overlay.innerHTML = `<div class="panel" style="width:min(60vw,680px)" aria-busy="true">
+        <h2>${esc(S.confirm.title)}</h2>
+        <p class="busy" role="status"><span class="spinner" aria-hidden="true"></span><span>${esc(S.confirm.message)}</span></p>
+      </div>`;
+      return;
+    }
     const buttons = S.confirm.simple
       ? `<button class="btn primary" data-action="confirm-no" data-autofocus data-focusable data-key="ok">${labels.ok}</button>`
       : `<button class="btn primary" data-action="confirm-yes" data-autofocus data-focusable data-key="yes">${labels.confirm}</button><button class="btn ghost" data-action="confirm-no" data-focusable data-key="no">${labels.cancel}</button>`;
@@ -681,6 +732,12 @@
     </div>`;
   }
 
+  function focusView() {
+    const scope = overlay.classList.contains("hidden") ? main : overlay;
+    const target = scope.querySelector("[data-autofocus]") || scope.querySelector("[data-focusable]");
+    if (target) target.focus();
+  }
+
   function render() {
     const active = document.activeElement;
     const activeKey = active && active.closest("#main, #overlay") ? active.getAttribute("data-key") : null;
@@ -689,10 +746,10 @@
     pc.querySelector("span:last-child").textContent = S.data?.pc?.online ? labels.pcOnline : labels.pcOffline;
     content.classList.toggle("wide", S.view === "storage");
     renderUpdateButton();
-    if (S.confirm) return renderConfirm();
-    if (S.download) return renderDownloadSheet();
-    if (S.view === "storage") return renderStorage();
-    if (S.view === "details") return renderDetails();
+    if (S.confirm) { renderConfirm(); return focusView(); }
+    if (S.download) { renderDownloadSheet(); return focusView(); }
+    if (S.view === "storage") { renderStorage(); return focusView(); }
+    if (S.view === "details") { renderDetails(); return focusView(); }
     overlay.classList.add("hidden");
     if (S.offline || S.error) return renderOffline();
     const packs = S.data?.packs || [];
@@ -867,19 +924,21 @@
     else if (action === "rollback") {
       const p = selectedPack();
       const prev = p?.versions?.[p.versions.length - 2];
-      S.confirm = { title: "Roll back?", message: `Switch to ${prev || "the previous version"}? The current version stays on disk.`, packId };
-      render();
+      showConfirm({ title: "Roll back?", message: `Switch to ${prev || "the previous version"}? The current version stays on disk.`, packId });
+    }
+    else if (action === "uninstall") {
+      const p = selectedPack();
+      if (p) requestStorageClear(p.id, "pack", p.totalBytes);
     }
     else if (action === "confirm-check") confirmCheck(packId, el.getAttribute("data-check"));
     else if (action === "confirm-yes") {
       const c = S.confirm;
-      S.confirm = null;
-      if (c.appUpdate) installAppUpdate();
-      else if (c.storage) clearStorageData(c.storage);
+      if (c.appUpdate) { installAppUpdate(); return; }
+      dismissConfirm();
+      if (c.storage) clearStorageData(c.storage);
       else if (c.packId) rollback(c.packId);
-      else render();
     }
-    else if (action === "confirm-no") { S.confirm = null; render(); }
+    else if (action === "confirm-no") { if (S.confirm?.busy) return; dismissConfirm(); }
   });
 
   function focusables() {
@@ -903,7 +962,7 @@
   }
 
   function back() {
-    if (S.confirm) { S.confirm = null; render(); return; }
+    if (S.confirm) { dismissConfirm(); return; }
     if (S.download) { S.download = null; render(); return; }
     if (S.view === "storage") { S.view = "home"; render(); return; }
     if (S.view === "details") { S.view = "home"; render(); return; }
@@ -911,6 +970,9 @@
   }
 
   window.addEventListener("keydown", (event) => {
+    // Installing and closing are not cancellable: nothing behind or on the
+    // overlay may take a press while the download runs or the app quits.
+    if (S.confirm && S.confirm.busy) { event.preventDefault(); return; }
     if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); moveFocus(1); }
     else if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); moveFocus(-1); }
     else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(); }
@@ -923,6 +985,7 @@
   // Controller-first: D-pad/left stick moves focus, A activates, B backs, X details, Y refreshes.
   const pad = { held: {}, lastMove: 0 };
   function pollPad() {
+    if (S.confirm && S.confirm.busy) return;
     const gps = navigator.getGamepads ? navigator.getGamepads() : [];
     const gp = gps && gps[0];
     if (!gp) return;

@@ -15,6 +15,9 @@ const wantsDevtools = process.argv.includes("--devtools");
 const screenshotArg = process.argv.find((arg) => arg.startsWith("--screenshot="));
 const screenshotPath = screenshotArg ? screenshotArg.slice("--screenshot=".length) : "";
 
+/** How long the closing overlay stays up before the window goes. */
+const CLOSING_OVERLAY_MS = 2000;
+
 if (isSteam) app.commandLine.appendSwitch("no-sandbox");
 app.setName("ModSync");
 
@@ -162,7 +165,9 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle("modsync:update-install", async () => {
       const appImage = await updater.install();
       app.relaunch({ execPath: appImage, args: relaunchArgs(process.argv.slice(1)) });
-      app.quit();
+      // The renderer switches to its closing state as soon as this call
+      // returns. Hold the window long enough to read it, then quit as before.
+      setTimeout(() => app.quit(), CLOSING_OVERLAY_MS);
     });
     ipcMain.handle("modsync:releases", () => shell.openExternal(RELEASES_PAGE));
 

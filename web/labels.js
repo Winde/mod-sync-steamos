@@ -41,6 +41,7 @@
     details: "Details",
     refresh: "Refresh",
     rollBack: "Roll back",
+    uninstall: "Uninstall",
     back: "Back",
     cancel: "Cancel",
     confirm: "Confirm",
@@ -167,7 +168,11 @@
 
     updateTo: (v) => `Update ${v}`,
     updateTitle: (v) => `Update ModSync to ${v}?`,
-    updateMessage: "The app downloads the new AppImage, verifies its checksum, then restarts. Packs and saves stay on this TV.",
+    updateMessage: "The app downloads the new AppImage, verifies its checksum, then closes. Open it again from Steam to finish. Packs and saves stay on this TV.",
+    updateInstallingTitle: "Updating ModSync",
+    updateInstallingMessage: (v) => `Downloading ModSync ${v}... ModSync will close when it's done.`,
+    updateClosingTitle: "Update installed",
+    updateClosingMessage: (v) => `ModSync ${v} is installed. Closing ModSync — open it again from Steam.`,
     updateFailed: "Update failed",
 
     launchingTitle: "Launching",
