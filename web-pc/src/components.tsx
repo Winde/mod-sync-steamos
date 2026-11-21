@@ -80,7 +80,7 @@ export function BuildBanner({ job, name, onShow }: {
   );
 }
 
-export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onShowBuild }: {
+export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onShowBuild, onChangeFolder }: {
   data: ConsoleState | null;
   error: string | null;
   job: BuildJobState | null;
@@ -90,11 +90,12 @@ export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild
   onReveal: (id: string) => void;
   onRemove: (pack: PackState) => void;
   onShowBuild: () => void;
+  onChangeFolder: () => void;
 }) {
   const valid = data?.packs.filter((pack) => pack.valid) || [];
   const bytes = valid.reduce((sum, pack) => sum + pack.totalBytes, 0);
   const summary = data
-    ? `${valid.length} pack${valid.length === 1 ? "" : "s"} · ${formatBytes(bytes)} · ${data.settings.packsDir}`
+    ? `${valid.length} pack${valid.length === 1 ? "" : "s"} · ${formatBytes(bytes)}`
     : "Loading packs…";
   const buildName = data && job ? data.recipes.find((recipe) => recipe.id === job.recipeId)?.name || job.packId : "";
 
@@ -103,7 +104,19 @@ export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild
       <div className="panelhead">
         <div>
           <h1>Pack library</h1>
-          <p id="packs-summary" className="muted">{summary}</p>
+          <div id="packs-summary" className="librarypath">
+            <span className="muted">{summary}</span>
+            {data ? <code title={data.settings.packsDir}>{data.settings.packsDir}</code> : null}
+            {data ? (
+              <button
+                className="btn small"
+                data-action="change-packs"
+                disabled={job?.status === "running"}
+                title={job?.status === "running" ? "Wait for the running build before changing the folder." : undefined}
+                onClick={onChangeFolder}
+              >Change folder</button>
+            ) : null}
+          </div>
         </div>
         <div className="headactions">
           <button className="btn small" data-action="refresh" onClick={onRefresh}>Refresh</button>
@@ -119,9 +132,17 @@ export function PackLibrary({ data, error, job, onRefresh, onBuildNew, onRebuild
         {data && !data.packs.length ? (
           <div className="empty">
             <strong>No packs in this folder</strong>
-            <span>Build one from a recipe, or point Settings at an existing packs folder.</span>
+            <span>Build one from a recipe, or choose a folder that already has packs.</span>
             <code>{data.settings.packsDir}</code>
-            <button className="btn primary" data-action="build-new" onClick={onBuildNew}>Build a pack</button>
+            <div className="actions">
+              <button className="btn primary" data-action="build-new" onClick={onBuildNew}>Build a pack</button>
+              <button
+                className="btn"
+                data-action="change-packs"
+                disabled={job?.status === "running"}
+                onClick={onChangeFolder}
+              >Choose existing folder</button>
+            </div>
           </div>
         ) : null}
         {data?.packs.map((pack) => {
@@ -290,7 +311,16 @@ export function SettingsPanel({ draft, data, saving, saved, onChange, onBrowsePa
   return (
     <section className="panel">
       <div className="panelhead compact">
-        <div><h2>Settings</h2><p className="muted">Saved on this server. Changes apply immediately.</p></div>
+        <div><h2>Settings</h2><p className="muted">Saved on this server. Edited fields apply when you save.</p></div>
+        <div className="headactions">
+          <button
+            id="settings-save-top"
+            className="btn primary small"
+            type="submit"
+            form="settings-form"
+            disabled={saving}
+          >{saving ? "Saving…" : "Save settings"}</button>
+        </div>
       </div>
       <form id="settings-form" className="settingsform" autoComplete="off" onSubmit={(event) => { event.preventDefault(); onSave(); }}>
         <div className="field">
@@ -300,6 +330,7 @@ export function SettingsPanel({ draft, data, saving, saved, onChange, onBrowsePa
             <button id="packs-browse" className="btn small" type="button" disabled={!desktopBridge()?.pickFolder} onClick={onBrowsePacks}>Browse</button>
             <button className="btn small" type="button" data-action="reveal-packs" onClick={onRevealPacks}>Open</button>
           </div>
+          <p className="hint">Choosing a folder applies it immediately. A typed path is saved with the other settings.</p>
         </div>
         <div className="field">
           <label htmlFor="bind-mode">Bind</label>

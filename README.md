@@ -55,13 +55,15 @@ There are two separate Electron apps:
   packs.
 - **ModSync Client** — the pre-existing app that installs, updates, rolls back,
   and launches packs on the machine that plays the game. It runs on SteamOS
-  (AppImage) or Windows (NSIS).
+  (AppImage) or Windows (NSIS). Its **Check for updates** header button checks
+  only when pressed; the Linux AppImage can install the update itself.
 
 The Server console:
 
 - **Pack library** — lists the packs in the selected folder, shows version,
-  size, file count, and build date. Each card can rebuild the pack from its
-  working install, open the folder, or remove it.
+  size, file count, and build date. **Change folder** points the library at an
+  existing packs folder. Each card can rebuild the pack from its working
+  install, open the folder, or remove it.
 - **Pack server** — start and stop the LAN server, copy its URL, token, and the
   Client install one-liner. A server error (busy port, no LAN address) is shown
   in the same card.
@@ -69,6 +71,9 @@ The Server console:
   the server on launch, start ModSync Server at sign-in, and minimize to the
   tray instead of the taskbar. The app starts hidden in the tray for sign-in
   starts.
+- **Update check** — the footer asks GitHub for the latest release only when
+  you press **Check for updates**, then links to the releases page if a newer
+  build exists.
 - **Rebuilds are staged** — the old pack stays in place until the new build is
   complete, then it is swapped in. A failed build does not destroy the working
   pack.

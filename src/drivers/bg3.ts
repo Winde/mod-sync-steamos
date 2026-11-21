@@ -142,7 +142,6 @@ function contentsFrom(source: string, paks: string[]): ContentsSummary {
   const inactive = paks.filter((name) => !used.has(name));
   const activeMods = mods.filter((mod) => !mod.builtin);
   return {
-    kind: "mods",
     source: "modsettings.lsx",
     generatedAt: new Date().toISOString(),
     count: activeMods.length,
@@ -153,10 +152,6 @@ function contentsFrom(source: string, paks: string[]): ContentsSummary {
       active: true,
     })),
     inactive,
-    modules: mods.length,
-    paks: paks.length,
-    inactivePaks: inactive,
-    mods: activeMods,
   };
 }
 

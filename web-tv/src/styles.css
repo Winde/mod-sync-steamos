@@ -41,6 +41,7 @@ body { font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; overflow: 
 .chipbtn { font: inherit; cursor: pointer; color: #cbd5e1; }
 #storage-btn { border-color: rgba(255,255,255,.24); background: rgba(15,20,29,.8); }
 .chipbtn:focus { outline: .18em solid #ffb4a8; outline-offset: .18em; }
+.chipbtn:disabled { opacity: .6; cursor: default; }
 .hidden { display: none !important; }
 .content { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .85fr); gap: 3vw; min-height: 0; }
 .content.wide { grid-template-columns: 1fr; }

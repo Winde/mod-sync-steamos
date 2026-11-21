@@ -61,10 +61,8 @@ generated `pack.json` remains the definition the agent serves.
   required and owns the pack's id, name, save file, `notes`, and
   `preconditions`; they are data, not driver code.
 - `contentsFor({ recipe, source, version })` — return the normalized contents
-  summary. Every driver exposes the same method, so PC tooling does not branch
-  on the game id. New output includes `items` and `itemsLabel`; the older
-  `mods`/`packages`/`inactivePaks` fields remain until the React TV renderer
-  migrates.
+  summary. Every driver exposes the same method and emits `items`/`itemsLabel`,
+  so renderers and PC tooling do not branch on the game id.
 - Loader helpers live under `src/loaders/` (`me3`, `bg3le`) and own runtime
   layout, profile parsing, tool platform tags, and executable modes. Drivers
   supply the game-specific source paths.

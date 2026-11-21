@@ -19,6 +19,7 @@ import type {
   SettingsDraft,
   SettingsState,
   ToastItem,
+  UpdateInfo,
 } from "./types";
 
 function toDraft(settings: SettingsState): SettingsDraft {
@@ -34,6 +35,17 @@ function toDraft(settings: SettingsState): SettingsDraft {
   };
 }
 
+function sameDraft(a: SettingsDraft, b: SettingsDraft): boolean {
+  return a.packsDir === b.packsDir
+    && a.bind === b.bind
+    && a.host === b.host
+    && a.port === b.port
+    && a.token === b.token
+    && a.autoStart === b.autoStart
+    && a.launchAtLogin === b.launchAtLogin
+    && a.minimizeToTray === b.minimizeToTray;
+}
+
 export default function App() {
   const [data, setData] = useState<ConsoleState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +58,10 @@ export default function App() {
   const [buildView, setBuildView] = useState(false);
   const [buildRecipeId, setBuildRecipeId] = useState<string | undefined>(undefined);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const lastBuildStatus = useRef<string | null>(null);
+  const settingsBase = useRef<SettingsDraft | null>(null);
   const toastId = useRef(0);
 
   const toast = useCallback((message: string, tone: ToastItem["tone"] = "neutral") => {
@@ -61,9 +76,15 @@ export default function App() {
     try {
       const next = await api<ConsoleState>("/api/state");
       const previous = lastBuildStatus.current;
+      const incoming = toDraft(next.settings);
       setData(next);
       setError(null);
-      setSettingsDraft((draft) => draft || toDraft(next.settings));
+      setSettingsDraft((draft) => {
+        if (!draft) return incoming;
+        // Follow changes made elsewhere only while the form has no unsaved edits.
+        return settingsBase.current && sameDraft(draft, settingsBase.current) ? incoming : draft;
+      });
+      settingsBase.current = incoming;
       lastBuildStatus.current = next.build?.status || null;
       if (previous === "running" && next.build?.status === "done") toast("Build finished. The server sees the new pack now.", "success");
       if (previous === "running" && next.build?.status === "error") toast(next.build.error || "Build failed.", "error");
@@ -134,8 +155,10 @@ export default function App() {
           minimizeToTray: settingsDraft.minimizeToTray,
         }),
       });
+      const nextDraft = toDraft(next.settings);
       setData(next);
-      setSettingsDraft(toDraft(next.settings));
+      setSettingsDraft(nextDraft);
+      settingsBase.current = nextDraft;
       setSaved("Saved.");
       toast("Settings saved.", "success");
     } catch (err) {
@@ -220,9 +243,74 @@ export default function App() {
     }
   };
 
+  const applyPacksFolder = async (dir: string) => {
+    setSaving(true);
+    try {
+      const next = await api<ConsoleState>("/api/settings", {
+        method: "POST",
+        body: JSON.stringify({ packsDir: dir }),
+      });
+      const serverDraft = toDraft(next.settings);
+      setData(next);
+      // Keep any other unsaved edits in the form; only adopt the saved folder.
+      setSettingsDraft((draft) => draft ? { ...draft, packsDir: serverDraft.packsDir } : serverDraft);
+      settingsBase.current = serverDraft;
+      setSaved("");
+      toast("Packs folder changed.", "success");
+    } catch (err) {
+      toast(messageOf(err), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const browsePacks = async () => {
     const picked = await desktopBridge()?.pickFolder?.("Choose packs folder");
-    if (picked) updateDraft({ packsDir: picked });
+    if (!picked) return;
+    updateDraft({ packsDir: picked });
+    await applyPacksFolder(picked);
+  };
+
+  const changePacksFolder = async () => {
+    const pickFolder = desktopBridge()?.pickFolder;
+    if (!pickFolder) {
+      // In a browser (or without the desktop bridge) the settings field is the
+      // only way to type a path, so take the user straight to it.
+      const input = document.getElementById("packs-dir") as HTMLInputElement | null;
+      input?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      input?.focus();
+      input?.select();
+      return;
+    }
+    const picked = await pickFolder("Choose packs folder");
+    if (picked) await applyPacksFolder(picked);
+  };
+
+  const checkForUpdates = async () => {
+    const bridge = desktopBridge();
+    if (!bridge?.checkUpdate || checkingUpdate) return;
+    setCheckingUpdate(true);
+    try {
+      const info = await bridge.checkUpdate();
+      if (!info) {
+        toast("Could not check for updates.", "error");
+        return;
+      }
+      if (info.error) {
+        toast(info.error, "error");
+        return;
+      }
+      setUpdateInfo(info);
+      if (info.available && info.latest) {
+        toast(`Update ${info.latest} is available.`, "neutral");
+      } else {
+        toast(`ModSync Server ${info.current} is up to date.`, "success");
+      }
+    } catch (err) {
+      toast(messageOf(err), "error");
+    } finally {
+      setCheckingUpdate(false);
+    }
   };
 
   const closeModal = () => {
@@ -245,6 +333,7 @@ export default function App() {
             onReveal={(id) => { void revealPack(id); }}
             onRemove={openRemove}
             onShowBuild={() => openBuild(buildRecipeId)}
+            onChangeFolder={() => { void changePacksFolder(); }}
           />
           <aside className="side">
             <ServerPanel
@@ -287,7 +376,27 @@ export default function App() {
         </main>
         <footer className="footer">
           <span>Mods only · LAN only · no port forwarding</span>
-          <span id="build-footer">{data ? `ModSync Server ${data.app.version}` : ""}</span>
+          <span className="footerend">
+            {updateInfo?.available && updateInfo.latest ? (
+              <button
+                id="open-releases"
+                className="btn small"
+                type="button"
+                title="Open the releases page"
+                onClick={() => { void desktopBridge()?.openReleases?.(); }}
+              >Update {updateInfo.latest}</button>
+            ) : null}
+            {desktopBridge()?.checkUpdate ? (
+              <button
+                id="check-updates"
+                className="btn small"
+                type="button"
+                disabled={checkingUpdate}
+                onClick={() => { void checkForUpdates(); }}
+              >{checkingUpdate ? "Checking…" : "Check for updates"}</button>
+            ) : null}
+            <span id="build-footer">{data ? `ModSync Server ${data.app.version}` : ""}</span>
+          </span>
         </footer>
       </div>
       {modal?.kind === "build" && data ? (

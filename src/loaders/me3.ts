@@ -66,17 +66,7 @@ export function contentsFor({ recipe, source, version }: ContentsInput): Content
       loadBefore: entry.load_before || [],
     };
   });
-  const natives = parsed.natives.map((entry) => {
-    const entryPath = typeof entry.path === "string" ? entry.path : "";
-    return {
-      path: entryPath,
-      label: entryPath.split("/").filter(Boolean).pop() || "",
-      enabled: entry.enabled !== false,
-      optional: entry.optional === true,
-    };
-  });
   return {
-    kind: "packages",
     source: "me3 profile",
     generatedAt: new Date().toISOString(),
     count: packages.length,
@@ -87,8 +77,6 @@ export function contentsFor({ recipe, source, version }: ContentsInput): Content
       active: entry.enabled,
     })),
     inactive: [],
-    packages,
-    natives,
   };
 }
 

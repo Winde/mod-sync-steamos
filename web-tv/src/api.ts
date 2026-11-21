@@ -77,14 +77,27 @@ export function firstBlocker(p: PackView): CheckView | null {
 
 export function contentsCount(contents: ContentsView | null | undefined): string {
   if (!contents) return "";
-  return contents.kind === "mods" ? labels.modsCount(contents.count) : labels.packagesCount(contents.count);
+  const count = Array.isArray(contents.items)
+    ? contents.items.filter((item) => item.active !== false).length
+    : contents.count;
+  return labels.itemsCount(count);
 }
 
 export function contentsNames(contents: ContentsView | null | undefined): string[] {
   if (!contents) return [];
-  if (Array.isArray(contents.mods)) return contents.mods.map((m) => m.name).filter((name): name is string => !!name);
-  if (Array.isArray(contents.packages)) return contents.packages.map((p) => p.label || p.path).filter((name): name is string => !!name);
-  return [];
+  if (!Array.isArray(contents.items)) return [];
+  return contents.items
+    .filter((item) => item.active !== false)
+    .map((item) => item.label || item.path)
+    .filter((name): name is string => !!name);
+}
+
+export function contentsHeading(contents: ContentsView): string {
+  return contents.itemsLabel || labels.contentsRow;
+}
+
+export function contentsInactive(contents: ContentsView): number {
+  return contents.inactive?.length || 0;
 }
 
 export function packContents(p: PackView): string {

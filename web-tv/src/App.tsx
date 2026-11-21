@@ -40,6 +40,7 @@ export default function App() {
   const [downloadState, setDownloadState] = useState<{ packId: string } | null>(null);
   const [storage, setStorage] = useState<StorageReport | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [rate, setRate] = useState<{ speed: number; eta: number | null }>({ speed: 0, eta: null });
 
   const selectedRef = useRef<string | null>(null);
@@ -174,19 +175,6 @@ export default function App() {
       setRate(rateInfo(jobState, rateRef.current));
     }
   }, [jobState]);
-
-  useEffect(() => {
-    const desktop = window.modsyncDesktop;
-    if (!desktop?.checkUpdate) return;
-    const timer = window.setTimeout(async () => {
-      try {
-        setUpdate(await desktop.checkUpdate());
-      } catch {
-        setUpdate(null);
-      }
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     document.title = labels.appName;
@@ -430,7 +418,7 @@ export default function App() {
 
   const requestAppUpdate = () => {
     const desktop = window.modsyncDesktop;
-    if (!update || !update.available) return;
+    if (!update || !update.available || !update.latest) return;
     if (!update.canInstall) {
       void desktop?.openReleases?.();
       return;
@@ -438,10 +426,40 @@ export default function App() {
     showConfirm({ title: labels.updateTitle(update.latest), message: labels.updateMessage, appUpdate: true });
   };
 
+  const checkForUpdates = async () => {
+    const desktop = window.modsyncDesktop;
+    if (!desktop?.checkUpdate || checkingUpdate) return;
+    setCheckingUpdate(true);
+    showConfirm({ title: labels.checkingUpdatesTitle, message: labels.checkingUpdatesMessage, busy: true });
+    try {
+      const info = await desktop.checkUpdate();
+      if (!info) throw new Error(labels.updateCheckFailedMessage);
+      if (info.error) {
+        showConfirm({ title: labels.updateCheckFailed, message: info.error, simple: true });
+        return;
+      }
+      setUpdate(info);
+      if (!info.available || !info.latest) {
+        showConfirm({ title: labels.updateUpToDateTitle, message: labels.updateUpToDateMessage(info.current), simple: true }, 3000);
+        return;
+      }
+      if (!info.canInstall) {
+        showConfirm({ title: labels.updateAvailableTitle(info.latest), message: labels.updateAvailableMessage, simple: true });
+        void desktop.openReleases?.();
+        return;
+      }
+      showConfirm({ title: labels.updateTitle(info.latest), message: labels.updateMessage, appUpdate: true });
+    } catch (err) {
+      showConfirm({ title: labels.updateCheckFailed, message: messageOf(err), simple: true });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   const installAppUpdate = async () => {
     const desktop = window.modsyncDesktop;
-    if (!update || !desktop) return;
-    const latest = update.latest;
+    const latest = update?.latest;
+    if (!update || !desktop || !latest) return;
     showConfirm({ title: labels.updateInstallingTitle, message: labels.updateInstallingMessage(latest), busy: true });
     try {
       await desktop.installUpdate();
@@ -650,13 +668,21 @@ export default function App() {
         <div className="topright">
           <button
             id="update-btn"
-            className={`chip chipbtn${update && update.available ? "" : " hidden"}`}
+            className={`chip chipbtn${window.modsyncDesktop?.checkUpdate ? "" : " hidden"}`}
             data-action="update-app"
             data-focusable
             data-key="update"
-            onClick={requestAppUpdate}
+            disabled={checkingUpdate}
+            onClick={() => {
+              if (update?.available) requestAppUpdate();
+              else void checkForUpdates();
+            }}
           >
-            {update ? labels.updateTo(update.latest) : ""}
+            {checkingUpdate
+              ? labels.checkingUpdates
+              : update?.available && update.latest
+                ? labels.updateTo(update.latest)
+                : labels.checkForUpdates}
           </button>
           <button id="storage-btn" className="chip chipbtn" data-action="storage" data-focusable data-key="storage" onClick={() => { void openStorage(); }}>
             {storageBtnText}

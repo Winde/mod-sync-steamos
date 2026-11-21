@@ -115,8 +115,18 @@ export interface ToastItem {
   tone: ToastTone;
 }
 
+export interface UpdateInfo {
+  current: string;
+  latest: string | null;
+  available: boolean;
+  canInstall: boolean;
+  error?: string;
+}
+
 export interface DesktopBridge {
   pickFolder?(title?: string): Promise<string | null>;
+  checkUpdate?(): Promise<UpdateInfo | null>;
+  openReleases?(): Promise<void>;
 }
 
 export type ModalState = { kind: "build" } | { kind: "remove"; pack: PackState } | null;

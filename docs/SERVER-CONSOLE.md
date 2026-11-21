@@ -41,6 +41,11 @@ immediately. Copy the install one-liner again after changing it.
 
 ## Pack library
 
+The path beside the pack count is the folder the library reads. **Change folder**
+opens a folder picker and applies the choice immediately, without opening
+Settings; the same action appears in the empty state. It is disabled while a
+build runs, because the build writes into the current folder.
+
 Each pack card shows its game, mod version, file count, size, target platforms,
 build date, and folder. Actions:
 
@@ -61,6 +66,8 @@ is empty.
 
 - **Packs folder** — the directory the server reads and the library lists. It
   can be changed at any time; a running server restarts if the folder changes.
+  **Browse** applies the chosen folder immediately. On the console page without
+  the desktop folder picker, type the path and use **Save settings**.
 - **Bind** — automatic LAN address, loopback only, or one specific address.
 - **Port** — default `8787`.
 - **Token** — at least four characters, no spaces, commas, or single quotes. The current value is masked;
@@ -80,6 +87,18 @@ Closing the window always hides it to the tray while the app keeps running.
 Minimizing does the same while **Minimize to the tray** is enabled. The tray
 menu has **Open ModSync Server**, **Start/Stop pack server**, **Open packs folder**,
 and **Quit**. Quit is the only action that fully stops the app and its server.
+
+## Updates
+
+The console footer shows the running version and a **Check for updates**
+button. It contacts GitHub only when pressed. If a newer release exists, an
+**Update** button with the new version appears next to it and opens the releases
+page; the Server does not replace its own executable. Otherwise the footer
+reports that the build is current.
+
+The Client has the same manual **Check for updates** chip in its header. It no
+longer checks at launch. On the Linux AppImage the Client downloads and verifies
+the new build itself; the Windows build opens the releases page.
 
 ## Files
 

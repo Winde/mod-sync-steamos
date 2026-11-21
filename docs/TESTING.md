@@ -9,6 +9,8 @@ Linux launcher and me3.
 On the server machine, `npm run dev:server` opens the Server console. Check without touching the game:
 
 1. The pack library lists the packs in `packs/`, with version, size, and path.
+   **Change folder** switches to another folder and lists its packs; it is
+   disabled while a build runs.
 2. **Pack server → Start server** shows a URL and token; **Stop server** closes
    it. If port 8787 is busy, stop the old CLI `serve` or change the port.
 3. **Show**, **Copy**, and **New token** reveal and replace the token. Save
@@ -20,6 +22,8 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
 5. **Remove** asks for confirmation and deletes only the pack folder.
 6. Minimizing the window hides it to the tray while the setting is enabled;
    closing it always hides it. **Quit** in the tray exits.
+7. **Check for updates** in the footer reports that the build is current, or
+   offers the latest release. It does not run on its own.
 
 ## 0b. Stop old listeners
 
@@ -134,6 +138,8 @@ This is the step that proves the Linux launcher and me3, which the PC cannot.
 4. Launch from the generated game shortcut, not the Steam Play button.
 5. Confirm Graceborne loads; exit the game and check
    `~/ModSync/packs/eldenring-graceborne/mods/graceborne/current.txt`.
+6. Press **Check for updates** in the header. It should report the current
+   version or open the release offer; it must not check automatically at launch.
 
 ## What to report back
 

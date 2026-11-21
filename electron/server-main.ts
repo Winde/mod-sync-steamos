@@ -1,5 +1,5 @@
 import {
-  app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell, Tray,
+  app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, safeStorage, shell, Tray,
 } from "electron";
 import fs from "node:fs";
 import os from "node:os";
@@ -7,6 +7,7 @@ import path from "node:path";
 import { createConsole } from "../src/console";
 import { errorMessage } from "../src/util";
 import { projectRoot } from "../src/root";
+import { RELEASES_PAGE, Updater } from "./updater";
 import type { ConsoleTokenStore, LoginItemResult } from "../src/console";
 import type { MenuItemConstructorOptions, OpenDialogOptions } from "electron";
 
@@ -323,8 +324,28 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
+    const updater = new Updater({
+      currentVersion: () => app.getVersion(),
+      // The Server only checks for a newer release. Downloading the installer
+      // and replacing the running app stays a manual step from the releases page.
+      appImage: () => null,
+      fetch: (url, init) => net.fetch(url, init) as Promise<Response>,
+    });
     ipcMain.handle("modsync:version", () => app.getVersion());
-    ipcMain.handle("modsync:releases", () => shell.openExternal("https://github.com/Winde/mod-sync-steamos/releases"));
+    ipcMain.handle("modsync:update-check", async () => {
+      try {
+        return await updater.check();
+      } catch (err) {
+        return {
+          current: app.getVersion(),
+          latest: null,
+          available: false,
+          canInstall: false,
+          error: errorMessage(err),
+        };
+      }
+    });
+    ipcMain.handle("modsync:releases", () => shell.openExternal(RELEASES_PAGE));
     ipcMain.handle("modsync:pick-folder", async (event, title?: string) => {
       const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
       const options: OpenDialogOptions = {

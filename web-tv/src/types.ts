@@ -2,7 +2,7 @@
 
 export interface UpdateInfo {
   current: string;
-  latest: string;
+  latest: string | null;
   available: boolean;
   canInstall: boolean;
   error?: string;
@@ -54,14 +54,20 @@ export interface PreconditionsView {
   failedRequired: CheckView[];
 }
 
+export interface ContentsItemView {
+  label?: string;
+  path?: string;
+  active?: boolean;
+  optional?: boolean;
+}
+
 export interface ContentsView {
-  kind: string;
   count: number;
   source?: string;
-  mods?: Array<{ name?: string; builtin?: boolean }>;
-  packages?: Array<{ label?: string; path?: string }>;
-  inactivePaks?: string[];
-  [key: string]: unknown;
+  generatedAt?: string;
+  itemsLabel?: string;
+  items?: ContentsItemView[];
+  inactive?: string[];
 }
 
 export interface LaunchView {

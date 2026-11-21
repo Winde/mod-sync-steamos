@@ -73,6 +73,11 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 .headactions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .muted { color: var(--muted); font-size: 13px; }
 .hint { color: #8b96a8; font-size: 12px; margin: 6px 0 0; }
+.librarypath { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 5px; min-width: 0; }
+.librarypath code {
+  color: #cbd5e1; font-size: 12px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 .btn {
   appearance: none; cursor: pointer; color: #e8eef8;
@@ -241,6 +246,8 @@ select.input { cursor: pointer; }
   color: #6f7b8f; font-size: 11px; letter-spacing: 0.04em;
   padding: 2px 2px 0;
 }
+.footerend { display: flex; align-items: center; gap: 8px; }
+.footer .btn.small { padding: 3px 8px; font-size: 11px; }
 
 .modal {
   position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;

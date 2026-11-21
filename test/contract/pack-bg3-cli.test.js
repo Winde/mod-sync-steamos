@@ -71,11 +71,11 @@ test("BG3 pack CLI produces a complete multi-platform pack contract", { timeout:
   assert.equal(pack.platforms["linux-native"].template, "games/bg3-native.sh");
 
   // Contents are normalized for the dashboard and the refresh script.
-  assert.equal(pack.contents.kind, "mods");
   assert.equal(pack.contents.count, 1);
-  assert.equal(pack.contents.mods[0].name, "Test Mod");
-  assert.equal(pack.contents.mods[0].file, "Mods/TestMod_uuid.pak");
-  assert.deepEqual(pack.contents.inactivePaks, ["Extra.pak"]);
+  assert.equal(pack.contents.itemsLabel, "Included mods");
+  assert.equal(pack.contents.items[0].label, "Test Mod");
+  assert.equal(pack.contents.items[0].path, "Mods/TestMod_uuid.pak");
+  assert.deepEqual(pack.contents.inactive, ["Extra.pak"]);
 
   // Preconditions gate the build the pack was made for.
   const build = pack.preconditions.find((check) => check.type === "game-build");

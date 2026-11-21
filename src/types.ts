@@ -143,18 +143,6 @@ export interface ModInfo {
   version: string;
 }
 
-export interface ModContentsEntry {
-  name?: string;
-  builtin?: boolean;
-  [key: string]: unknown;
-}
-
-export interface PackageContentsEntry {
-  label?: string;
-  path?: string;
-  [key: string]: unknown;
-}
-
 export interface ContentsItem {
   label: string;
   path?: string;
@@ -163,19 +151,12 @@ export interface ContentsItem {
 }
 
 export interface ContentsSummary {
-  /** Legacy display shape; new renderers should use `items` and `itemsLabel`. */
-  kind: string;
   count: number;
   source?: string;
+  generatedAt?: string;
   itemsLabel?: string;
   items?: ContentsItem[];
   inactive?: string[];
-  /** Legacy game-shaped fields kept for the current TV renderer. */
-  mods?: ModContentsEntry[];
-  packages?: PackageContentsEntry[];
-  inactivePaks?: string[];
-  paks?: number;
-  [key: string]: unknown;
 }
 
 export interface Pack {

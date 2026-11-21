@@ -38,7 +38,11 @@ function packFixture(overrides = {}) {
     art: { grid: "art/graceborne/grid.png", icon: "art/graceborne/icon.png" },
     notes: [],
     preconditions: { checks: [], failedRequired: [], blocked: false },
-    contents: { kind: "mods", count: 2, mods: [{ name: "Graceborne" }] },
+    contents: {
+      count: 1,
+      itemsLabel: "Included mods",
+      items: [{ label: "Graceborne", active: true }],
+    },
     install: null,
     loader: { type: "me3" },
     files: 1466,
@@ -123,13 +127,14 @@ function waitFor(window, predicate, timeoutMs = 2000) {
   });
 }
 
-async function boot({ fetchImpl }) {
+async function boot({ fetchImpl, desktop }) {
   const dom = new JSDOM(html, {
     url: "http://127.0.0.1:8788/",
     runScripts: "outside-only",
     pretendToBeVisual: true,
   });
   const { window } = dom;
+  if (desktop) window.modsyncDesktop = desktop;
   window.fetch = fetchImpl;
   window.eval(appScript);
   return dom;
@@ -351,7 +356,12 @@ test("details shows notes, checks, and the recent log", async () => {
     local: true,
     versions: ["0.2.5", "0.2.7"],
     notes: [{ title: "Stay offline", body: "Launch the modded shortcut.", tone: "warning" }],
-    contents: { kind: "mods", count: 2, mods: [{ name: "Graceborne" }, { name: "Regulation" }] },
+    contents: {
+      kind: "unknown-game-shape",
+      count: 2,
+      itemsLabel: "Included mods",
+      items: [{ label: "Graceborne", active: true }, { label: "Regulation", active: true }],
+    },
     launcher: "C:\\ModSync\\packs\\eldenring-graceborne\\launcher.cmd",
     desktopFile: null,
   });
@@ -370,6 +380,8 @@ test("details shows notes, checks, and the recent log", async () => {
     assert.match(doc.querySelector("#overlay .panel").textContent, /Versions kept/);
     assert.match(doc.querySelector("#overlay .panel").textContent, /0\.2\.5, 0\.2\.7/);
     assert.match(doc.querySelector("#overlay .panel").textContent, /Stay offline/);
+    assert.match(doc.querySelector("#overlay .panel").textContent, /Included mods/);
+    assert.match(doc.querySelector("#overlay .panel").textContent, /2 items/);
     assert.match(doc.querySelector("#overlay .panel").textContent, /Graceborne · Regulation/);
     await waitFor(window, (w) => /line one/.test(w.document.querySelector("#overlay .panel pre.log")?.textContent || ""));
     assert.ok(doc.querySelector('#overlay [data-key="back"]'));
@@ -377,5 +389,38 @@ test("details shows notes, checks, and the recent log", async () => {
     assert.ok(doc.querySelector('#overlay [data-action="uninstall"]'));
   } finally {
     dom.window.close();
+  }
+});
+
+test("the client checks for app updates only when asked", async () => {
+  let checks = 0;
+  let opened = 0;
+  const desktop = {
+    checkUpdate: async () => {
+      checks++;
+      return { current: "0.5.0", latest: "0.6.0", available: true, canInstall: false };
+    },
+    openReleases: async () => { opened++; },
+  };
+  const dom = await boot({
+    fetchImpl: async () => jsonResponse(stateFixture(packFixture())),
+    desktop,
+  });
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".hero h1")?.textContent === "Graceborne");
+    // The old build checked 1.2s after launch. Leave it well past that window.
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+    const doc = window.document;
+    assert.equal(checks, 0);
+    const button = doc.querySelector("#update-btn");
+    assert.equal(button.textContent, "Check for updates");
+    button.click();
+    await waitFor(window, () => opened === 1);
+    assert.equal(checks, 1);
+    await waitFor(window, () => button.textContent === "Update 0.6.0");
+    await waitFor(window, (w) => /Update 0.6.0 available/.test(w.document.querySelector("#overlay")?.textContent || ""));
+  } finally {
+    window.close();
   }
 });

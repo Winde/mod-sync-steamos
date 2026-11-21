@@ -111,27 +111,18 @@
     }
   ],
   "contents": {
-    "kind": "packages",
     "source": "me3 profile",
     "generatedAt": "2026-11-21T15:19:23.064Z",
     "count": 1,
-    "packages": [
+    "itemsLabel": "Included packages",
+    "items": [
       {
-        "path": "../mods/graceborne/versions/0.2.7/mod",
         "label": "Graceborne",
-        "enabled": true,
-        "loadAfter": [],
-        "loadBefore": []
+        "path": "../mods/graceborne/versions/0.2.7/mod",
+        "active": true
       }
     ],
-    "natives": [
-      {
-        "path": "../mods/graceborne/versions/0.2.7/mod/Scripts-Data-Exposer-FS.dll",
-        "label": "Scripts-Data-Exposer-FS.dll",
-        "enabled": true,
-        "optional": false
-      }
-    ]
+    "inactive": []
   },
   "files": "files.json",
   "save": {

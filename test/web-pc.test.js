@@ -97,12 +97,13 @@ function waitFor(window, predicate, timeoutMs = 2000) {
   });
 }
 
-async function boot(fetchImpl) {
+async function boot(fetchImpl, desktop) {
   const dom = new JSDOM(html, {
     url: "http://127.0.0.1:8789/",
     runScripts: "outside-only",
     pretendToBeVisual: true,
   });
+  if (desktop) dom.window.modsyncDesktop = desktop;
   dom.window.fetch = fetchImpl;
   dom.window.eval(script);
   return dom;
@@ -166,6 +167,80 @@ test("Server console starts the server and opens the rebuild dialog", async () =
     await waitFor(window, (w) => !!w.document.querySelector("#build-form"));
     assert.equal(doc.querySelector("#build-source").value, "D:\\EldenRingMods");
     assert.match(doc.querySelector("#build-recipe").textContent, /Graceborne/);
+  } finally {
+    window.close();
+  }
+});
+
+test("Pack library points the library at an existing packs folder", async () => {
+  let posted = null;
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/settings") && init.method === "POST") {
+      posted = JSON.parse(init.body);
+      return response(stateWithPacksDir(posted.packsDir));
+    }
+    if (String(url).endsWith("/api/state")) {
+      return response(stateWithPacksDir(posted ? posted.packsDir : "C:\\ModSync\\packs"));
+    }
+    return response({});
+  };
+  function stateWithPacksDir(packsDir) {
+    const state = fixture(packsDir === "C:\\ModSync\\packs" ? {} : { packs: [] });
+    state.settings = { ...state.settings, packsDir };
+    state.app = { ...state.app, packsDir };
+    return state;
+  }
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  window.modsyncDesktop = { pickFolder: async () => "D:\\Library\\packs" };
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    doc.querySelector('[data-action="change-packs"]').click();
+    await waitFor(window, () => posted !== null);
+    assert.deepEqual(posted, { packsDir: "D:\\Library\\packs" });
+    await waitFor(window, (w) => w.document.querySelector("#packs-dir").value === "D:\\Library\\packs");
+    assert.match(doc.querySelector("#packs-summary").textContent, /D:\\Library\\packs/);
+  } finally {
+    window.close();
+  }
+});
+
+test("Pack library focuses the settings field without the desktop bridge", async () => {
+  const dom = await boot(async (url) => {
+    return response(String(url).endsWith("/api/state") ? fixture() : {});
+  });
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    doc.querySelector('[data-action="change-packs"]').click();
+    await waitFor(window, (w) => w.document.activeElement === w.document.querySelector("#packs-dir"));
+    assert.equal(doc.activeElement.id, "packs-dir");
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console checks for updates and links to the release", async () => {
+  let opened = 0;
+  const dom = await boot(
+    async (url) => response(String(url).endsWith("/api/state") ? fixture() : {}),
+    {
+      checkUpdate: async () => ({ current: "0.4.0", latest: "0.6.0", available: true, canInstall: false }),
+      openReleases: async () => { opened++; },
+    },
+  );
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    const check = doc.querySelector("#check-updates");
+    assert.equal(check.textContent, "Check for updates");
+    check.click();
+    await waitFor(window, (w) => w.document.querySelector("#open-releases")?.textContent === "Update 0.6.0");
+    doc.querySelector("#open-releases").click();
+    await waitFor(window, () => opened === 1);
   } finally {
     window.close();
   }

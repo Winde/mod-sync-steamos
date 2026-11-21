@@ -4,6 +4,8 @@ import labels from "./labels";
 import {
   art,
   contentsCount,
+  contentsHeading,
+  contentsInactive,
   contentsNames,
   firstBlocker,
   fmtBytes,
@@ -480,8 +482,8 @@ export function DetailsPanel({ pack, logs, onClose, onRollback, onUninstall, onR
       {pack.contents ? (
         <>
           <p style={{ marginTop: "2vh" }}>
-            <b>{pack.contents.kind === "mods" ? labels.includedMods : labels.includedPackages}</b>{" "}
-            <span className="meta">{labels.contentsSource(pack.contents.source)}{pack.contents.inactivePaks && pack.contents.inactivePaks.length ? ` · ${labels.inactivePaks(pack.contents.inactivePaks.length)}` : ""}</span>
+            <b>{contentsHeading(pack.contents)}</b>{" "}
+            <span className="meta">{labels.contentsSource(pack.contents.source)}{contentsInactive(pack.contents) ? ` · ${labels.inactiveItems(contentsInactive(pack.contents))}` : ""}</span>
           </p>
           <div className="modlist">{contentsNames(pack.contents).join(" · ")}</div>
         </>

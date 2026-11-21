@@ -65,21 +65,19 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     assert.equal(grace.pack.loader.saveFile, "ER0000.graceborne.sl2");
     assert.equal(grace.pack.launch.profile, undefined);
     assert.equal(grace.pack.launch.saveFile, undefined);
-    assert.equal(grace.pack.contents.kind, "packages");
     assert.equal(grace.pack.contents.count, 1);
-    assert.match(grace.pack.contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
+    assert.equal(grace.pack.contents.itemsLabel, "Included packages");
+    assert.match(grace.pack.contents.items[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
 
     const contents = contentsFor({
       recipe: loadRecipe("eldenring-graceborne"),
       source: src,
       version: "1.0.0",
     });
-    assert.equal(contents.kind, "packages");
     assert.equal(contents.count, 1);
     assert.equal(contents.itemsLabel, "Included packages");
     assert.equal(contents.items[0].label, "Graceborne");
     assert.match(contents.items[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
-    assert.match(contents.packages[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);
     assert.equal(grace.pack.platforms.windows.loader, "tools/me3-win/bin/me3.exe");
     assert.equal(grace.pack.platforms["linux-proton"].loaderSupport, "tools/me3-win/bin");
     assert.equal(grace.pack.platforms["linux-proton"].template, "loaders/me3.sh");
