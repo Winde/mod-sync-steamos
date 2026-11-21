@@ -110,5 +110,6 @@ the game is closed.
 - [`docs/TRANSPORT.md`](docs/TRANSPORT.md) — HTTP pull, token, firewall/VPN
 - [`docs/DRIVERS.md`](docs/DRIVERS.md) — adding Skyrim/BG3/BG2 drivers
 - [`docs/TESTING.md`](docs/TESTING.md) — manual acceptance test (install, resume, rollback)
+- [`docs/TESTING-BG3.md`](docs/TESTING-BG3.md) — BG3 prefix/modsettings/BG3SE acceptance test
 - [`docs/CONTRACT-TESTS.md`](docs/CONTRACT-TESTS.md) — automated black-box suite and refactor rules
 - [`docs/packs/eldenring-graceborne.md`](docs/packs/eldenring-graceborne.md) — pack-specific setup
