@@ -12,7 +12,7 @@ const preconditions = require("./preconditions");
 const paths = require("./paths");
 const storage = require("./storage");
 const versionStore = require("./version-store");
-const { projectRoot } = require("./root");
+const projectRoot = path.resolve(__dirname, "..");
 
 function contentType(p) {
   switch (path.extname(p).toLowerCase()) {

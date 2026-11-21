@@ -12,7 +12,7 @@ const preconditions = require("./preconditions");
 const versionStore = require("./version-store");
 const paths = require("./paths");
 const installers = require("./installers");
-const { projectRoot } = require("./root");
+const projectRoot = path.resolve(__dirname, "..");
 
 function renderTemplate(file, values) {
   let text = fs.readFileSync(file, "utf8");
