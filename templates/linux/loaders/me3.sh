@@ -17,6 +17,15 @@ VER="$(cat "$ROOT/mods/$MOD/current.txt" 2>/dev/null || true)"
 PROFILE="$ROOT/profiles/$MOD-$VER.me3"
 LOG="$LOG_DIR/launch-$MOD-$(date +%Y%m%d-%H%M%S).log"
 
+echo "Steam launch env: LD_PRELOAD=${LD_PRELOAD:-<unset>} SteamAppId=${SteamAppId:-<unset>} SteamGameId=${SteamGameId:-<unset>}" >>"$LOG"
+
+# Steam starts non-Steam shortcuts with gameoverlayrenderer.so in LD_PRELOAD.
+# me3 forwards that into the Steam Linux Runtime entry point, which can
+# deadlock before the game starts. The terminal launch has no such preload.
+unset LD_PRELOAD
+export SteamAppId="$STEAM_APP_ID"
+export SteamGameId="$STEAM_APP_ID"
+
 if [ ! -x "$ME3" ]; then
   echo "me3 is not executable: $ME3" >>"$LOG"
   exit 1

@@ -12,6 +12,7 @@ const preconditions = require("./preconditions");
 const versionStore = require("./version-store");
 const paths = require("./paths");
 const installers = require("./installers");
+const { projectRoot } = require("./root");
 
 function renderTemplate(file, values) {
   let text = fs.readFileSync(file, "utf8");
@@ -19,6 +20,36 @@ function renderTemplate(file, values) {
     text = text.split(`{{${key}}}`).join(String(value));
   }
   return text;
+}
+
+function writeLauncher({ pack, root, game }) {
+  const packRoot = versionStore.packRoot(root, pack.id);
+  const target = paths.resolve(pack, game);
+  const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
+  const templates = path.join(projectRoot, "templates", "linux");
+  const defaultTemplates = { steam: "launch-steam.sh" };
+  const templateName = target.template || defaultTemplates[pack.launch.type];
+  if (!templateName) throw new Error(`No launcher template for launch type ${pack.launch.type}.`);
+  const templateFile = path.resolve(templates, templateName);
+  if (!templateFile.startsWith(path.resolve(templates) + path.sep)) {
+    throw new Error(`Launcher template escapes the template directory: ${templateName}`);
+  }
+  const launcherText = renderTemplate(templateFile, {
+    ROOT: packRoot,
+    MOD: pack.mod.id,
+    GAME: game ? game.root : "",
+    PREFIX: game && game.prefix ? game.prefix : "",
+    DATA_DIR: target.dataDir || "",
+    DATA_HOME: paths.contextFor(game).dataHome,
+    STEAM_APP_ID: pack.launch.steamAppId,
+    GAME_PROCESS: target.gameProcess,
+    EXE: target.exe,
+    SAVE_FILE: pack.launch.saveFile,
+    LOADER: target.loader ? path.join(packRoot, target.loader) : "",
+    LOADER_SUPPORT: target.loaderSupport ? path.join(packRoot, target.loaderSupport) : "",
+  });
+  writeText(launcher, launcherText, 0o755);
+  return launcher;
 }
 
 function abortError() {
@@ -192,30 +223,7 @@ async function installPack({ pack, filesDoc, remoteBase, token, root, game, sign
   }
 
   progress({ phase: "launcher" });
-  const templates = path.join(__dirname, "..", "templates", "linux");
-  const launcher = versionStore.launcherFile(packRoot, pack.mod.id);
-  const defaultTemplates = { steam: "launch-steam.sh" };
-  const templateName = target.template || defaultTemplates[pack.launch.type];
-  if (!templateName) throw new Error(`No launcher template for launch type ${pack.launch.type}.`);
-  const templateFile = path.resolve(templates, templateName);
-  if (!templateFile.startsWith(path.resolve(templates) + path.sep)) {
-    throw new Error(`Launcher template escapes the template directory: ${templateName}`);
-  }
-  const launcherText = renderTemplate(templateFile, {
-    ROOT: packRoot,
-    MOD: pack.mod.id,
-    GAME: game ? game.root : "",
-    PREFIX: game && game.prefix ? game.prefix : "",
-    DATA_DIR: target.dataDir || "",
-    DATA_HOME: paths.contextFor(game).dataHome,
-    STEAM_APP_ID: pack.launch.steamAppId,
-    GAME_PROCESS: target.gameProcess,
-    EXE: target.exe,
-    SAVE_FILE: pack.launch.saveFile,
-    LOADER: target.loader ? path.join(packRoot, target.loader) : "",
-    LOADER_SUPPORT: target.loaderSupport ? path.join(packRoot, target.loaderSupport) : "",
-  });
-  writeText(launcher, launcherText, 0o755);
+  const launcher = writeLauncher({ pack, root, game });
 
   const icon = path.join(packRoot, pack.art.icon);
   const shortcutName = target.shortcut || (pack.launch.mode !== "default" ? pack.name : "");
@@ -247,6 +255,7 @@ Categories=Game;
           exePath: launcher,
           name: shortcutName,
           icon,
+          allowOverlay: pack.launch.allowOverlay !== false,
           art: {
             grid: path.join(packRoot, pack.art.grid),
             hero: path.join(packRoot, pack.art.hero),
@@ -287,4 +296,4 @@ function rollback({ pack, root, log = () => {} }) {
   return { previous, current };
 }
 
-module.exports = { installPack, rollback };
+module.exports = { installPack, rollback, writeLauncher };

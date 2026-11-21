@@ -12,6 +12,7 @@ const preconditions = require("./preconditions");
 const paths = require("./paths");
 const storage = require("./storage");
 const versionStore = require("./version-store");
+const { projectRoot } = require("./root");
 
 function contentType(p) {
   switch (path.extname(p).toLowerCase()) {
@@ -61,7 +62,7 @@ function createAgent(config) {
   const token = config.token || "";
   if (config.steamRoot) process.env.STEAM_ROOT = String(config.steamRoot);
   if (Array.isArray(config.steamLibraries)) steam.setExtraLibraries(config.steamLibraries);
-  const webDir = path.join(__dirname, "..", "web");
+  const webDir = path.join(projectRoot, "web");
   const jobs = new Map();
   let activeJob = null;
   let lastJob = null;
@@ -301,12 +302,13 @@ function createAgent(config) {
     if (!pack) throw new Error("Pack is not installed on this TV.");
     const info = localInfo(pack);
     if (!info.installed) throw new Error("Pack is not installed.");
-    if (!info.launcher) throw new Error("Launcher is missing. Reinstall the pack.");
-    const target = paths.resolve(pack, steam.findGame(pack.game));
+    const game = steam.findGame(pack.game);
+    const target = paths.resolve(pack, game);
     if (util.isGameRunning(target.processes)) throw new Error("The game is already running.");
-    const child = spawn("bash", [info.launcher], { detached: true, stdio: "ignore" });
+    const launcher = installer.writeLauncher({ pack, root, game });
+    const child = spawn("bash", [launcher], { detached: true, stdio: "ignore" });
     child.unref();
-    return { ok: true, launcher: info.launcher };
+    return { ok: true, launcher };
   }
 
   async function art(packId, key) {
@@ -443,6 +445,14 @@ function createAgent(config) {
       res.end(JSON.stringify({ error: err.message }));
     }
   });
+
+  // Refresh generated launchers at app startup so an app update applies new
+  // launch behavior without requiring a pack reinstall.
+  for (const pack of localPacks()) {
+    const game = steam.findGame(pack.game);
+    if (!game) continue;
+    try { installer.writeLauncher({ pack, root, game }); } catch { }
+  }
 
   return {
     server,
