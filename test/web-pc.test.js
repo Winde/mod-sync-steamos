@@ -47,7 +47,13 @@ function fixture(overrides = {}) {
         generatedAt: "2026-11-21T12:00:00.000Z",
         count: 1,
         itemsLabel: "Included packages",
-        items: [{ label: "Graceborne", path: "../mods/graceborne/versions/0.2.7/mod", active: true }],
+        items: [{
+          label: "Graceborne",
+          path: "../mods/graceborne/versions/0.2.7/mod",
+          active: true,
+          modId: "Graceborne",
+          review: null,
+        }],
         inactive: [],
       },
       platforms: ["windows", "linux-proton"],
@@ -372,12 +378,11 @@ test("Pack library focuses the settings field without the desktop bridge", async
   }
 });
 
-test("Server console renames a pack and saves its notes and review", async () => {
+test("Server console renames a pack and saves its notes", async () => {
   const posted = [];
   const state = fixture();
   state.packs[0].baseName = "Graceborne";
   state.packs[0].notes = "Keep online off.";
-  state.packs[0].review = { rating: 3, body: "Solid.", updatedAt: "2026-11-21T12:00:00.000Z" };
   const fetchImpl = async (url, init = {}) => {
     if (String(url).endsWith("/api/state")) return response(state);
     if (init.method === "POST") {
@@ -392,14 +397,14 @@ test("Server console renames a pack and saves its notes and review", async () =>
     await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
     const doc = window.document;
     assert.match(doc.querySelector(".packnotes").textContent, /Keep online off/);
-    assert.equal(doc.querySelector(".badge.stars").textContent, "★★★☆☆");
     assert.ok(doc.querySelector('[data-action="change-art"]'));
 
     doc.querySelector('[data-action="edit"]').click();
     await waitFor(window, (w) => !!w.document.querySelector("#pack-display-name"));
     assert.equal(doc.querySelector("#pack-display-name").value, "Graceborne");
     assert.equal(doc.querySelector("#pack-notes").value, "Keep online off.");
-    assert.equal(doc.querySelector("#pack-review").value, "Solid.");
+    assert.equal(doc.querySelector("#pack-review"), null);
+    assert.match(doc.querySelector(".modalform").textContent, /individual mods inside the pack/i);
     assert.ok(doc.querySelector(".imagefield .artbtn"));
     assert.match(doc.querySelector(".imageactions").textContent, /Choose image/);
 
@@ -411,27 +416,79 @@ test("Server console renames a pack and saves its notes and review", async () =>
     };
     setValue("#pack-display-name", "Graceborne Remastered");
     setValue("#pack-notes", "Now tested on the 1.17 build.");
-    setValue("#pack-review", "Still great after the patch.");
-    doc.querySelectorAll('[data-action="rate"]')[4].click();
-    await waitFor(window, (w) => /5 of 5/.test(w.document.querySelector(".modal .stars .hint")?.textContent || ""));
 
     doc.querySelector(".modalform").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
-    await waitFor(window, () => posted.length === 2);
-    const libraryPost = posted.find((entry) => entry.url.includes("/library"));
-    const reviewPost = posted.find((entry) => entry.url.endsWith("/api/reviews"));
-    assert.ok(libraryPost);
-    assert.deepEqual(libraryPost.body, {
+    await waitFor(window, () => posted.length === 1);
+    assert.deepEqual(posted[0].body, {
       name: "Graceborne Remastered",
       notes: "Now tested on the 1.17 build.",
     });
-    assert.ok(reviewPost);
-    assert.deepEqual(reviewPost.body, {
-      gameId: "eldenring",
-      modId: "graceborne",
-      rating: 5,
-      body: "Still great after the patch.",
-    });
     await waitFor(window, (w) => !w.document.querySelector("#pack-display-name"));
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console reviews mods inside a pack, not the pack itself", async () => {
+  const posted = [];
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/reviews") && init.method === "POST") {
+      const body = JSON.parse(init.body);
+      posted.push(body);
+      return response({
+        ok: true,
+        review: {
+          ...body,
+          body: body.body.trim(),
+          updatedAt: "2026-11-22T12:00:00.000Z",
+        },
+      });
+    }
+    if (String(url).endsWith("/api/state")) return response(fixture());
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    assert.equal(doc.querySelector(".packcard .badge.stars"), null);
+
+    doc.querySelector('[data-action="contents"]').click();
+    await waitFor(window, (w) => w.document.querySelector(".modal h2")?.textContent === "Graceborne");
+    assert.match(doc.querySelector(".contentshint").textContent, /belong to each mod/i);
+    assert.equal(doc.querySelector(".contentsreview"), null);
+
+    doc.querySelector('[data-action="review-mod"]').click();
+    await waitFor(window, (w) => !!w.document.querySelector(".reviewform"));
+    doc.querySelectorAll('[data-action="rate-mod"]')[4].click();
+    await waitFor(window, (w) => /5 of 5/.test(w.document.querySelector(".reviewform .stars .hint")?.textContent || ""));
+
+    const textarea = doc.querySelector(".reviewform textarea");
+    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set.call(textarea, "A must-have overhaul.");
+    textarea.dispatchEvent(new window.Event("input", { bubbles: true }));
+    doc.querySelector(".reviewform").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+
+    await waitFor(window, () => posted.length === 1);
+    assert.deepEqual(posted[0], {
+      gameId: "eldenring",
+      modId: "Graceborne",
+      name: "Graceborne",
+      rating: 5,
+      body: "A must-have overhaul.",
+    });
+    await waitFor(window, (w) => /A must-have overhaul/.test(w.document.querySelector(".contentsreview")?.textContent || ""));
+    assert.match(doc.querySelector(".contentsreview").textContent, /★★★★★/);
+    assert.match(doc.querySelector(".packcard .badge.stars").textContent, /1\/1 reviewed/);
+
+    doc.querySelector('[data-action="review-mod"]').click();
+    await waitFor(window, (w) => !!w.document.querySelector('[data-action="clear-review"]'));
+    doc.querySelector('[data-action="clear-review"]').click();
+    await waitFor(window, () => posted.length === 2);
+    assert.equal(posted[1].rating, 0);
+    assert.equal(posted[1].body, "");
+    await waitFor(window, (w) => !w.document.querySelector(".contentsreview"));
+    assert.equal(doc.querySelector(".packcard .badge.stars"), null);
   } finally {
     window.close();
   }
@@ -479,7 +536,7 @@ test("Server console confirms a rebuild and warns that name, notes, and image ar
     const modal = doc.querySelector(".modal");
     assert.match(modal.textContent, /Replace Graceborne\?/);
     assert.match(modal.textContent, /Custom name, notes, and image are cleared/);
-    assert.match(modal.textContent, /rating and review are kept/i);
+    assert.match(modal.textContent, /Reviews of the individual mods inside the pack are kept/i);
     assert.equal(doc.querySelector('[data-action="rebuild-overwrite"]').checked, true);
     doc.querySelector('[data-action="confirm-rebuild"]').click();
     await waitFor(window, () => posted !== null);

@@ -69,9 +69,11 @@ export function contentsFor({ recipe, source, version }: ContentsInput): Content
   const parsed = parseMe3Profile(fs.readFileSync(profileFile(source, recipe.modId, version), "utf8"));
   const packages = parsed.packages.map((entry, index) => {
     const entryPath = typeof entry.path === "string" ? entry.path : "";
+    const label = packageLabel(entryPath, index, recipe.name);
     return {
+      id: label,
       path: entryPath,
-      label: packageLabel(entryPath, index, recipe.name),
+      label,
       enabled: entry.enabled !== false,
       loadAfter: entry.load_after || [],
       loadBefore: entry.load_before || [],
@@ -83,6 +85,7 @@ export function contentsFor({ recipe, source, version }: ContentsInput): Content
     count: packages.filter((entry) => entry.enabled).length,
     itemsLabel: "Included packages",
     items: packages.map((entry) => ({
+      id: entry.id,
       label: entry.label,
       path: entry.path,
       active: entry.enabled,

@@ -66,8 +66,10 @@ everything. The pack count and size follow the visible packs.
 Each pack card shows its game, mod version, file count, size, target platforms,
 build date, and folder. When the pack records its contents, the card also shows
 a count such as **72 mods**; pressing it opens the full list and any inactive
-pak files from `pack.json`. A rating appears as stars, and console notes show as
-a short preview under the card metadata. Actions:
+pak files from `pack.json`. The same list is where the individual mods are rated
+and reviewed: each entry has a **Review** action and shows its own stars and
+text. The card reports how many included mods have a review, not a rating for
+the pack. Console notes show as a short preview under the card metadata. Actions:
 
 - **Rebuild** opens the build form, then asks for confirmation before replacing
   a pack. The confirmation offers two choices: **Overwrite** replaces the
@@ -77,24 +79,26 @@ a short preview under the card metadata. Actions:
   `.modsync-build/`; the old pack folder is replaced only after the new build
   succeeds, so a failure leaves it untouched.
 - A rebuild always starts with a clean library: the custom display name, notes,
-  and selected cover are cleared. The rating and review are kept because they
-  are stored per game + mod. The confirmation warns about this before the build
+  and selected cover are cleared. Reviews belong to the individual mods inside
+  the pack, so they are kept. The confirmation warns about this before the build
   starts.
-- **Edit details** renames the pack and adds notes, a rating, and a review.
-  The name and notes are stored in `packs/<pack>/library.json` for the current
-  build. The name and notes are also served to the Client: the notes appear with
-  the pack's other install notes. **Pack image** in the same dialog selects a
-  PNG cover; clicking the cover in the library opens the same picker. The image
-  is written into the pack folder and its `files.json`, so the Server, the
-  library, and the TV use the selected cover. A custom cover can be removed to
-  restore the driver's default art.
+- **Edit details** renames the pack and adds notes. The name and notes are
+  stored in `packs/<pack>/library.json` for the current build. The name and
+  notes are also served to the Client: the notes appear with the pack's other
+  install notes. **Pack image** in the same dialog selects a PNG cover; clicking
+  the cover in the library opens the same picker. The image is written into the
+  pack folder and its `files.json`, so the Server, the library, and the TV use
+  the selected cover. A custom cover can be removed to restore the driver's
+  default art.
 - **Open folder** reveals the pack directory in Explorer.
 - **Remove** deletes the pack folder and its payload after a confirmation. It
   does not touch the game, saves, or the working mod install.
 
-Ratings and reviews are separate from the pack. They are keyed by game + mod, so
-every build of the same mod shares one review and removing the pack does not
-delete it. They live in `reviews.json` beside the console config.
+Ratings and reviews belong to the individual mods included in a pack, not to the
+pack build. Open a pack's contents list and use **Review** on any mod. Reviews
+are keyed by game + mod id, so a mod keeps its review when the pack is rebuilt,
+when another pack includes the same mod, or when the pack is removed. They live
+in `reviews.json` beside the console config.
 
 Two packs built from the same recipe share the same game + mod, so the Client
 installs one at a time; the Server keeps both builds and can switch between them.
@@ -169,7 +173,7 @@ the new build itself; the Windows build opens the releases page.
 | `%APPDATA%/ModSync Server/console.json` (installed) | Same, for the installed build |
 | `state/devices.json` (checkout) | Paired-device token hashes, names, addresses, legacy tombstones |
 | `%APPDATA%/ModSync Server/devices.json` (installed) | Same, for the installed build |
-| `state/reviews.json` (checkout) | Mod ratings and reviews, indexed by game + mod |
+| `state/reviews.json` (checkout) | Reviews of individual mods, indexed by game + mod id |
 | `%APPDATA%/ModSync Server/reviews.json` (installed) | Same, for the installed build |
 | `packs/` (checkout) | Default pack output and server root |
 | `Documents/ModSync/packs` (installed) | Default pack output and server root |

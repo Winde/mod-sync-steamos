@@ -18,8 +18,10 @@ import type {
   BuildJobState,
   BuildStartOptions,
   ConsoleState,
+  ContentsItemState,
   DeviceState,
   ModalState,
+  ModReviewState,
   PackState,
   SettingsDraft,
   SettingsState,
@@ -212,7 +214,7 @@ export default function App() {
     setModal({ kind: "edit", pack });
   };
 
-  const savePackEdits = async (input: { name: string; notes: string; rating: number; review: string }) => {
+  const savePackEdits = async (input: { name: string; notes: string }) => {
     if (!modal || modal.kind !== "edit") return;
     const pack = modal.pack;
     const builtInName = pack.baseName || pack.name;
@@ -220,28 +222,16 @@ export default function App() {
     const notes = input.notes.trim();
     const previousName = pack.baseName && pack.name !== pack.baseName ? pack.name : "";
     const previousNotes = (pack.notes || "").trim();
-    const previousRating = pack.review?.rating || 0;
-    const previousReview = (pack.review?.body || "").trim();
-    const libraryChanged = name !== previousName || notes !== previousNotes;
-    const reviewChanged = input.rating !== previousRating || input.review.trim() !== previousReview;
-    if (!libraryChanged && !reviewChanged) {
+    if (name === previousName && notes === previousNotes) {
       setModal(null);
       return;
     }
     setBusy(true);
     try {
-      if (libraryChanged) {
-        await api(`/api/packs/${encodeURIComponent(pack.id)}/library`, {
-          method: "POST",
-          body: JSON.stringify({ name, notes: input.notes }),
-        });
-      }
-      if (reviewChanged) {
-        await api("/api/reviews", {
-          method: "POST",
-          body: JSON.stringify({ gameId: pack.game.id, modId: pack.mod.id, rating: input.rating, body: input.review }),
-        });
-      }
+      await api(`/api/packs/${encodeURIComponent(pack.id)}/library`, {
+        method: "POST",
+        body: JSON.stringify({ name, notes: input.notes }),
+      });
       setModal(null);
       toast("Pack details saved.", "success");
       await refresh();
@@ -250,6 +240,30 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const saveModReview = async (pack: PackState, item: ContentsItemState, rating: number, body: string): Promise<ModReviewState | null> => {
+    const result = await api<{ review: ModReviewState | null }>("/api/reviews", {
+      method: "POST",
+      body: JSON.stringify({ gameId: pack.game.id, modId: item.modId, name: item.label, rating, body }),
+    });
+    setData((current) => current ? {
+      ...current,
+      packs: current.packs.map((entry) => {
+        if (entry.game.id !== pack.game.id || !entry.contents?.items) return entry;
+        if (!entry.contents.items.some((candidate) => candidate.modId === item.modId)) return entry;
+        return {
+          ...entry,
+          contents: {
+            ...entry.contents,
+            items: entry.contents.items.map((candidate) => (
+              candidate.modId === item.modId ? { ...candidate, review: result.review } : candidate
+            )),
+          },
+        };
+      }),
+    } : current);
+    return result.review;
   };
 
   const updatePacks = (packs: PackState[]) => {
@@ -531,6 +545,7 @@ export default function App() {
             onRemove={openRemove}
             onEdit={openEdit}
             onPickImage={(pack) => { void pickPackImage(pack); }}
+            onSaveReview={saveModReview}
             onShowBuild={() => openBuild(data?.build?.recipeId, data?.build?.packId)}
             onChangeFolder={() => { void changePacksFolder(); }}
             onApprovePair={(id) => { void answerPair(id, "approve"); }}

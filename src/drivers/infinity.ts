@@ -501,6 +501,7 @@ export function contentsForGame(game: InfinityGame, { source }: ContentsInput): 
       count: weidu.mods.length,
       itemsLabel: "Installed mods",
       items: weidu.mods.map((mod) => ({
+        id: mod.folder,
         label: mod.components > 1 ? `${mod.folder} (${mod.components})` : mod.folder,
         path: mod.tp2,
         active: true,
@@ -516,7 +517,7 @@ export function contentsForGame(game: InfinityGame, { source }: ContentsInput): 
     count: files.length,
     itemsLabel: "Manual overlay files",
     items: files.length
-      ? [{ label: `Manual overlay (${files.length} files)`, path: "override/", active: true }]
+      ? [{ id: "override", label: `Manual overlay (${files.length} files)`, path: "override/", active: true }]
       : [],
     inactive: [],
   };

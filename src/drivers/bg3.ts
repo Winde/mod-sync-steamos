@@ -246,6 +246,7 @@ function contentsFrom(source: string, paks: string[]): ContentsSummary {
     items: mods.map((mod, index) => {
       const file = matches.get(index);
       return {
+        id: mod.name || mod.folder || mod.id,
         label: mod.name,
         path: file ? `Mods/${file}` : undefined,
         active: true,

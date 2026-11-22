@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { desktopBridge, formatBytes, formatDate, platformName } from "./api";
+import { desktopBridge, formatBytes, formatDate, messageOf, platformName } from "./api";
 import type {
   BuildFormState,
   BuildJobState,
@@ -9,6 +9,7 @@ import type {
   ContentsItemState,
   ContentsState,
   DeviceState,
+  ModReviewState,
   PackState,
   PairRequestState,
   SettingsDraft,
@@ -138,7 +139,7 @@ export function PairRequests({ requests, busy, onApprove, onDeny }: {
   );
 }
 
-export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onEdit, onPickImage, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
+export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onEdit, onPickImage, onSaveReview, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
   data: ConsoleState | null;
   error: string | null;
   job: BuildJobState | null;
@@ -151,6 +152,7 @@ export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBui
   onRemove: (pack: PackState) => void;
   onEdit: (pack: PackState) => void;
   onPickImage: (pack: PackState) => void;
+  onSaveReview: (pack: PackState, item: ContentsItemState, rating: number, body: string) => Promise<ModReviewState | null>;
   onShowBuild: () => void;
   onChangeFolder: () => void;
   onApprovePair: (id: string) => void;
@@ -253,6 +255,11 @@ export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBui
         ) : null}
         {visiblePacks.map((pack) => {
           const recipe = data?.recipes.find((entry) => entry.id === pack.recipeId);
+          const packItems = pack.contents?.items || [];
+          const reviewed = packItems.filter((item) => {
+            const review = item.review;
+            return !!review && (!!review.rating || !!review.body.trim());
+          }).length;
           return (
           <article key={pack.id} className={`packcard${pack.valid ? "" : " invalid"}`}>
             <PackArt
@@ -277,9 +284,12 @@ export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBui
               </div>
               {pack.valid ? (
                 <div className="meta">
-                  {pack.review?.rating ? (
-                    <span className="badge stars" title={`${pack.review.rating} of 5 stars`}>
-                      {"★".repeat(pack.review.rating)}{"☆".repeat(Math.max(0, 5 - pack.review.rating))}
+                  {reviewed ? (
+                    <span
+                      className="badge stars"
+                      title={`${reviewed} of ${packItems.length} ${(pack.contents?.itemsLabel || "items").toLowerCase()} reviewed`}
+                    >
+                      ★ {reviewed}/{packItems.length} reviewed
                     </span>
                   ) : null}
                   <span className="badge">{formatBytes(pack.totalBytes)}</span>
@@ -327,19 +337,64 @@ export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBui
           );
         })}
       </div>
-      {contentsPack ? <ContentsModal pack={contentsPack} onClose={() => setContentsPack(null)} /> : null}
+      {contentsPack ? (
+        <ContentsModal
+          pack={contentsPack}
+          onSaveReview={(item, rating, body) => onSaveReview(contentsPack, item, rating, body)}
+          onClose={() => setContentsPack(null)}
+        />
+      ) : null}
     </section>
   );
 }
 
-export function ContentsModal({ pack, onClose }: {
+export function ContentsModal({ pack, onSaveReview, onClose }: {
   pack: PackState;
+  onSaveReview: (item: ContentsItemState, rating: number, body: string) => Promise<ModReviewState | null>;
   onClose: () => void;
 }) {
   const contents = pack.contents;
+  const [reviewEdits, setReviewEdits] = useState<Record<string, ModReviewState | null>>({});
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftRating, setDraftRating] = useState(0);
+  const [draftBody, setDraftBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   if (!contents) return null;
   const items = contents.items || [];
   const inactive = contents.inactive || [];
+
+  const reviewFor = (item: ContentsItemState): ModReviewState | null => {
+    if (Object.prototype.hasOwnProperty.call(reviewEdits, item.modId)) return reviewEdits[item.modId];
+    return item.review || null;
+  };
+  const reviewed = items.filter((item) => {
+    const review = reviewFor(item);
+    return !!review && (!!review.rating || !!review.body.trim());
+  }).length;
+
+  const startEdit = (item: ContentsItemState) => {
+    const review = reviewFor(item);
+    setEditing(item.modId);
+    setDraftRating(review?.rating || 0);
+    setDraftBody(review?.body || "");
+    setError("");
+  };
+
+  const save = async (item: ContentsItemState, rating: number, body: string) => {
+    setSaving(true);
+    setError("");
+    try {
+      const review = await onSaveReview(item, rating, body);
+      setReviewEdits((current) => ({ ...current, [item.modId]: review }));
+      setEditing(null);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Modal onClose={onClose}>
       <div className="modalhead">
@@ -348,19 +403,102 @@ export function ContentsModal({ pack, onClose }: {
           <p className="muted">
             {contentsCountLabel(contents)}
             {contents.source ? ` · from ${contents.source}` : ""}
+            {reviewed ? ` · ${reviewed} reviewed` : ""}
           </p>
         </div>
         <button className="btn small" data-action="close-modal" onClick={onClose}>Close</button>
       </div>
       {items.length ? (
-        <div className="contentslist">
-          {items.map((item, index) => (
-            <div className={`contentsitem${item.active === false ? " inactive" : ""}`} key={`${item.label}-${index}`}>
-              <span>{item.label || item.path || "Unnamed item"}{item.active === false ? " (inactive)" : ""}</span>
-              {item.path ? <code>{item.path}</code> : null}
-            </div>
-          ))}
-        </div>
+        <>
+          <p className="hint contentshint">
+            Reviews belong to each mod, not to this pack build. They stay when the pack is rebuilt, built again under another name, or removed.
+          </p>
+          <div className="contentslist">
+            {items.map((item, index) => {
+              const review = reviewFor(item);
+              const hasReview = !!review && (!!review.rating || !!review.body.trim());
+              const isEditing = editing === item.modId;
+              return (
+                <div className={`contentsrow${item.active === false ? " inactive" : ""}`} key={item.modId || `${item.label}-${index}`}>
+                  <div className="contentsitem">
+                    <span className="contentsname">{item.label || item.path || "Unnamed item"}{item.active === false ? " (inactive)" : ""}</span>
+                    <span className="contentsside">
+                      {item.path ? <code>{item.path}</code> : null}
+                      <button
+                        className="btn small"
+                        type="button"
+                        data-action="review-mod"
+                        data-mod-id={item.modId}
+                        onClick={() => startEdit(item)}
+                      >{hasReview ? "Edit review" : "Review"}</button>
+                    </span>
+                  </div>
+                  {hasReview ? (
+                    <div className="contentsreview">
+                      {review.rating ? (
+                        <span className="reviewstars" title={`${review.rating} of 5 stars`}>
+                          {"★".repeat(review.rating)}{"☆".repeat(Math.max(0, 5 - review.rating))}
+                        </span>
+                      ) : null}
+                      {review.body ? <span className="reviewbody">{review.body}</span> : null}
+                    </div>
+                  ) : null}
+                  {isEditing ? (
+                    <form
+                      className="reviewform"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void save(item, draftRating, draftBody);
+                      }}
+                    >
+                      <div className="stars" role="group" aria-label={`Rating for ${item.label}`}>
+                        {[1, 2, 3, 4, 5].map((value) => (
+                          <button
+                            key={value}
+                            className={`star${value <= draftRating ? " on" : ""}`}
+                            type="button"
+                            data-action="rate-mod"
+                            data-rating={value}
+                            aria-label={`${value} of 5 stars`}
+                            aria-pressed={value === draftRating}
+                            title={value === draftRating ? "Clear rating" : `${value} of 5 stars`}
+                            onClick={() => setDraftRating((current) => current === value ? 0 : value)}
+                          >★</button>
+                        ))}
+                        <span className="hint">{draftRating ? `${draftRating} of 5` : "Not rated"}</span>
+                      </div>
+                      <textarea
+                        className="input"
+                        rows={3}
+                        maxLength={4000}
+                        aria-label={`Review for ${item.label}`}
+                        placeholder="What you think of this mod…"
+                        value={draftBody}
+                        onChange={(event) => setDraftBody(event.target.value)}
+                      />
+                      {error ? <p className="hint error">{error}</p> : null}
+                      <div className="actions">
+                        <button className="btn primary small" type="submit" data-action="save-review" disabled={saving}>
+                          {saving ? "Saving…" : "Save review"}
+                        </button>
+                        {hasReview ? (
+                          <button
+                            className="btn small"
+                            type="button"
+                            data-action="clear-review"
+                            disabled={saving}
+                            onClick={() => { void save(item, 0, ""); }}
+                          >Clear review</button>
+                        ) : null}
+                        <button className="btn small" type="button" disabled={saving} onClick={() => setEditing(null)}>Cancel</button>
+                      </div>
+                    </form>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </>
       ) : (
         <div className="callout">This pack has no item list recorded. Rebuild it or run the contents refresh to add one.</div>
       )}
@@ -380,7 +518,7 @@ export function ContentsModal({ pack, onClose }: {
 export function EditPackModal({ pack, busy, onSave, onPickImage, onClearImage, onClose }: {
   pack: PackState;
   busy: boolean;
-  onSave: (input: { name: string; notes: string; rating: number; review: string }) => void;
+  onSave: (input: { name: string; notes: string }) => void;
   onPickImage: (pack: PackState) => Promise<string | null>;
   onClearImage: (pack: PackState) => Promise<string | null>;
   onClose: () => void;
@@ -388,8 +526,6 @@ export function EditPackModal({ pack, busy, onSave, onPickImage, onClearImage, o
   const builtInName = pack.baseName || pack.name;
   const [name, setName] = useState(pack.name || "");
   const [notes, setNotes] = useState(pack.notes || "");
-  const [rating, setRating] = useState(pack.review?.rating || 0);
-  const [review, setReview] = useState(pack.review?.body || "");
   const [imageUrl, setImageUrl] = useState(pack.artUrl);
   const [customImage, setCustomImage] = useState(!!pack.artCustom);
   const [imageBusy, setImageBusy] = useState(false);
@@ -439,7 +575,7 @@ export function EditPackModal({ pack, busy, onSave, onPickImage, onClearImage, o
         autoComplete="off"
         onSubmit={(event) => {
           event.preventDefault();
-          onSave({ name: name.trim(), notes, rating, review });
+          onSave({ name: name.trim(), notes });
         }}
       >
         <div className="field">
@@ -485,35 +621,7 @@ export function EditPackModal({ pack, busy, onSave, onPickImage, onClearImage, o
             onChange={(event) => setNotes(event.target.value)}
           />
           <p className="hint">Saved in the pack folder as library.json and shown with the pack on the Client.</p>
-        </div>
-        <div className="field">
-          <label>Rating and review</label>
-          <div className="stars" role="group" aria-label="Rating">
-            {[1, 2, 3, 4, 5].map((value) => (
-              <button
-                key={value}
-                className={`star${value <= rating ? " on" : ""}`}
-                type="button"
-                data-action="rate"
-                data-rating={value}
-                aria-label={`${value} of 5 stars`}
-                aria-pressed={value === rating}
-                title={value === rating ? "Clear rating" : `${value} of 5 stars`}
-                onClick={() => setRating((current) => current === value ? 0 : value)}
-              >★</button>
-            ))}
-            <span className="hint">{rating ? `${rating} of 5` : "Not rated"}</span>
-          </div>
-          <textarea
-            id="pack-review"
-            className="input"
-            rows={4}
-            maxLength={4000}
-            placeholder="What you think of this mod…"
-            value={review}
-            onChange={(event) => setReview(event.target.value)}
-          />
-          <p className="hint">Reviews are saved per game + mod in a separate database, so rebuilds and removal of this pack keep them.</p>
+          <p className="hint">Ratings and reviews belong to the individual mods inside the pack. Open the mod list on the card to review them.</p>
         </div>
         <div className="actions">
           <button className="btn primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save details"}</button>
@@ -1051,7 +1159,7 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, initialPackId,
               <b>This replaces the current pack.</b> The folder and payload are swapped only after the new build succeeds.
             </div>
             <div className="callout error">
-              <b>Custom name, notes, and image are cleared.</b> They belong to this build. The rating and review are kept because they are stored per game + mod.
+              <b>Custom name, notes, and image are cleared.</b> They belong to this build. Reviews of the individual mods inside the pack are kept.
             </div>
           </>
         )}

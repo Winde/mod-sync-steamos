@@ -23,16 +23,20 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
    A build log and percentage are shown, and a failed build leaves the old pack
    in place.
 5. **Remove** asks for confirmation and deletes only the pack folder.
-6. **Edit details** renames a pack, adds notes, sets a star rating and review,
-   and selects a PNG pack image. Click the cover or **Choose image**; the image
-   is written into the pack's `art/` folder and `files.json`, and the card and
-   TV show it. **Remove custom image** restores the built-in art.
-   `packs/<pack>/library.json` holds the name, notes, and image metadata;
-   `state/reviews.json` holds the review keyed by game + mod.
+6. **Edit details** renames a pack, adds notes, and selects a PNG pack image.
+   Click the cover or **Choose image**; the image is written into the pack's
+   `art/` folder and `files.json`, and the card and TV show it. **Remove custom
+   image** restores the built-in art. `packs/<pack>/library.json` holds the
+   name, notes, and image metadata.
+   **View N mods** opens the mods inside the pack. Use **Review** on one mod,
+   set its stars and text, and save. The card shows how many included mods are
+   reviewed, and each entry keeps its own review. `state/reviews.json` stores
+   them keyed by game + mod id.
 7. **Rebuild** shows the confirmation. Overwriting clears the custom name,
-   notes, and image and keeps the rating and review. **Create a new pack** keeps
-   the existing pack and adds a second card with the new name and id. Removing a
-   pack deletes its `library.json` but keeps the review.
+   notes, and image and keeps the reviews of the individual mods. **Create a
+   new pack** keeps the existing pack and adds a second card with the new name
+   and id; its mods share the same reviews. Removing a pack deletes its
+   `library.json` but keeps the mod reviews.
 8. Minimizing the window hides it to the tray while the setting is enabled;
    closing it always hides it. **Quit** in the tray exits.
 9. **Check for updates** in the footer reports that the build is current, or

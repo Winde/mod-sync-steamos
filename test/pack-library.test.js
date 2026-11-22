@@ -11,7 +11,13 @@ function addVersion(source, version) {
   for (const [rel, body] of [
     [`mods/graceborne/versions/${version}/mod/regulation.bin`, `regulation-${version}`],
     [`mods/graceborne/versions/${version}/mod/parts/test.partsbndsc.dcx`, `part-${version}`],
-    [`profiles/graceborne-${version}.me3`, `profile-${version}`],
+    [`profiles/graceborne-${version}.me3`, `[[packages]]
+id = "GraceBorne"
+path = '../mods/graceborne/versions/${version}/mod'
+enabled = true
+load_after = []
+load_before = []
+`],
   ]) {
     h.write(source, rel, body);
   }
@@ -186,10 +192,11 @@ test("A rebuild can create a second pack from the same recipe", async (t) => {
   assert.ok(fs.existsSync(path.join(packsDir, "eldenring-graceborne", "library.json")));
 });
 
-test("Mod reviews use a separate database indexed by game + mod", async (t) => {
+test("Mod reviews are stored per included mod, not per pack", async (t) => {
   const root = h.tempDir("modsync-reviews-");
   const packsDir = path.join(root, "packs");
   const source = h.workingInstall({ versions: ["0.2.7"] });
+  addVersion(source, "0.2.7");
   const configFile = path.join(root, "state", "console.json");
   const service = createConsole({
     configFile,
@@ -207,6 +214,21 @@ test("Mod reviews use a separate database indexed by game + mod", async (t) => {
   const built = await waitForBuild(service);
   assert.equal(built.status, "done", built.error || "");
 
+  let packs = service.listPacks();
+  assert.equal(packs[0].contents.items[0].modId, "Graceborne");
+
+  // Packs built before reviews were per mod have no item id. Their label still
+  // matches the id a later rebuild writes for the same mod.
+  const manifestFile = path.join(packsDir, "eldenring-graceborne", "pack.json");
+  const manifest = h.readJson(manifestFile);
+  delete manifest.contents.items[0].id;
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+  packs = service.listPacks();
+  const item = packs[0].contents.items[0];
+  assert.equal(item.label, "Graceborne");
+  assert.equal(item.modId, "Graceborne");
+  assert.equal(item.review, null);
+
   const reviewFile = path.join(root, "state", "reviews.json");
   const control = await service.listen();
   const reviewResponse = await fetch(`${control}/api/reviews`, {
@@ -214,7 +236,8 @@ test("Mod reviews use a separate database indexed by game + mod", async (t) => {
     headers: { "content-type": "application/json", origin: control },
     body: JSON.stringify({
       gameId: "eldenring",
-      modId: "graceborne",
+      modId: item.modId,
+      name: item.label,
       rating: 5,
       body: "  Best overhaul for 1.17.  ",
     }),
@@ -225,35 +248,38 @@ test("Mod reviews use a separate database indexed by game + mod", async (t) => {
   assert.equal(review.body, "Best overhaul for 1.17.");
   assert.ok(review.updatedAt);
 
-  let packs = service.listPacks();
-  assert.deepEqual(packs[0].review, review);
-  const key = "g:eldenring::m:graceborne";
+  packs = service.listPacks();
+  assert.deepEqual(packs[0].contents.items[0].review, review);
+  const key = "g:eldenring::m:Graceborne";
   const db = h.readJson(reviewFile);
-  assert.equal(db.schema, 1);
+  assert.equal(db.schema, 2);
   assert.equal(db.reviews[key].gameId, "eldenring");
-  assert.equal(db.reviews[key].modId, "graceborne");
+  assert.equal(db.reviews[key].modId, "Graceborne");
+  assert.equal(db.reviews[key].name, "Graceborne");
   assert.equal(db.reviews[key].rating, 5);
   assert.equal(db.reviews[key].body, "Best overhaul for 1.17.");
 
-  // A rebuild and a removal of the pack keep the review.
+  // A rebuild and a removal of the pack keep the review because it belongs to
+  // the mod, and the mod keeps the same id in both builds.
   addVersion(source, "0.2.8");
   service.startBuild({ recipeId: "eldenring-graceborne", source, version: "0.2.8" });
   const rebuilt = await waitForBuild(service);
   assert.equal(rebuilt.status, "done", rebuilt.error || "");
   packs = service.listPacks();
   assert.equal(packs[0].mod.version, "0.2.8");
-  assert.equal(packs[0].review.rating, 5);
+  assert.equal(packs[0].contents.items[0].modId, "Graceborne");
+  assert.equal(packs[0].contents.items[0].review.rating, 5);
 
   await service.removePack("eldenring-graceborne");
   assert.equal(service.listPacks().length, 0);
   assert.equal(h.readJson(reviewFile).reviews[key].rating, 5);
 
   // Clearing both the rating and the text removes the entry and the file.
-  assert.equal(service.saveReview({ gameId: "eldenring", modId: "graceborne", rating: 0, body: "   " }), null);
+  assert.equal(service.saveReview({ gameId: "eldenring", modId: "Graceborne", name: "Graceborne", rating: 0, body: "   " }), null);
   assert.equal(fs.existsSync(reviewFile), false);
 
   assert.throws(
-    () => service.saveReview({ gameId: "eldenring", modId: "graceborne", rating: 9, body: "Nope" }),
+    () => service.saveReview({ gameId: "eldenring", modId: "Graceborne", name: "Graceborne", rating: 9, body: "Nope" }),
     /Rating must be a whole number/,
   );
 });

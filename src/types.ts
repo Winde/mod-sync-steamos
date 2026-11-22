@@ -146,6 +146,8 @@ export interface ContentsItem {
   path?: string;
   active?: boolean;
   optional?: boolean;
+  /** Stable identity of this mod, used to keep its review across rebuilds. */
+  id?: string;
 }
 
 export interface ContentsSummary {

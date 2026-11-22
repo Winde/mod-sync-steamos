@@ -3,11 +3,13 @@ import path from "node:path";
 import { readJson, writeJson } from "./util";
 
 /**
- * Mod reviews kept apart from the pack folders.
+ * Reviews of the individual mods inside a pack, kept apart from the pack
+ * folders.
  *
- * A review belongs to the game + mod pair, not to one pack build, so rebuilding
- * a pack or removing it from the library keeps the review. The console stores
- * them in its own `reviews.json` beside the console config.
+ * A review belongs to one mod of a game, not to a pack build. Rebuilding a
+ * pack, adding a second pack with the same mods, or removing a pack therefore
+ * keeps the review. The console stores them in its own `reviews.json` beside
+ * the console config.
  */
 
 export const REVIEW_BODY_MAX = 4000;
@@ -16,20 +18,24 @@ export const REVIEW_ID_MAX = 200;
 
 export interface ModReview {
   gameId: string;
+  /** Stable id of the mod inside the pack, supplied by the pack's driver. */
   modId: string;
+  /** Display name of the mod when the review was last saved. */
+  name: string;
   rating: number;
   body: string;
   updatedAt: string;
 }
 
 export interface ReviewBook {
-  schema: 1;
+  schema: 2;
   reviews: Record<string, ModReview>;
 }
 
 export interface ReviewInput {
   gameId: unknown;
   modId: unknown;
+  name: unknown;
   rating: unknown;
   body: unknown;
 }
@@ -69,13 +75,16 @@ function normalizeBody(value: unknown): string {
 }
 
 function emptyBook(): ReviewBook {
-  return { schema: 1, reviews: Object.create(null) as Record<string, ModReview> };
+  return { schema: 2, reviews: Object.create(null) as Record<string, ModReview> };
 }
 
 function readBook(file: string): ReviewBook {
   const book = emptyBook();
   try {
     const raw = readJson<Record<string, unknown>>(file);
+    // Reviews were never created before they became per-mod, so only the
+    // current shape is read.
+    if (raw.schema !== 2) return book;
     const reviews = raw.reviews;
     if (!reviews || typeof reviews !== "object" || Array.isArray(reviews)) return book;
     for (const [key, value] of Object.entries(reviews as Record<string, unknown>)) {
@@ -88,6 +97,7 @@ function readBook(file: string): ReviewBook {
       book.reviews[key] = {
         gameId: typeof entry.gameId === "string" ? entry.gameId : "",
         modId: typeof entry.modId === "string" ? entry.modId : "",
+        name: typeof entry.name === "string" ? entry.name : "",
         rating,
         body,
         updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : "",
@@ -122,6 +132,7 @@ export function createReviewStore(file: string): ReviewStore {
     set(input) {
       const gameId = normalizeId(input.gameId, "Game id");
       const modId = normalizeId(input.modId, "Mod id");
+      const name = normalizeId(input.name, "Mod name");
       const rating = normalizeRating(input.rating);
       const body = normalizeBody(input.body);
       const key = reviewKey(gameId, modId);
@@ -134,6 +145,7 @@ export function createReviewStore(file: string): ReviewStore {
       const review: ModReview = {
         gameId,
         modId,
+        name,
         rating,
         body,
         updatedAt: new Date().toISOString(),

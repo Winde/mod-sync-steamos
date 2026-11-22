@@ -28,6 +28,9 @@ export interface ContentsItemState {
   path?: string;
   active?: boolean;
   optional?: boolean;
+  /** Stable identity for this mod's review. */
+  modId: string;
+  review?: ModReviewState | null;
 }
 
 export interface ContentsState {
@@ -42,6 +45,7 @@ export interface ContentsState {
 export interface ModReviewState {
   gameId: string;
   modId: string;
+  name: string;
   rating: number;
   body: string;
   updatedAt: string;
@@ -65,7 +69,6 @@ export interface PackState {
   artUrl: string;
   artCustom?: boolean;
   notes?: string;
-  review?: ModReviewState | null;
   error: string | null;
 }
 

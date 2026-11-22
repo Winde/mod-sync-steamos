@@ -20,7 +20,7 @@ import type { DeviceView } from "./devices";
 import type { Driver } from "./drivers";
 import type { PairingStore, PairRequestView } from "./pairing";
 import type { ModReview, ReviewInput } from "./reviews";
-import type { BuildOption, BuildProgress, ContentsSummary, PackSummary, Recipe, Variant } from "./types";
+import type { BuildOption, BuildProgress, ContentsItem, ContentsSummary, PackSummary, Recipe, Variant } from "./types";
 
 /**
  * PC-side pack console.
@@ -50,6 +50,17 @@ export interface ConsoleConfig {
   working: Record<string, ConsoleWorking>;
 }
 
+export interface ConsoleContentsItem extends ContentsItem {
+  /** Stable identity used to look up this mod's review. */
+  modId: string;
+  /** Review of this mod, shared by every pack of the game that includes it. */
+  review: ModReview | null;
+}
+
+export interface ConsoleContentsSummary extends Omit<ContentsSummary, "items"> {
+  items?: ConsoleContentsItem[];
+}
+
 export interface ConsolePack {
   valid: boolean;
   id: string;
@@ -61,7 +72,7 @@ export interface ConsolePack {
   mod: { id: string; version: string };
   files: number;
   totalBytes: number;
-  contents: ContentsSummary | null;
+  contents: ConsoleContentsSummary | null;
   platforms: Variant[];
   root: string;
   modifiedAt: string;
@@ -71,8 +82,6 @@ export interface ConsolePack {
   artCustom: boolean;
   /** Console notes kept in the pack's own `library.json`. */
   notes: string;
-  /** Review for this game + mod pair, shared by every pack of the mod. */
-  review: ModReview | null;
   error: string | null;
 }
 
@@ -530,6 +539,29 @@ export function createConsole(options: ConsoleOptions): Console {
     return out;
   }
 
+  function contentsItemId(item: ContentsItem): string {
+    // Packs built before reviews were per mod have no item id. Their label is
+    // the same name the driver now records, minus the WeiDU component count, so
+    // reviews made on those packs still follow the mod after a rebuild.
+    const label = String(item.label || "").trim().replace(/\s+\(\d+\)$/, "").trim();
+    return String(item.id || label || item.path || "").trim();
+  }
+
+  function contentsWithReviews(gameId: string, contents: ContentsSummary | null): ConsoleContentsSummary | null {
+    if (!contents) return null;
+    return {
+      ...contents,
+      items: contents.items?.map((item) => {
+        const modId = contentsItemId(item);
+        return {
+          ...item,
+          modId,
+          review: modId ? reviews.get(gameId, modId) : null,
+        };
+      }),
+    };
+  }
+
   function listPacks(): ConsolePack[] {
     if (!fs.existsSync(config.packsDir)) return [];
     const recipeIds = new Set(listRecipes().map((recipe) => recipe.id));
@@ -550,7 +582,6 @@ export function createConsole(options: ConsoleOptions): Console {
           name: summary.name,
           baseName: summary.baseName,
           notes: library?.notes || "",
-          review: reviews.get(summary.game.id, summary.mod.id),
           description: summary.description || "",
           game: {
             id: summary.game.id,
@@ -562,7 +593,7 @@ export function createConsole(options: ConsoleOptions): Console {
           mod: { id: summary.mod.id, version: summary.mod.version },
           files: summary.files,
           totalBytes: summary.totalBytes,
-          contents: summary.contents,
+          contents: contentsWithReviews(summary.game.id, summary.contents),
           platforms: summary.platforms ? Object.keys(summary.platforms) as Variant[] : ["windows", "linux-proton"],
           root,
           modifiedAt,
@@ -580,7 +611,6 @@ export function createConsole(options: ConsoleOptions): Console {
           name: entry.name,
           baseName: entry.name,
           notes: "",
-          review: null,
           description: "",
           game: { id: "", title: "", appId: null, build: "", version: "" },
           mod: { id: "", version: "" },
@@ -1184,6 +1214,7 @@ export function createConsole(options: ConsoleOptions): Console {
         review: saveReview({
           gameId: body.gameId,
           modId: body.modId,
+          name: body.name,
           rating: body.rating,
           body: body.body,
         }),
