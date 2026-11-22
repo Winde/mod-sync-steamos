@@ -1,6 +1,6 @@
 {
   "name": "mod-sync-steamos",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "description": "Reusable mod-pack deployment for Windows and SteamOS. Mods only in v1.",
   "author": "Winde",
