@@ -12,6 +12,7 @@ import type {
   SettingsDraft,
   ToastItem,
   UpdateInfo,
+  UpdateProgress,
 } from "./types";
 
 export function Header({ data, busy, onToggleServer }: {
@@ -782,12 +783,24 @@ export function RemoveModal({ pack, busy, onConfirm, onClose }: {
   );
 }
 
-export function UpdateModal({ info, installing, onInstall, onClose }: {
+export function UpdateModal({ info, installing, progress, onInstall, onClose }: {
   info: UpdateInfo;
   installing: boolean;
+  progress: UpdateProgress | null;
   onInstall: () => void;
   onClose: () => void;
 }) {
+  const percent = progress?.total && progress.total > 0
+    ? Math.max(0, Math.min(100, Math.round((progress.received / progress.total) * 100)))
+    : null;
+  const phase = progress?.phase === "verify"
+    ? "Verifying the download…"
+    : progress?.phase === "install"
+      ? `Installing ModSync Server ${info.latest}…`
+      : `Downloading ModSync Server ${info.latest}…`;
+  const size = progress?.total
+    ? `${formatBytes(progress.received)} of ${formatBytes(progress.total)}`
+    : progress ? formatBytes(progress.received) : "";
   return (
     <Modal onClose={() => { if (!installing) onClose(); }}>
       <div className="modalhead">
@@ -798,9 +811,18 @@ export function UpdateModal({ info, installing, onInstall, onClose }: {
         {installing ? null : <button className="btn small" data-action="close-modal" onClick={onClose}>Not now</button>}
       </div>
       {installing ? (
-        <div className="callout installing">
-          <span className="spinner" />
-          <span>Downloading and installing {info.latest}. ModSync Server will restart on its own.</span>
+        <div className="updateinstall">
+          <div className="callout installing">
+            <span className="spinner" />
+            <span>{phase}</span>
+          </div>
+          {percent != null ? (
+            <div className="progresswrap">
+              <div className="progress"><div className="fill" style={{ width: `${percent}%` }} /></div>
+              <div className="progressmeta"><span>{size}</span><span>{percent}%</span></div>
+            </div>
+          ) : size ? <p className="hint">{size}</p> : null}
+          <p className="hint">The pack server stops while it installs. The Server reopens on its own.</p>
         </div>
       ) : (
         <>

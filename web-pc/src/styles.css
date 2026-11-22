@@ -164,6 +164,8 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 .callout.info { border-color: rgba(158, 201, 232, 0.32); background: rgba(13, 32, 47, 0.5); color: #d7ecfa; }
 .callout.installing { display: flex; align-items: center; gap: 10px; }
 .callout + .callout { margin-top: 8px; }
+.updateinstall { display: flex; flex-direction: column; gap: 10px; }
+.updateinstall .hint { margin: 0; }
 .pairlist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .pairrequest { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .pairrequest .hint { margin-top: 3px; }

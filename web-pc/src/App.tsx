@@ -21,6 +21,7 @@ import type {
   SettingsState,
   ToastItem,
   UpdateInfo,
+  UpdateProgress,
 } from "./types";
 
 function toDraft(settings: SettingsState): SettingsDraft {
@@ -64,6 +65,7 @@ export default function App() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updatePrompt, setUpdatePrompt] = useState<UpdateInfo | null>(null);
   const [installingUpdate, setInstallingUpdate] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
   const lastBuildStatus = useRef<string | null>(null);
   const settingsBase = useRef<SettingsDraft | null>(null);
   const toastId = useRef(0);
@@ -74,6 +76,12 @@ export default function App() {
     window.setTimeout(() => {
       setToasts((items) => items.filter((item) => item.id !== id));
     }, tone === "error" ? 6500 : 4000);
+  }, []);
+
+  useEffect(() => {
+    const bridge = desktopBridge();
+    if (!bridge?.onUpdateProgress) return;
+    return bridge.onUpdateProgress((progress) => setUpdateProgress(progress));
   }, []);
 
   const refresh = useCallback(async () => {
@@ -312,6 +320,7 @@ export default function App() {
     const bridge = desktopBridge();
     if (!bridge?.checkUpdate || checkingUpdate) return;
     setCheckingUpdate(true);
+    setUpdateProgress(null);
     try {
       const info = await bridge.checkUpdate();
       if (!info) {
@@ -339,6 +348,7 @@ export default function App() {
     const bridge = desktopBridge();
     if (!updateInfo) return;
     if (updateInfo.canInstall && bridge?.installUpdate) {
+      setUpdateProgress(null);
       setUpdatePrompt(updateInfo);
       return;
     }
@@ -348,11 +358,13 @@ export default function App() {
   const installUpdate = async () => {
     const bridge = desktopBridge();
     if (!bridge?.installUpdate || !updatePrompt) return;
+    setUpdateProgress({ phase: "download", received: 0, total: null });
     setInstallingUpdate(true);
     try {
       await bridge.installUpdate();
     } catch (err) {
       setInstallingUpdate(false);
+      setUpdateProgress(null);
       toast(messageOf(err), "error");
     }
   };
@@ -471,8 +483,9 @@ export default function App() {
         <UpdateModal
           info={updatePrompt}
           installing={installingUpdate}
+          progress={updateProgress}
           onInstall={() => { void installUpdate(); }}
-          onClose={() => { setUpdatePrompt(null); }}
+          onClose={() => { setUpdatePrompt(null); setUpdateProgress(null); }}
         />
       ) : null}
       <Toasts items={toasts} />

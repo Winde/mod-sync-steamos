@@ -26,13 +26,15 @@ test("release parsing keeps only assets from our download path", () => {
   const release = parseRelease({
     tag_name: "v0.2.0",
     assets: [
-      { name: appImageName("0.2.0"), browser_download_url: `${DOWNLOAD}/v0.2.0/${appImageName("0.2.0")}` },
-      { name: "SHA256SUMS.txt", browser_download_url: `${DOWNLOAD}/v0.2.0/SHA256SUMS.txt` },
+      { name: appImageName("0.2.0"), browser_download_url: `${DOWNLOAD}/v0.2.0/${appImageName("0.2.0")}`, size: 1234 },
+      { name: "SHA256SUMS.txt", browser_download_url: `${DOWNLOAD}/v0.2.0/SHA256SUMS.txt`, size: 80 },
       { name: "evil", browser_download_url: "https://example.com/evil" },
     ],
   });
   assert.equal(release.version, "0.2.0");
   assert.equal(release.assets.length, 2);
+  assert.equal(release.assets[0].size, 1234);
+  assert.equal(release.assets[1].size, 80);
 });
 
 test("checksum lookup accepts sha256sum output", () => {
@@ -139,6 +141,58 @@ test("the updater downloads a checksummed Windows Server installer", async () =>
     assert.deepEqual(installed, { kind: "installer", path: target });
     assert.deepEqual(fs.readFileSync(target), payload);
     assert.equal(fs.existsSync(`${target}.part`), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the updater reports download and verify progress", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-progress-"));
+  const name = windowsInstallerName("Server", "0.3.0");
+  const payload = Buffer.alloc(1024 * 1024, 7);
+  const hash = crypto.createHash("sha256").update(payload).digest("hex");
+  const fetch = async (url) => {
+    if (url.endsWith("/releases/latest")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tag_name: "v0.3.0",
+          assets: [
+            { name, browser_download_url: `${DOWNLOAD}/v0.3.0/${name}`, size: payload.length },
+            { name: "SHA256SUMS.txt", browser_download_url: `${DOWNLOAD}/v0.3.0/SHA256SUMS.txt`, size: 80 },
+          ],
+        }),
+        text: async () => "",
+        body: null,
+      };
+    }
+    if (url.endsWith("SHA256SUMS.txt")) {
+      return { ok: true, status: 200, json: async () => ({}), text: async () => `${hash}  ${name}\n`, body: null };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => "",
+      body: new Response(payload).body,
+    };
+  };
+  const updater = new Updater({
+    currentVersion: () => "0.2.0",
+    installer: {
+      assetName: (version) => windowsInstallerName("Server", version),
+      downloadDir: () => dir,
+    },
+    fetch,
+  });
+  const seen = [];
+  try {
+    await updater.check();
+    await updater.install({ onProgress: (progress) => seen.push(progress) });
+    assert.ok(seen.some((progress) => progress.phase === "download" && progress.received === 0 && progress.total === payload.length));
+    assert.ok(seen.some((progress) => progress.phase === "download" && progress.received === payload.length && progress.total === payload.length));
+    assert.ok(seen.some((progress) => progress.phase === "verify" && progress.received === payload.length));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

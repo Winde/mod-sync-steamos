@@ -109,11 +109,11 @@ and **Quit**. Quit is the only action that fully stops the app and its server.
 The console footer shows the running version and a **Check for updates**
 button. It contacts GitHub only when pressed. If a newer release exists, an
 **Install x.y.z** button appears next to it on an installed Windows Server.
-Confirming it downloads the new NSIS installer, verifies its SHA-256 checksum,
-runs it silently, and reopens the Server when the install finishes. Packs,
-settings, and the token are kept. Elsewhere the button is **Update x.y.z** and
-opens the releases page. Otherwise the footer reports that the build is
-current.
+Confirming it downloads the new NSIS installer with a live progress bar,
+verifies its SHA-256 checksum, runs it silently, and reopens the Server when the
+install finishes. Packs, settings, and the token are kept. Elsewhere the button
+is **Update x.y.z** and opens the releases page. Otherwise the footer reports
+that the build is current.
 
 The Client has the same manual **Check for updates** chip in its header. It no
 longer checks at launch. On the Linux AppImage the Client downloads and verifies

@@ -4,7 +4,7 @@ import {
   mkdirSync, realpathSync, renameSync, rmSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 const RELEASES_REPO = "Winde/mod-sync-steamos";
@@ -64,6 +64,7 @@ export function windowsInstallerName(product: "Server" | "Client", version: stri
 export interface ReleaseAsset {
   name: string;
   url: string;
+  size: number | null;
 }
 
 export interface Release {
@@ -83,7 +84,11 @@ export function parseRelease(value: unknown): Release {
       const asset = raw as Record<string, unknown>;
       if (typeof asset.name !== "string" || typeof asset.browser_download_url !== "string") continue;
       if (!asset.browser_download_url.startsWith(DOWNLOAD_PREFIX)) continue;
-      assets.push({ name: asset.name, url: asset.browser_download_url });
+      assets.push({
+        name: asset.name,
+        url: asset.browser_download_url,
+        size: typeof asset.size === "number" && asset.size > 0 ? asset.size : null,
+      });
     }
   }
   return { version, assets };
@@ -151,6 +156,18 @@ export interface UpdateInstall {
   path: string;
 }
 
+export type UpdatePhase = "download" | "verify" | "install";
+
+export interface UpdateProgress {
+  phase: UpdatePhase;
+  received: number;
+  total: number | null;
+}
+
+export interface InstallOptions {
+  onProgress?: (progress: UpdateProgress) => void;
+}
+
 export class Updater {
   private readonly currentVersion: () => string;
   private readonly appImage: () => string | null;
@@ -199,7 +216,7 @@ export class Updater {
     };
   }
 
-  async install(): Promise<UpdateInstall> {
+  async install(options: InstallOptions = {}): Promise<UpdateInstall> {
     const release = this.pending;
     if (!release) throw new Error("Check for updates before installing one");
 
@@ -208,7 +225,7 @@ export class Updater {
       const directory = this.installer.downloadDir();
       mkdirSync(directory, { recursive: true });
       const target = join(directory, name);
-      await this.download(release, name, target, false);
+      await this.download(release, name, target, false, options.onProgress);
       // Keep the release pending: if the installer cannot start, the console
       // can retry without checking GitHub again.
       return { kind: "installer", path: target };
@@ -217,16 +234,26 @@ export class Updater {
     const target = this.appImage();
     if (!target) throw new Error("This copy of ModSync cannot update itself");
     const name = appImageName(release.version);
-    await this.download(release, name, target, true);
+    await this.download(release, name, target, true, options.onProgress);
     this.pending = null;
     return { kind: "appimage", path: target };
   }
 
-  private async download(release: Release, name: string, target: string, executable: boolean): Promise<void> {
+  private async download(
+    release: Release,
+    name: string,
+    target: string,
+    executable: boolean,
+    onProgress?: (progress: UpdateProgress) => void,
+  ): Promise<void> {
     const asset = release.assets.find((entry) => entry.name === name);
     if (!asset) throw new Error(`The latest release does not include ${name}`);
     const checksums = release.assets.find((entry) => entry.name === CHECKSUMS_NAME);
     if (!checksums) throw new Error("The latest release is missing its checksums");
+
+    const emit = (progress: UpdateProgress): void => {
+      try { onProgress?.(progress); } catch { /* progress must not break the update */ }
+    };
 
     let sums: string;
     try {
@@ -244,10 +271,35 @@ export class Updater {
       const response = await this.fetch(asset.url, { headers: API_HEADERS, signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
       if (!response.ok) throw new Error(`The update download failed (${response.status}).`);
       if (!response.body) throw new Error("The update download was empty.");
+
+      const lengthHeader = response.headers?.get?.("content-length");
+      const length = lengthHeader ? Number(lengthHeader) : 0;
+      const total = asset.size ?? (Number.isFinite(length) && length > 0 ? length : null);
+      let received = 0;
+      let lastReport = 0;
+      const report = (force = false): void => {
+        if (!onProgress) return;
+        const now = Date.now();
+        if (!force && now - lastReport < 200) return;
+        lastReport = now;
+        emit({ phase: "download", received, total });
+      };
+
+      emit({ phase: "download", received: 0, total });
+      const counter = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+          received += chunk.length;
+          report();
+          callback(null, chunk);
+        },
+      });
       await pipeline(
         Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+        counter,
         createWriteStream(part, executable ? { mode: 0o755 } : {}),
       );
+      report(true);
+      emit({ phase: "verify", received, total });
       const actual = await sha256(part);
       if (actual !== expected) throw new Error("The downloaded update failed its checksum.");
       if (executable) chmodSync(part, 0o755);

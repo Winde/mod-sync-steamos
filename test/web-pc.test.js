@@ -388,11 +388,20 @@ test("Server console checks for updates and links to the release", async () => {
 test("Server console installs a Windows update after confirmation", async () => {
   let installed = 0;
   let opened = 0;
+  let reportProgress = null;
   const dom = await boot(
     async (url) => response(String(url).endsWith("/api/state") ? fixture() : {}),
     {
       checkUpdate: async () => ({ current: "0.4.0", latest: "0.6.0", available: true, canInstall: true }),
-      installUpdate: async () => { installed++; },
+      installUpdate: async () => {
+        installed++;
+        reportProgress?.({ phase: "download", received: 50, total: 100 });
+        reportProgress?.({ phase: "download", received: 100, total: 100 });
+      },
+      onUpdateProgress: (callback) => {
+        reportProgress = callback;
+        return () => { reportProgress = null; };
+      },
       openReleases: async () => { opened++; },
     },
   );
@@ -407,7 +416,9 @@ test("Server console installs a Windows update after confirmation", async () => 
     assert.equal(opened, 0);
     doc.querySelector('[data-action="install-update"]').click();
     await waitFor(window, () => installed === 1);
-    await waitFor(window, (w) => /Downloading and installing 0\.6\.0/.test(w.document.querySelector(".callout.installing")?.textContent || ""));
+    await waitFor(window, (w) => /Downloading ModSync Server 0\.6\.0/.test(w.document.querySelector(".callout.installing")?.textContent || ""));
+    await waitFor(window, (w) => /100%/.test(w.document.querySelector(".progressmeta")?.textContent || ""));
+    assert.match(doc.querySelector(".progressmeta").textContent, /100(\.0)? B of 100(\.0)? B/);
   } finally {
     window.close();
   }

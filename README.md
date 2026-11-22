@@ -75,9 +75,9 @@ The Server console:
   starts.
 - **Update check** — the footer asks GitHub for the latest release only when
   you press **Check for updates**. On Windows the installed Server updates
-  itself: it downloads the new installer, verifies its checksum, installs it
-  silently, and reopens. Other builds link to the releases page when a newer
-  build exists.
+  itself: it downloads the new installer with visible progress, verifies its
+  checksum, installs it silently, and reopens. Other builds link to the releases
+  page when a newer build exists.
 - **Rebuilds are staged** — the old pack stays in place until the new build is
   complete, then it is swapped in. A failed build does not destroy the working
   pack.

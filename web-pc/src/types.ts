@@ -159,10 +159,19 @@ export interface UpdateInfo {
   error?: string;
 }
 
+export type UpdatePhase = "download" | "verify" | "install";
+
+export interface UpdateProgress {
+  phase: UpdatePhase;
+  received: number;
+  total: number | null;
+}
+
 export interface DesktopBridge {
   pickFolder?(title?: string): Promise<string | null>;
   checkUpdate?(): Promise<UpdateInfo | null>;
   installUpdate?(): Promise<void>;
+  onUpdateProgress?(callback: (progress: UpdateProgress) => void): () => void;
   openReleases?(): Promise<void>;
 }
 

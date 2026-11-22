@@ -9,6 +9,7 @@ import { createConsole } from "../src/console";
 import { errorMessage } from "../src/util";
 import { projectRoot } from "../src/root";
 import { RELEASES_PAGE, Updater, windowsInstallerName } from "./updater";
+import type { UpdateProgress } from "./updater";
 import type { ConsoleTokenStore, LoginItemResult } from "../src/console";
 import type { MenuItemConstructorOptions, OpenDialogOptions } from "electron";
 
@@ -351,9 +352,19 @@ if (!app.requestSingleInstanceLock()) {
         };
       }
     });
-    ipcMain.handle("modsync:update-install", async () => {
-      const installed = await updater.install();
+    ipcMain.handle("modsync:update-install", async (event) => {
+      const state: { last: UpdateProgress | null } = { last: null };
+      const sendProgress = (progress: UpdateProgress): void => {
+        state.last = progress;
+        if (!event.sender.isDestroyed()) event.sender.send("modsync:update-progress", progress);
+      };
+      const installed = await updater.install({ onProgress: sendProgress });
       if (installed.kind !== "installer") throw new Error("This copy of ModSync cannot install the update.");
+      sendProgress({
+        phase: "install",
+        received: state.last?.received ?? 0,
+        total: state.last?.total ?? null,
+      });
       // The NSIS installer waits for this process to exit, replaces the app in
       // place, and reopens it because of --force-run.
       const child = spawn(installed.path, ["--updated", "/S", "--force-run"], {
