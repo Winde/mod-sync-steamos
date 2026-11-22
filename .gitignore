@@ -12,11 +12,5 @@ tools/node-linux/
 web/pc/
 web/tv/
 
-# Generated packs: commit only the definition JSON, never the mod payload.
-packs/*/library.json
-packs/*/payload/
-packs/*/tools/
-packs/*/profiles/
-packs/*/art/
-packs/*/README.md
-packs/*/DOCS.md
+# Generated pack library. Rebuild packs from recipes/ and the working install.
+packs/

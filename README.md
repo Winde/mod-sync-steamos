@@ -38,8 +38,10 @@ Pack identity lives in `recipes/<id>.json` (Graceborne, Convergence, BG3, and
 the four EE games); the driver only knows the game's layout and loader.
 The Server console uses the same source/output fields.
 
-Every build writes a human-readable `DOCS.md` into the pack folder, and the
-Server console keeps a durable mod catalog beside its config. The catalog
+`packs/` is generated output and is ignored by git: rebuild it from `recipes/`
+and the working install instead of committing it. Every build writes a
+human-readable `DOCS.md` into the pack folder, and the Server console keeps a
+durable mod catalog beside its config. The catalog
 survives rebuilds and pack removal; open **Mods & docs** in the console to
 browse it, review a mod, or copy the whole catalog as Markdown. Run
 `npm run docs` to regenerate `DOCS.md` for every built pack without rebuilding.

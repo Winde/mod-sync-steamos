@@ -56,8 +56,9 @@ Two offline tests wait for the agent's 2.5-second remote-catalog cache to expire
 ## White-box tests
 
 `test/preconditions.test.js`, `test/rollback.test.js`, `test/smoke.test.js`,
-`test/storage.test.js`, `test/steam.test.js`, `test/catalog-docs.test.js`, and
-`test/console.test.js` import the compiled functions from `dist/` directly. They are useful characterization
+`test/storage.test.js`, `test/steam.test.js`, `test/packs.test.js`,
+`test/catalog-docs.test.js`, and `test/console.test.js` import compiled
+functions from `dist/` directly. They are useful characterization
 tests, but they are tied to current module boundaries and will need import
 updates when those modules are split. `test/web-app.test.js` and
 `test/web-pc.test.js` load the compiled React renderers into jsdom with a stub
