@@ -372,6 +372,195 @@ test("Pack library focuses the settings field without the desktop bridge", async
   }
 });
 
+test("Server console renames a pack and saves its notes and review", async () => {
+  const posted = [];
+  const state = fixture();
+  state.packs[0].baseName = "Graceborne";
+  state.packs[0].notes = "Keep online off.";
+  state.packs[0].review = { rating: 3, body: "Solid.", updatedAt: "2026-11-21T12:00:00.000Z" };
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/state")) return response(state);
+    if (init.method === "POST") {
+      posted.push({ url: String(url), body: init.body ? JSON.parse(init.body) : null });
+      return response({ ok: true });
+    }
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    assert.match(doc.querySelector(".packnotes").textContent, /Keep online off/);
+    assert.equal(doc.querySelector(".badge.stars").textContent, "★★★☆☆");
+
+    doc.querySelector('[data-action="edit"]').click();
+    await waitFor(window, (w) => !!w.document.querySelector("#pack-display-name"));
+    assert.equal(doc.querySelector("#pack-display-name").value, "Graceborne");
+    assert.equal(doc.querySelector("#pack-notes").value, "Keep online off.");
+    assert.equal(doc.querySelector("#pack-review").value, "Solid.");
+
+    const setValue = (selector, value) => {
+      const input = doc.querySelector(selector);
+      const proto = input.tagName === "TEXTAREA" ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value").set.call(input, value);
+      input.dispatchEvent(new window.Event("input", { bubbles: true }));
+    };
+    setValue("#pack-display-name", "Graceborne Remastered");
+    setValue("#pack-notes", "Now tested on the 1.17 build.");
+    setValue("#pack-review", "Still great after the patch.");
+    doc.querySelectorAll('[data-action="rate"]')[4].click();
+    await waitFor(window, (w) => /5 of 5/.test(w.document.querySelector(".modal .stars .hint")?.textContent || ""));
+
+    doc.querySelector(".modalform").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await waitFor(window, () => posted.length === 2);
+    const libraryPost = posted.find((entry) => entry.url.includes("/library"));
+    const reviewPost = posted.find((entry) => entry.url.endsWith("/api/reviews"));
+    assert.ok(libraryPost);
+    assert.deepEqual(libraryPost.body, {
+      name: "Graceborne Remastered",
+      notes: "Now tested on the 1.17 build.",
+    });
+    assert.ok(reviewPost);
+    assert.deepEqual(reviewPost.body, {
+      gameId: "eldenring",
+      modId: "graceborne",
+      rating: 5,
+      body: "Still great after the patch.",
+    });
+    await waitFor(window, (w) => !w.document.querySelector("#pack-display-name"));
+  } finally {
+    window.close();
+  }
+});
+
+function buildResponse(recipeId, packId) {
+  return response({
+    id: "job-1",
+    recipeId,
+    packId: packId || recipeId,
+    status: "running",
+    phase: "preparing",
+    percent: 0,
+    error: null,
+    startedAt: "2026-11-22T12:00:00.000Z",
+    finishedAt: null,
+    log: [],
+    result: null,
+  }, 202);
+}
+
+async function openRebuildConfirm(window, doc) {
+  doc.querySelector('[data-action="build"]').click();
+  await waitFor(window, (w) => !!w.document.querySelector("#build-form"));
+  doc.querySelector("#build-form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await waitFor(window, (w) => !!w.document.querySelector('[data-action="confirm-rebuild"]'));
+}
+
+test("Server console confirms a rebuild and warns that name and notes are cleared", async () => {
+  let posted = null;
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/build") && init.method === "POST") {
+      posted = JSON.parse(init.body);
+      return buildResponse(posted.recipeId, posted.packId);
+    }
+    if (String(url).endsWith("/api/state")) return response(fixture());
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    await openRebuildConfirm(window, doc);
+    const modal = doc.querySelector(".modal");
+    assert.match(modal.textContent, /Replace Graceborne\?/);
+    assert.match(modal.textContent, /Custom name and notes are cleared/);
+    assert.match(modal.textContent, /rating and review are kept/i);
+    assert.equal(doc.querySelector('[data-action="rebuild-overwrite"]').checked, true);
+    doc.querySelector('[data-action="confirm-rebuild"]').click();
+    await waitFor(window, () => posted !== null);
+    assert.equal(posted.recipeId, "eldenring-graceborne");
+    assert.equal(posted.packId, "eldenring-graceborne");
+    assert.equal(posted.createNew, false);
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console can create a new pack instead of replacing one", async () => {
+  let posted = null;
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/build") && init.method === "POST") {
+      posted = JSON.parse(init.body);
+      return buildResponse(posted.recipeId, posted.packId);
+    }
+    if (String(url).endsWith("/api/state")) return response(fixture());
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    await openRebuildConfirm(window, doc);
+    doc.querySelector('[data-action="rebuild-new"]').click();
+    await waitFor(window, (w) => !!w.document.querySelector("#new-pack-name"));
+    assert.equal(doc.querySelector("#new-pack-name").value, "Graceborne copy");
+    assert.equal(doc.querySelector("#new-pack-id").value, "graceborne-copy");
+
+    const setValue = (selector, value) => {
+      const input = doc.querySelector(selector);
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new window.Event("input", { bubbles: true }));
+    };
+    setValue("#new-pack-name", "My Graceborne");
+    await waitFor(window, (w) => w.document.querySelector("#new-pack-id").value === "my-graceborne");
+    doc.querySelector('[data-action="confirm-rebuild"]').click();
+    await waitFor(window, () => posted !== null);
+    assert.equal(posted.packId, "my-graceborne");
+    assert.equal(posted.createNew, true);
+    assert.equal(posted.packName, "My Graceborne");
+  } finally {
+    window.close();
+  }
+});
+
+test("Pack library filters packs by game", async () => {
+  const state = fixture();
+  const bg3 = {
+    ...state.packs[0],
+    id: "bg3-modded",
+    name: "BG3 Modded",
+    game: { id: "bg3", title: "Baldur's Gate 3", appId: 1086940, build: "4.1", version: "4.1" },
+    mod: { id: "bg3", version: "1.2.3" },
+    recipeId: "bg3-modded",
+    root: "C:\\ModSync\\packs\\bg3-modded",
+    artUrl: "/api/packs/bg3-modded/art/grid",
+  };
+  state.packs = [state.packs[0], bg3];
+  const dom = await boot(async (url) => response(String(url).endsWith("/api/state") ? state : {}));
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelectorAll(".packcard").length === 2);
+    const doc = window.document;
+    const select = doc.querySelector("#game-filter");
+    assert.ok(select);
+    assert.equal(select.options.length, 3);
+    const choose = (value) => {
+      Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set.call(select, value);
+      select.dispatchEvent(new window.Event("change", { bubbles: true }));
+    };
+    choose("bg3");
+    await waitFor(window, (w) => w.document.querySelectorAll(".packcard").length === 1);
+    assert.equal(doc.querySelector(".packtitle").textContent, "BG3 Modded");
+    choose("");
+    await waitFor(window, (w) => w.document.querySelectorAll(".packcard").length === 2);
+  } finally {
+    window.close();
+  }
+});
+
 test("Server console checks for updates and links to the release", async () => {
   let opened = 0;
   const dom = await boot(

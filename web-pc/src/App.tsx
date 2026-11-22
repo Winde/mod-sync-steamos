@@ -3,6 +3,7 @@ import { api, copyText, desktopBridge, messageOf, randomToken } from "./api";
 import {
   BuildModal,
   DevicesPanel,
+  EditPackModal,
   GuidePanel,
   Header,
   PackLibrary,
@@ -15,6 +16,7 @@ import {
 import type {
   BuildFormState,
   BuildJobState,
+  BuildStartOptions,
   ConsoleState,
   DeviceState,
   ModalState,
@@ -62,6 +64,7 @@ export default function App() {
   const [modal, setModal] = useState<ModalState>(null);
   const [buildView, setBuildView] = useState(false);
   const [buildRecipeId, setBuildRecipeId] = useState<string | undefined>(undefined);
+  const [buildPackId, setBuildPackId] = useState<string | undefined>(undefined);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -192,8 +195,9 @@ export default function App() {
     });
   };
 
-  const openBuild = (recipeId?: string) => {
+  const openBuild = (recipeId?: string, packId?: string) => {
     setBuildRecipeId(recipeId);
+    setBuildPackId(packId);
     setBuildView(data?.build?.status === "running");
     setModal({ kind: "build" });
   };
@@ -203,7 +207,52 @@ export default function App() {
     setModal({ kind: "remove", pack });
   };
 
-  const startBuild = async (form: BuildFormState) => {
+  const openEdit = (pack: PackState) => {
+    setBuildView(false);
+    setModal({ kind: "edit", pack });
+  };
+
+  const savePackEdits = async (input: { name: string; notes: string; rating: number; review: string }) => {
+    if (!modal || modal.kind !== "edit") return;
+    const pack = modal.pack;
+    const builtInName = pack.baseName || pack.name;
+    const name = input.name.trim() === builtInName ? "" : input.name.trim();
+    const notes = input.notes.trim();
+    const previousName = pack.baseName && pack.name !== pack.baseName ? pack.name : "";
+    const previousNotes = (pack.notes || "").trim();
+    const previousRating = pack.review?.rating || 0;
+    const previousReview = (pack.review?.body || "").trim();
+    const libraryChanged = name !== previousName || notes !== previousNotes;
+    const reviewChanged = input.rating !== previousRating || input.review.trim() !== previousReview;
+    if (!libraryChanged && !reviewChanged) {
+      setModal(null);
+      return;
+    }
+    setBusy(true);
+    try {
+      if (libraryChanged) {
+        await api(`/api/packs/${encodeURIComponent(pack.id)}/library`, {
+          method: "POST",
+          body: JSON.stringify({ name, notes: input.notes }),
+        });
+      }
+      if (reviewChanged) {
+        await api("/api/reviews", {
+          method: "POST",
+          body: JSON.stringify({ gameId: pack.game.id, modId: pack.mod.id, rating: input.rating, body: input.review }),
+        });
+      }
+      setModal(null);
+      toast("Pack details saved.", "success");
+      await refresh();
+    } catch (err) {
+      toast(messageOf(err), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startBuild = async (form: BuildFormState, options: BuildStartOptions = {}) => {
     if (!form.source.trim()) {
       toast("Choose the working install folder.", "error");
       return;
@@ -217,7 +266,15 @@ export default function App() {
       }
       const job = await api<BuildJobState>("/api/build", {
         method: "POST",
-        body: JSON.stringify({ ...form, source: form.source.trim(), version: form.version.trim(), driverOptions }),
+        body: JSON.stringify({
+          ...form,
+          packId: options.packId ?? form.packId,
+          createNew: options.createNew === true,
+          packName: options.packName,
+          source: form.source.trim(),
+          version: form.version.trim(),
+          driverOptions,
+        }),
       });
       setData((current) => current ? { ...current, build: job } : current);
       lastBuildStatus.current = job.status;
@@ -417,10 +474,11 @@ export default function App() {
             job={data?.build || null}
             onRefresh={() => { void refresh(); }}
             onBuildNew={() => openBuild()}
-            onRebuild={(pack) => openBuild(pack.recipeId || undefined)}
+            onRebuild={(pack) => openBuild(pack.recipeId || undefined, pack.id)}
             onReveal={(id) => { void revealPack(id); }}
             onRemove={openRemove}
-            onShowBuild={() => openBuild(buildRecipeId)}
+            onEdit={openEdit}
+            onShowBuild={() => openBuild(data?.build?.recipeId, data?.build?.packId)}
             onChangeFolder={() => { void changePacksFolder(); }}
             pairBusy={pairBusy}
             onApprovePair={(id) => { void answerPair(id, "approve"); }}
@@ -499,8 +557,9 @@ export default function App() {
           job={data.build}
           viewJob={buildView}
           initialRecipeId={buildRecipeId}
+          initialPackId={buildPackId}
           busy={busy}
-          onStart={(form) => { void startBuild(form); }}
+          onStart={(form, options) => { void startBuild(form, options); }}
           onClose={closeModal}
           onReveal={(id) => { void revealPack(id); }}
           onBuildAnother={() => setBuildView(false)}
@@ -511,6 +570,14 @@ export default function App() {
           pack={modal.pack}
           busy={busy}
           onConfirm={() => { void confirmRemove(); }}
+          onClose={closeModal}
+        />
+      ) : null}
+      {modal?.kind === "edit" ? (
+        <EditPackModal
+          pack={modal.pack}
+          busy={busy}
+          onSave={(input) => { void savePackEdits(input); }}
           onClose={closeModal}
         />
       ) : null}

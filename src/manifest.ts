@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readJson, safeJoin } from "./util";
 import { validateNotes, validatePreconditions } from "./preconditions";
+import { readPackLibrary } from "./pack-library";
 import * as paths from "./paths";
 import type {
   ArtInfo,
@@ -64,6 +65,9 @@ export function validatePack(pack: unknown): Pack {
   const p = pack as Record<string, unknown>;
   if (p.schema !== 1) throw new Error("pack.json: schema must be 1");
   requireString(p, "id", "pack.json");
+  if (p.recipe != null && (typeof p.recipe !== "string" || !p.recipe)) {
+    throw new Error("pack.json: recipe must be a non-empty string");
+  }
   requireString(p, "name", "pack.json");
   if (!p.game || typeof p.game !== "object" || Array.isArray(p.game)) throw new Error("pack.json: missing game");
   const game = p.game as Record<string, unknown>;
@@ -157,9 +161,14 @@ export function packSummary(packRoot: string): PackSummary {
   let totalBytes = 0;
   for (const f of files.files) totalBytes += f.size;
   const stats = paths.platformStats(files.files);
+  const library = readPackLibrary(packRoot);
+  const notes: Note[] = [...(pack.notes || [])];
+  if (library?.notes) notes.push({ title: "Server notes", body: library.notes, tone: "info" });
   return {
     id: pack.id,
-    name: pack.name,
+    recipe: pack.recipe,
+    name: library?.name || pack.name,
+    baseName: pack.name,
     description: pack.description || "",
     game: pack.game,
     platforms: pack.platforms || null,
@@ -169,7 +178,7 @@ export function packSummary(packRoot: string): PackSummary {
     install: pack.install || null,
     contents: pack.contents || null,
     art: pack.art,
-    notes: pack.notes || [],
+    notes,
     preconditions: pack.preconditions || [],
     files: files.files.length,
     totalBytes,

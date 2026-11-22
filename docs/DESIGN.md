@@ -42,6 +42,7 @@ the bind address is detected or passed explicitly, and the firewall rule uses
 ```
 pack.json          metadata: game, mod, launch, art, files manifest path
 files.json         source -> target, size, sha256, mode
+library.json       optional console rename and notes for the current build
 payload/           the mod files (hardlinked or copied)
 profiles/          loader profile (me3 for ELDEN RING; modsettings for BG3)
 tools/             loader runtime (me3 Linux/Windows)
@@ -49,7 +50,9 @@ art/               grid/hero/logo/icon
 README.md
 ```
 
-A pack never contains the base game or saves.
+A pack never contains the base game or saves. A pack built under a second id
+from an existing recipe records that recipe in `pack.json.recipe`, so the
+console can rebuild it from the same working install.
 
 `pack.json` (v1):
 

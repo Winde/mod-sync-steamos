@@ -10,7 +10,8 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
 
 1. The pack library lists the packs in `packs/`, with version, size, and path.
    **Change folder** switches to another folder and lists its packs; it is
-   disabled while a build runs.
+   disabled while a build runs. When packs from more than one game are present,
+   the **Game** list filters the library and **All games** restores it.
 2. **Pack server → Start server** shows a URL and the tokenless install
    one-liner; **Stop server** closes it. If port 8787 is busy, stop the old CLI
    `serve` or change the port.
@@ -22,14 +23,22 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
    A build log and percentage are shown, and a failed build leaves the old pack
    in place.
 5. **Remove** asks for confirmation and deletes only the pack folder.
-6. Minimizing the window hides it to the tray while the setting is enabled;
+6. **Edit details** renames a pack, adds notes, and sets a star rating and
+   review. The new name, notes preview, and stars appear on the card.
+   `packs/<pack>/library.json` holds the name and notes; `state/reviews.json`
+   holds the review keyed by game + mod.
+7. **Rebuild** shows the confirmation. Overwriting clears the custom name and
+   notes and keeps the rating and review. **Create a new pack** keeps the
+   existing pack and adds a second card with the new name and id. Removing a
+   pack deletes its `library.json` but keeps the review.
+8. Minimizing the window hides it to the tray while the setting is enabled;
    closing it always hides it. **Quit** in the tray exits.
-7. **Check for updates** in the footer reports that the build is current, or
+9. **Check for updates** in the footer reports that the build is current, or
    offers the latest release. It does not run on its own. In an installed
    Windows build, **Install x.y.z** asks for confirmation, installs the update,
    and the Server reopens with the new version; packs, settings, paired devices,
    and tokens are still there.
-8. A new Client shows the pairing request in the Server console. **Allow** issues
+10. A new Client shows the pairing request in the Server console. **Allow** issues
    its own device token and it reconnects without asking after a restart.
    **Deny** leaves it unpaired. Revoking that device forces it to pair again
    without touching another TV.

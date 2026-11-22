@@ -39,10 +39,19 @@ export interface ContentsState {
   inactive?: string[];
 }
 
+export interface ModReviewState {
+  gameId: string;
+  modId: string;
+  rating: number;
+  body: string;
+  updatedAt: string;
+}
+
 export interface PackState {
   valid: boolean;
   id: string;
   name: string;
+  baseName?: string;
   description: string;
   game: { id: string; title: string; appId: number | null; build: string; version: string };
   mod: { id: string; version: string };
@@ -54,6 +63,8 @@ export interface PackState {
   modifiedAt: string;
   recipeId: string | null;
   artUrl: string;
+  notes?: string;
+  review?: ModReviewState | null;
   error: string | null;
 }
 
@@ -158,6 +169,14 @@ export interface BuildFormState {
   version: string;
   copy: boolean;
   driverOptions: Record<string, string>;
+  /** Pack folder to rebuild; defaults to the recipe's own pack. */
+  packId?: string;
+}
+
+export interface BuildStartOptions {
+  packId?: string;
+  createNew?: boolean;
+  packName?: string;
 }
 
 export interface ToastItem {
@@ -190,4 +209,8 @@ export interface DesktopBridge {
   openReleases?(): Promise<void>;
 }
 
-export type ModalState = { kind: "build" } | { kind: "remove"; pack: PackState } | null;
+export type ModalState =
+  | { kind: "build" }
+  | { kind: "remove"; pack: PackState }
+  | { kind: "edit"; pack: PackState }
+  | null;

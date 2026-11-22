@@ -7,7 +7,9 @@ import * as drivers from "./drivers";
 import { contentType, readJsonBody } from "./http";
 import labels from "./labels";
 import { loadPack, packSummary } from "./manifest";
+import { libraryFile, normalizePackLibraryName, readPackLibrary, savePackLibrary } from "./pack-library";
 import * as recipes from "./recipes";
+import { createReviewStore } from "./reviews";
 import { projectRoot } from "./root";
 import { createDeviceStore } from "./devices";
 import { createPairingStore } from "./pairing";
@@ -16,6 +18,7 @@ import * as util from "./util";
 import type { DeviceView } from "./devices";
 import type { Driver } from "./drivers";
 import type { PairingStore, PairRequestView } from "./pairing";
+import type { ModReview, ReviewInput } from "./reviews";
 import type { BuildOption, BuildProgress, ContentsSummary, PackSummary, Recipe, Variant } from "./types";
 
 /**
@@ -50,6 +53,8 @@ export interface ConsolePack {
   valid: boolean;
   id: string;
   name: string;
+  /** The name written by the pack builder; `name` may be a library rename. */
+  baseName: string;
   description: string;
   game: { id: string; title: string; appId: number | null; build: string; version: string };
   mod: { id: string; version: string };
@@ -61,6 +66,10 @@ export interface ConsolePack {
   modifiedAt: string;
   recipeId: string | null;
   artUrl: string;
+  /** Console notes kept in the pack's own `library.json`. */
+  notes: string;
+  /** Review for this game + mod pair, shared by every pack of the mod. */
+  review: ModReview | null;
   error: string | null;
 }
 
@@ -102,6 +111,20 @@ export interface BuildJob {
 }
 
 export type BuildJobSummary = Omit<BuildJob, "log"> & { log: string[] };
+
+export interface BuildRequest {
+  recipeId: string;
+  source?: string;
+  version?: string;
+  copy?: boolean;
+  driverOptions?: Record<string, unknown>;
+  /** Target pack id; defaults to the recipe id. */
+  packId?: string;
+  /** Create a new pack instead of replacing an existing one. */
+  createNew?: boolean;
+  /** Display name applied to a newly created pack. */
+  packName?: string;
+}
 
 export interface ConsoleState {
   app: {
@@ -149,6 +172,8 @@ export interface ConsoleOptions {
   tokenStore?: ConsoleTokenStore;
   /** Paired-device credential store; defaults beside the console config. */
   devicesFile?: string;
+  /** Mod review database; defaults beside the console config. */
+  reviewsFile?: string;
 }
 
 export interface Console {
@@ -162,7 +187,9 @@ export interface Console {
   updateSettings: (input: Partial<ConsoleConfig> & { workingSource?: { recipeId: string; source: string } }) => Promise<ConsoleState>;
   listPacks: () => ConsolePack[];
   listRecipes: () => ConsoleRecipe[];
-  startBuild: (input: { recipeId: string; source?: string; version?: string; copy?: boolean; driverOptions?: Record<string, unknown> }) => BuildJobSummary;
+  startBuild: (input: BuildRequest) => BuildJobSummary;
+  updatePackLibrary: (id: string, input: { name?: unknown; notes?: unknown }) => ConsolePack[];
+  saveReview: (input: ReviewInput) => ModReview | null;
   removePack: (id: string) => Promise<void>;
   revealPack: (id: string) => void;
   revealPacksDir: () => void;
@@ -339,6 +366,8 @@ export function createConsole(options: ConsoleOptions): Console {
   let config = loadConfig();
   const devicesFile = path.resolve(options.devicesFile || path.join(path.dirname(configFile), "devices.json"));
   const devices = createDeviceStore({ file: devicesFile, legacyToken: config.token });
+  const reviewsFile = path.resolve(options.reviewsFile || path.join(path.dirname(configFile), "reviews.json"));
+  const reviews = createReviewStore(reviewsFile);
   let runtime: ServerRuntime | null = null;
   let serverError: string | null = null;
   let loginError: string | null = null;
@@ -509,10 +538,14 @@ export function createConsole(options: ConsoleOptions): Console {
       try { modifiedAt = fs.statSync(manifest).mtime.toISOString(); } catch { /* keep empty */ }
       try {
         const summary: PackSummary = packSummary(root);
+        const library = readPackLibrary(root);
         out.push({
           valid: true,
           id: summary.id,
           name: summary.name,
+          baseName: summary.baseName,
+          notes: library?.notes || "",
+          review: reviews.get(summary.game.id, summary.mod.id),
           description: summary.description || "",
           game: {
             id: summary.game.id,
@@ -528,7 +561,9 @@ export function createConsole(options: ConsoleOptions): Console {
           platforms: summary.platforms ? Object.keys(summary.platforms) as Variant[] : ["windows", "linux-proton"],
           root,
           modifiedAt,
-          recipeId: recipeIds.has(summary.id) ? summary.id : null,
+          recipeId: summary.recipe && recipeIds.has(summary.recipe)
+            ? summary.recipe
+            : recipeIds.has(summary.id) ? summary.id : null,
           artUrl: `/api/packs/${encodeURIComponent(summary.id)}/art/grid?v=${encodeURIComponent(modifiedAt)}`,
           error: null,
         });
@@ -537,6 +572,9 @@ export function createConsole(options: ConsoleOptions): Console {
           valid: false,
           id: entry.name,
           name: entry.name,
+          baseName: entry.name,
+          notes: "",
+          review: null,
           description: "",
           game: { id: "", title: "", appId: null, build: "", version: "" },
           mod: { id: "", version: "" },
@@ -791,7 +829,7 @@ export function createConsole(options: ConsoleOptions): Console {
     return devices.list();
   }
 
-  function startBuild(input: { recipeId: string; source?: string; version?: string; copy?: boolean; driverOptions?: Record<string, unknown> }): BuildJobSummary {
+  function startBuild(input: BuildRequest): BuildJobSummary {
     if (activeJob) throw new Error("A build is already running.");
     if (!PACK_ID.test(String(input.recipeId || ""))) throw new Error("Invalid recipe id.");
     const recipe = recipes.loadRecipe(String(input.recipeId || ""));
@@ -801,13 +839,26 @@ export function createConsole(options: ConsoleOptions): Console {
     if (requestedVersion && !/^[A-Za-z0-9._+-]+$/.test(requestedVersion)) {
       throw new Error("Version can only use letters, numbers, dots, dashes, underscores, and plus signs.");
     }
+    const requestedPackId = String(input.packId || "").trim();
+    const packId = requestedPackId || recipe.id;
+    if (!PACK_ID.test(packId) || packId === "." || packId === "..") throw new Error("Invalid pack id.");
+    const createNew = input.createNew === true;
+    if (createNew) {
+      if (!requestedPackId) throw new Error("Choose a pack id for the new pack.");
+      if (fs.existsSync(packRoot(packId))) throw new Error(`A pack already exists with that id: ${packId}`);
+      if (recipes.listRecipes().some((entry) => entry.id === packId)) {
+        throw new Error(`That pack id belongs to a recipe: ${packId}`);
+      }
+    } else if (packId !== recipe.id && !fs.existsSync(packRoot(packId))) {
+      throw new Error(`Pack not found: ${packId}`);
+    }
+    const newPackName = createNew ? normalizePackLibraryName(input.packName) : "";
     const remembered = config.working[recipe.id]?.source || "";
     const source = path.resolve(String(input.source || remembered || driver.defaultSource()));
     if (!fs.existsSync(source)) throw new Error(`Working install not found: ${source}`);
     config.working[recipe.id] = { source };
     recipeCache = null;
     saveConfig(config);
-    const packId = recipe.id;
     const finalOut = packRoot(packId);
     const stamp = `${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
     const staging = buildRoot();
@@ -843,6 +894,7 @@ export function createConsole(options: ConsoleOptions): Console {
       try {
         log(`Building ${recipe.name} ${requestedVersion}`.trim());
         log(`Source: ${source}`);
+        if (packId !== recipe.id) log(`Target pack: ${packId}`);
         const result = await driver.buildPack({
           recipe,
           source,
@@ -853,6 +905,23 @@ export function createConsole(options: ConsoleOptions): Console {
           progress,
           log,
         });
+        if (packId !== recipe.id) {
+          // The builders write the recipe id. A derived pack keeps the recipe
+          // in pack.json so the console can still offer "Rebuild from install".
+          const packFile = path.join(tempOut, "pack.json");
+          const packDoc = util.readJson<Record<string, unknown>>(packFile);
+          packDoc.id = packId;
+          packDoc.recipe = recipe.id;
+          util.writeJson(packFile, packDoc);
+          const filesRel = typeof packDoc.files === "string" && packDoc.files ? packDoc.files : "files.json";
+          const filesFile = util.safeJoin(tempOut, filesRel);
+          const filesDoc = util.readJson<Record<string, unknown>>(filesFile);
+          filesDoc.pack = packId;
+          util.writeJson(filesFile, filesDoc);
+        }
+        // A rebuild starts with a clean library. Custom names and notes belong
+        // to one built pack and are not carried into the replacement.
+        fs.rmSync(libraryFile(tempOut), { force: true });
         job.phase = "swapping";
         if (fs.existsSync(finalOut)) {
           fs.rmSync(backup, { recursive: true, force: true });
@@ -865,6 +934,13 @@ export function createConsole(options: ConsoleOptions): Console {
           throw err;
         }
         fs.rmSync(backup, { recursive: true, force: true });
+        if (createNew && newPackName) {
+          try {
+            savePackLibrary(finalOut, { name: newPackName });
+          } catch (err) {
+            log(`Could not save the new pack name: ${util.errorMessage(err)}`);
+          }
+        }
         config.working[recipe.id] = { source };
         recipeCache = null;
         saveConfig(config);
@@ -922,6 +998,17 @@ export function createConsole(options: ConsoleOptions): Console {
       }
     }
     throw last;
+  }
+
+  function updatePackLibrary(id: string, input: { name?: unknown; notes?: unknown }): ConsolePack[] {
+    const root = packRoot(id);
+    if (!fs.existsSync(path.join(root, "pack.json"))) throw new Error(`Pack not found: ${id}`);
+    savePackLibrary(root, { name: input.name, notes: input.notes });
+    return listPacks();
+  }
+
+  function saveReview(input: ReviewInput): ModReview | null {
+    return reviews.set(input);
   }
 
   async function removePack(id: string): Promise<void> {
@@ -1034,6 +1121,9 @@ export function createConsole(options: ConsoleOptions): Console {
         source: body.source == null ? undefined : String(body.source),
         version: body.version == null ? undefined : String(body.version),
         copy: body.copy === true,
+        packId: body.packId == null ? undefined : String(body.packId),
+        createNew: body.createNew === true,
+        packName: body.packName == null ? undefined : String(body.packName),
         driverOptions: body.driverOptions && typeof body.driverOptions === "object" && !Array.isArray(body.driverOptions)
           ? body.driverOptions as Record<string, unknown>
           : undefined,
@@ -1047,9 +1137,29 @@ export function createConsole(options: ConsoleOptions): Console {
       await removePack(String(body.id || ""));
       return sendJson(res, 200, { ok: true, packs: listPacks() });
     }
+    if (url.pathname === "/api/reviews" && method === "POST") {
+      const body = await readJsonBody(req);
+      return sendJson(res, 200, {
+        ok: true,
+        review: saveReview({
+          gameId: body.gameId,
+          modId: body.modId,
+          rating: body.rating,
+          body: body.body,
+        }),
+      });
+    }
     if (url.pathname === "/api/reveal/packs" && method === "POST") {
       revealPacksDir();
       return sendJson(res, 200, { ok: true });
+    }
+    if (url.pathname.startsWith("/api/packs/") && method === "POST" && url.pathname.endsWith("/library")) {
+      const id = decodeURIComponent(url.pathname.split("/")[3] || "");
+      const body = await readJsonBody(req);
+      return sendJson(res, 200, {
+        ok: true,
+        packs: updatePackLibrary(id, { name: body.name, notes: body.notes }),
+      });
     }
     if (url.pathname.startsWith("/api/packs/") && method === "POST" && url.pathname.endsWith("/reveal")) {
       const id = decodeURIComponent(url.pathname.split("/")[3] || "");
@@ -1128,6 +1238,8 @@ export function createConsole(options: ConsoleOptions): Console {
     listPacks,
     listRecipes,
     startBuild,
+    updatePackLibrary,
+    saveReview,
     removePack,
     revealPack,
     revealPacksDir,

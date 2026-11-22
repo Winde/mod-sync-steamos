@@ -78,6 +78,8 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
   color: #cbd5e1; font-size: 12px; max-width: 100%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.gamefilter { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.gamefilter select { width: auto; max-width: 220px; padding: 4px 8px; font-size: 12px; }
 
 .btn {
   appearance: none; cursor: pointer; color: #e8eef8;
@@ -135,6 +137,7 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 }
 .badge.red { border-color: rgba(248, 113, 113, 0.4); color: #fecaca; }
 .badge.amber { border-color: rgba(252, 211, 77, 0.36); color: #fde68a; }
+.badge.stars { color: var(--amber); border-color: rgba(252, 211, 77, 0.36); letter-spacing: 1px; }
 .badgebtn {
   font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
   border-color: rgba(158, 201, 232, 0.42); color: #d7ecfa;
@@ -144,6 +147,12 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 .badgebtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .badgechev { font-size: 13px; line-height: 1; margin-left: 1px; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.packnotes {
+  color: #a8b3c4; font-size: 11.5px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; overflow-wrap: anywhere;
+}
+.packnotes::before { content: "Notes: "; color: #6f7b8f; }
 .packpath {
   font-size: 11px; color: #6f7b8f; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-family: ui-monospace, Consolas, monospace;
@@ -247,6 +256,16 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 }
 .input:focus { outline: 2px solid rgba(255, 180, 168, 0.45); outline-offset: 1px; }
 select.input { cursor: pointer; }
+textarea.input { resize: vertical; min-height: 84px; font: inherit; line-height: 1.45; }
+.stars { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.star {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  color: #6f7b8f; font-size: 24px; line-height: 1; padding: 0 2px;
+}
+.star.on { color: var(--amber); }
+.star:hover { color: #fde68a; }
+.star:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
+.stars .hint { margin: 0 0 0 8px; }
 .inputrow { display: flex; gap: 6px; align-items: stretch; min-width: 0; }
 .inputrow .input { flex: 1; }
 .check { display: flex; align-items: flex-start; gap: 8px; color: #cbd5e1; font-size: 12.5px; line-height: 1.35; }
@@ -292,6 +311,17 @@ select.input { cursor: pointer; }
 .modalhead p { margin: 4px 0 0; }
 .modalform { display: flex; flex-direction: column; gap: 13px; }
 .modal .actions { margin-top: 4px; }
+.choicegrid { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 14px; }
+.choice {
+  display: flex; gap: 9px; align-items: flex-start;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: rgba(8, 12, 18, 0.55); padding: 10px 12px; cursor: pointer;
+}
+.choice.on { border-color: var(--line-strong); background: rgba(17, 24, 34, 0.88); }
+.choice input { margin: 3px 0 0; accent-color: var(--red); flex: 0 0 auto; }
+.choice > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.choice .hint { margin: 0; }
+.hint.error { color: #fecaca; }
 .progresswrap { display: flex; flex-direction: column; gap: 9px; }
 .progress { height: 10px; border-radius: 999px; background: #1a2230; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.08); }
 .progress .fill { height: 100%; width: 0%; background: linear-gradient(90deg, #a4281d, #e05a49); transition: width 0.3s ease; }

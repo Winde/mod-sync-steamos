@@ -4,6 +4,7 @@ import { desktopBridge, formatBytes, formatDate, platformName } from "./api";
 import type {
   BuildFormState,
   BuildJobState,
+  BuildStartOptions,
   ConsoleState,
   ContentsItemState,
   ContentsState,
@@ -122,7 +123,7 @@ export function PairRequests({ requests, busy, onApprove, onDeny }: {
   );
 }
 
-export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
+export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onEdit, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
   data: ConsoleState | null;
   error: string | null;
   job: BuildJobState | null;
@@ -132,18 +133,32 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
   onRebuild: (pack: PackState) => void;
   onReveal: (id: string) => void;
   onRemove: (pack: PackState) => void;
+  onEdit: (pack: PackState) => void;
   onShowBuild: () => void;
   onChangeFolder: () => void;
   onApprovePair: (id: string) => void;
   onDenyPair: (id: string) => void;
 }) {
-  const valid = data?.packs.filter((pack) => pack.valid) || [];
+  const [contentsPack, setContentsPack] = useState<PackState | null>(null);
+  const [gameFilter, setGameFilter] = useState("");
+  const games: Array<{ id: string; title: string }> = [];
+  const seenGames = new Set<string>();
+  for (const pack of data?.packs || []) {
+    const id = pack.game?.id;
+    if (!pack.valid || !id || seenGames.has(id)) continue;
+    seenGames.add(id);
+    games.push({ id, title: pack.game.title || id });
+  }
+  games.sort((a, b) => a.title.localeCompare(b.title));
+  const activeFilter = games.some((game) => game.id === gameFilter) ? gameFilter : "";
+  const allPacks = data?.packs || [];
+  const visiblePacks = activeFilter ? allPacks.filter((pack) => pack.game?.id === activeFilter) : allPacks;
+  const valid = visiblePacks.filter((pack) => pack.valid);
   const bytes = valid.reduce((sum, pack) => sum + pack.totalBytes, 0);
   const summary = data
     ? `${valid.length} pack${valid.length === 1 ? "" : "s"} · ${formatBytes(bytes)}`
     : "Loading packs…";
   const buildName = data && job ? data.recipes.find((recipe) => recipe.id === job.recipeId)?.name || job.packId : "";
-  const [contentsPack, setContentsPack] = useState<PackState | null>(null);
 
   return (
     <section className="panel library">
@@ -153,6 +168,21 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
           <div id="packs-summary" className="librarypath">
             <span className="muted">{summary}</span>
             {data ? <code title={data.settings.packsDir}>{data.settings.packsDir}</code> : null}
+            {data && games.length > 1 ? (
+              <label className="gamefilter">
+                <span>Game</span>
+                <select
+                  id="game-filter"
+                  className="input"
+                  data-action="game-filter"
+                  value={activeFilter}
+                  onChange={(event) => setGameFilter(event.target.value)}
+                >
+                  <option value="">All games</option>
+                  {games.map((game) => <option key={game.id} value={game.id}>{game.title}</option>)}
+                </select>
+              </label>
+            ) : null}
             {data ? (
               <button
                 className="btn small"
@@ -181,7 +211,7 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
       <BuildBanner job={job} name={buildName} onShow={onShowBuild} />
       <div id="packs" className="packlist">
         {!data ? <div className="empty"><strong>Connecting to the console…</strong></div> : null}
-        {data && !data.packs.length ? (
+        {data && !allPacks.length ? (
           <div className="empty">
             <strong>No packs in this folder</strong>
             <span>Build one from a recipe, or choose a folder that already has packs.</span>
@@ -197,15 +227,25 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
             </div>
           </div>
         ) : null}
-        {data?.packs.map((pack) => {
-          const recipe = data.recipes.find((entry) => entry.id === pack.recipeId);
+        {data && allPacks.length && !visiblePacks.length ? (
+          <div className="empty">
+            <strong>No packs for this game</strong>
+            <span>Choose All games to see the whole library.</span>
+            <button className="btn small" data-action="clear-game-filter" onClick={() => setGameFilter("")}>Show all games</button>
+          </div>
+        ) : null}
+        {visiblePacks.map((pack) => {
+          const recipe = data?.recipes.find((entry) => entry.id === pack.recipeId);
           return (
           <article key={pack.id} className={`packcard${pack.valid ? "" : " invalid"}`}>
             <PackArt pack={pack} />
             <div className="packbody">
               <div className="packhead">
                 <div>
-                  <div className="packtitle">{pack.valid ? pack.name : `${pack.name} — invalid pack`}</div>
+                  <div
+                    className="packtitle"
+                    title={pack.baseName && pack.baseName !== pack.name ? `Built as ${pack.baseName}` : undefined}
+                  >{pack.valid ? pack.name : `${pack.name} — invalid pack`}</div>
                   <div className="packgame">
                     {pack.valid
                       ? `${pack.game.title}${pack.game.version ? ` · ${pack.game.version}` : ""}${pack.game.build ? ` · build ${pack.game.build}` : ""}`
@@ -216,6 +256,11 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
               </div>
               {pack.valid ? (
                 <div className="meta">
+                  {pack.review?.rating ? (
+                    <span className="badge stars" title={`${pack.review.rating} of 5 stars`}>
+                      {"★".repeat(pack.review.rating)}{"☆".repeat(Math.max(0, 5 - pack.review.rating))}
+                    </span>
+                  ) : null}
                   <span className="badge">{formatBytes(pack.totalBytes)}</span>
                   <span className="badge">{pack.files} files</span>
                   {pack.contents ? (
@@ -236,6 +281,7 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
                   {pack.modifiedAt ? <span className="badge">built {formatDate(pack.modifiedAt)}</span> : null}
                 </div>
               ) : null}
+              {pack.valid && pack.notes ? <div className="packnotes" title={pack.notes}>{pack.notes}</div> : null}
               {!pack.valid ? <div className="callout error">{pack.error || "Invalid pack folder."}</div> : null}
               <div className="packpath" title={pack.root}>{pack.root}</div>
               {pack.recipeId ? (
@@ -248,6 +294,9 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
                   <button className="btn primary small" data-action="build" data-id={pack.id} onClick={() => onRebuild(pack)}>
                     Rebuild from install
                   </button>
+                ) : null}
+                {pack.valid ? (
+                  <button className="btn small" data-action="edit" data-id={pack.id} onClick={() => onEdit(pack)}>Edit details</button>
                 ) : null}
                 <button className="btn small" data-action="reveal" data-id={pack.id} onClick={() => onReveal(pack.id)}>Open folder</button>
                 <button className="btn small danger" data-action="remove" data-id={pack.id} onClick={() => onRemove(pack)}>Remove</button>
@@ -303,6 +352,99 @@ export function ContentsModal({ pack, onClose }: {
       <div className="actions">
         <button className="btn primary" data-action="close-contents" onClick={onClose}>Close</button>
       </div>
+    </Modal>
+  );
+}
+
+export function EditPackModal({ pack, busy, onSave, onClose }: {
+  pack: PackState;
+  busy: boolean;
+  onSave: (input: { name: string; notes: string; rating: number; review: string }) => void;
+  onClose: () => void;
+}) {
+  const builtInName = pack.baseName || pack.name;
+  const [name, setName] = useState(pack.name || "");
+  const [notes, setNotes] = useState(pack.notes || "");
+  const [rating, setRating] = useState(pack.review?.rating || 0);
+  const [review, setReview] = useState(pack.review?.body || "");
+  return (
+    <Modal onClose={onClose}>
+      <div className="modalhead">
+        <div>
+          <h2>Edit {pack.name || pack.id}</h2>
+          <p className="muted">{pack.game.title || "Pack"} · {pack.mod.version || pack.id}</p>
+        </div>
+        <button className="btn small" type="button" data-action="close-modal" onClick={onClose}>Close</button>
+      </div>
+      <form
+        className="modalform"
+        autoComplete="off"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave({ name: name.trim(), notes, rating, review });
+        }}
+      >
+        <div className="field">
+          <label htmlFor="pack-display-name">Display name</label>
+          <input
+            id="pack-display-name"
+            className="input"
+            type="text"
+            maxLength={120}
+            spellCheck={false}
+            value={name}
+            placeholder={builtInName}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <p className="hint">Leave empty to use the built-in name “{builtInName}”. The name is shown in this library and on paired TVs.</p>
+        </div>
+        <div className="field">
+          <label htmlFor="pack-notes">Pack notes</label>
+          <textarea
+            id="pack-notes"
+            className="input"
+            rows={4}
+            maxLength={4000}
+            placeholder="Install hints, tested settings, compatibility…"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
+          <p className="hint">Saved in the pack folder as library.json and shown with the pack on the Client.</p>
+        </div>
+        <div className="field">
+          <label>Rating and review</label>
+          <div className="stars" role="group" aria-label="Rating">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <button
+                key={value}
+                className={`star${value <= rating ? " on" : ""}`}
+                type="button"
+                data-action="rate"
+                data-rating={value}
+                aria-label={`${value} of 5 stars`}
+                aria-pressed={value === rating}
+                title={value === rating ? "Clear rating" : `${value} of 5 stars`}
+                onClick={() => setRating((current) => current === value ? 0 : value)}
+              >★</button>
+            ))}
+            <span className="hint">{rating ? `${rating} of 5` : "Not rated"}</span>
+          </div>
+          <textarea
+            id="pack-review"
+            className="input"
+            rows={4}
+            maxLength={4000}
+            placeholder="What you think of this mod…"
+            value={review}
+            onChange={(event) => setReview(event.target.value)}
+          />
+          <p className="hint">Reviews are saved per game + mod in a separate database, so rebuilds and removal of this pack keep them.</p>
+        </div>
+        <div className="actions">
+          <button className="btn primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save details"}</button>
+          <button className="btn small" type="button" data-action="close-modal" onClick={onClose}>Cancel</button>
+        </div>
+      </form>
     </Modal>
   );
 }
@@ -620,27 +762,88 @@ function recipeFor(data: ConsoleState, id?: string) {
     || null;
 }
 
-export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart, onClose, onReveal, onBuildAnother }: {
+function slugPackId(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 64) || "pack";
+}
+
+function uniquePackId(base: string, taken: Set<string>): string {
+  if (!taken.has(base)) return base;
+  for (let index = 2; index < 1000; index++) {
+    const candidate = `${base}-${index}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base}-${Date.now()}`;
+}
+
+export function BuildModal({ data, job, viewJob, initialRecipeId, initialPackId, busy, onStart, onClose, onReveal, onBuildAnother }: {
   data: ConsoleState;
   job: BuildJobState | null;
   viewJob: boolean;
   initialRecipeId?: string;
+  initialPackId?: string;
   busy: boolean;
-  onStart: (form: BuildFormState) => void;
+  onStart: (form: BuildFormState, options?: BuildStartOptions) => void;
   onClose: () => void;
   onReveal: (id: string) => void;
   onBuildAnother: () => void;
 }) {
   const initialRecipe = recipeFor(data, initialRecipeId);
+  // A stale pack id must not retarget the fallback recipe the modal picks when
+  // the recipe that built the pack is gone.
+  const initialTargetPackId = initialRecipeId && data.recipes.some((entry) => entry.id === initialRecipeId)
+    ? initialPackId
+    : undefined;
   const [form, setForm] = useState<BuildFormState>({
     recipeId: initialRecipe?.id || "",
     source: initialRecipe?.source || "",
     version: "",
     copy: false,
     driverOptions: {},
+    packId: initialTargetPackId,
   });
+  const [confirming, setConfirming] = useState(false);
+  const [createNew, setCreateNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newId, setNewId] = useState("");
+  const [newIdTouched, setNewIdTouched] = useState(false);
   const recipe = data.recipes.find((entry) => entry.id === form.recipeId) || initialRecipe;
   const jobName = data.recipes.find((entry) => entry.id === job?.recipeId)?.name || job?.packId || "";
+
+  useEffect(() => {
+    if (!viewJob) setConfirming(false);
+  }, [viewJob]);
+
+  const targetId = form.packId || recipe?.id || "";
+  const existingPack = data.packs.find((pack) => pack.id === targetId) || null;
+  const replacing = !!existingPack || (!!recipe && targetId === recipe.id && recipe.packExists);
+  const takenIds = new Set<string>();
+  for (const pack of data.packs) takenIds.add(pack.id);
+  for (const entry of data.recipes) takenIds.add(entry.id);
+
+  const openConfirm = () => {
+    const suggestedName = `${(existingPack?.name || recipe?.name || "Pack").slice(0, 115)} copy`;
+    setNewName(suggestedName);
+    setNewId(uniquePackId(slugPackId(suggestedName), takenIds));
+    setNewIdTouched(false);
+    setCreateNew(false);
+    setConfirming(true);
+  };
+
+  const newIdError = !createNew
+    ? ""
+    : !newId
+      ? "Enter a folder id."
+      : newId === "." || newId === ".."
+        ? "That folder id is reserved."
+        : !/^[a-zA-Z0-9._-]+$/.test(newId)
+          ? "Use only letters, numbers, dots, dashes, and underscores."
+          : takenIds.has(newId)
+            ? "That folder id is already used by a pack or recipe."
+            : "";
 
   if (viewJob && job) {
     const done = job.status === "done";
@@ -691,6 +894,109 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
     );
   }
 
+  if (confirming) {
+    return (
+      <Modal onClose={onClose}>
+        <div className="modalhead">
+          <div>
+            <h2>{createNew ? "Create a new pack" : `Replace ${existingPack?.name || recipe.name}?`}</h2>
+            <p className="muted">{recipe.name} · {recipe.gameTitle}</p>
+          </div>
+          <button className="btn small" type="button" data-action="close-modal" onClick={onClose}>Cancel</button>
+        </div>
+        <div className="choicegrid">
+          <label className={`choice${createNew ? "" : " on"}`}>
+            <input
+              type="radio"
+              name="rebuild-mode"
+              data-action="rebuild-overwrite"
+              checked={!createNew}
+              onChange={() => setCreateNew(false)}
+            />
+            <span>
+              <b>Overwrite the existing pack</b>
+              <span className="hint">Replace {existingPack?.root || recipe.out}. The old pack stays until the new build succeeds.</span>
+            </span>
+          </label>
+          <label className={`choice${createNew ? " on" : ""}`}>
+            <input
+              type="radio"
+              name="rebuild-mode"
+              data-action="rebuild-new"
+              checked={createNew}
+              onChange={() => setCreateNew(true)}
+            />
+            <span>
+              <b>Create a new pack</b>
+              <span className="hint">Keep the existing pack and build a second one from this recipe.</span>
+            </span>
+          </label>
+        </div>
+        {createNew ? (
+          <>
+            <div className="callout info">The existing pack stays in place. The new pack is built into its own folder.</div>
+            <div className="field">
+              <label htmlFor="new-pack-name">New pack name</label>
+              <input
+                id="new-pack-name"
+                className="input"
+                type="text"
+                maxLength={120}
+                spellCheck={false}
+                value={newName}
+                placeholder={recipe.name}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setNewName(value);
+                  if (!newIdTouched) setNewId(uniquePackId(slugPackId(value || recipe.name), takenIds));
+                }}
+              />
+              <p className="hint">Shown in the library and on paired TVs. Leave empty to use the recipe name.</p>
+            </div>
+            <div className="field">
+              <label htmlFor="new-pack-id">Folder id</label>
+              <input
+                id="new-pack-id"
+                className="input"
+                type="text"
+                maxLength={64}
+                spellCheck={false}
+                value={newId}
+                onChange={(event) => {
+                  setNewIdTouched(true);
+                  setNewId(slugPackId(event.target.value));
+                }}
+              />
+              <p className={`hint${newIdError ? " error" : ""}`}>{newIdError || `Creates packs/${newId}.`}</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="callout">
+              <b>This replaces the current pack.</b> The folder and payload are swapped only after the new build succeeds.
+            </div>
+            <div className="callout error">
+              <b>Custom name and notes are cleared.</b> They belong to this build. The rating and review are kept because they are stored per game + mod.
+            </div>
+          </>
+        )}
+        <div className="actions">
+          <button
+            className="btn primary"
+            type="button"
+            data-action="confirm-rebuild"
+            disabled={busy || (createNew && !!newIdError)}
+            onClick={() => {
+              if (createNew) onStart(form, { packId: newId, createNew: true, packName: newName.trim() });
+              else onStart(form);
+            }}
+          >{busy ? "Starting…" : createNew ? "Create pack" : "Replace pack"}</button>
+          <button className="btn small" type="button" data-action="back-to-build" onClick={() => setConfirming(false)}>Back</button>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal onClose={onClose}>
       <div className="modalhead">
@@ -701,7 +1007,14 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
         id="build-form"
         className="modalform"
         autoComplete="off"
-        onSubmit={(event) => { event.preventDefault(); onStart(form); }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (replacing) {
+            openConfirm();
+            return;
+          }
+          onStart(form);
+        }}
       >
         {data.server.running ? <div className="callout">The pack server is running. Stop it first if the SteamOS client is downloading this pack.</div> : null}
         <div className="field">
@@ -717,6 +1030,7 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
                 recipeId: event.target.value,
                 source: next?.source || value.source,
                 driverOptions: {},
+                packId: undefined,
               }));
             }}
           >
@@ -800,7 +1114,7 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, busy, onStart,
         <div className="actions">
           <button className="btn primary" type="submit" disabled={busy}>{busy ? "Starting…" : "Build pack"}</button>
           <button className="btn small" type="button" data-action="close-modal" onClick={onClose}>Cancel</button>
-          <span className="hint">Output: <span className="mono">{recipe.out}</span></span>
+          <span className="hint">Output: <span className="mono">{form.packId ? `${data.settings.packsDir}/${form.packId}` : recipe.out}</span></span>
         </div>
       </form>
     </Modal>

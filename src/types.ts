@@ -160,6 +160,8 @@ export interface ContentsSummary {
 export interface Pack {
   schema: 1;
   id: string;
+  /** Recipe that built this pack; set when the pack id differs from the recipe. */
+  recipe?: string;
   name: string;
   description?: string;
   game: GameInfo;
@@ -194,7 +196,11 @@ export interface FilesDoc {
 
 export interface PackSummary {
   id: string;
+  /** Recipe that built this pack, when it differs from the pack id. */
+  recipe?: string;
   name: string;
+  /** The name written by the pack builder; `name` may be a library rename. */
+  baseName: string;
   description: string;
   game: GameInfo;
   platforms: Platforms | null;

@@ -59,23 +59,50 @@ opens a folder picker and applies the choice immediately, without opening
 Settings; the same action appears in the empty state. It is disabled while a
 build runs, because the build writes into the current folder.
 
+When the folder has packs for more than one game, a **Game** list appears beside
+the path. Pick one game to filter the library, or **All games** to show
+everything. The pack count and size follow the visible packs.
+
 Each pack card shows its game, mod version, file count, size, target platforms,
 build date, and folder. When the pack records its contents, the card also shows
 a count such as **72 mods**; pressing it opens the full list and any inactive
-pak files from `pack.json`. Actions:
+pak files from `pack.json`. A rating appears as stars, and console notes show as
+a short preview under the card metadata. Actions:
 
-- **Rebuild** builds the recipe into the packs folder. The working install is
-  read-only. The build is staged under `.modsync-build/`; the old pack folder is
-  replaced only after the new build succeeds. A failure leaves the old pack
-  untouched.
+- **Rebuild** opens the build form, then asks for confirmation before replacing
+  a pack. The confirmation offers two choices: **Overwrite** replaces the
+  existing pack folder, or **Create a new pack** keeps the existing pack and
+  builds a second pack from the same recipe under a new folder id and display
+  name. The working install is read-only. The build is staged under
+  `.modsync-build/`; the old pack folder is replaced only after the new build
+  succeeds, so a failure leaves it untouched.
+- A rebuild always starts with a clean library: the custom display name and
+  notes are cleared. The rating and review are kept because they are stored per
+  game + mod. The confirmation warns about this before the build starts.
+- **Edit details** renames the pack and adds notes, a rating, and a review.
+  The name and notes are stored in `packs/<pack>/library.json` for the current
+  build. The name and notes are also served to the Client: the notes appear with
+  the pack's other install notes.
 - **Open folder** reveals the pack directory in Explorer.
 - **Remove** deletes the pack folder and its payload after a confirmation. It
   does not touch the game, saves, or the working mod install.
 
+Ratings and reviews are separate from the pack. They are keyed by game + mod, so
+every build of the same mod shares one review and removing the pack does not
+delete it. They live in `reviews.json` beside the console config.
+
+Two packs built from the same recipe share the same game + mod, so the Client
+installs one at a time; the Server keeps both builds and can switch between them.
+
 **Build a pack** in the library header builds a recipe that is not in the
 library yet. The recipe list comes from `recipes/`. Version is optional; the
 driver uses its normal default (Elden Ring's `current.txt`, BG3's date) when it
-is empty.
+is empty. If the selected recipe already has a pack, the same confirmation
+appears before the build starts.
+
+A pack created under a second id records its source recipe in `pack.json`, so
+the card keeps its **Rebuild from install** action and the library still knows
+which recipe and working install to use.
 
 The form also shows the selected driver's own options. For BG3 these are an
 optional game folder (used to include the Windows/Proton Script Extender) and an
@@ -137,8 +164,11 @@ the new build itself; the Windows build opens the releases page.
 | `%APPDATA%/ModSync Server/console.json` (installed) | Same, for the installed build |
 | `state/devices.json` (checkout) | Paired-device token hashes, names, addresses, legacy tombstones |
 | `%APPDATA%/ModSync Server/devices.json` (installed) | Same, for the installed build |
+| `state/reviews.json` (checkout) | Mod ratings and reviews, indexed by game + mod |
+| `%APPDATA%/ModSync Server/reviews.json` (installed) | Same, for the installed build |
 | `packs/` (checkout) | Default pack output and server root |
 | `Documents/ModSync/packs` (installed) | Default pack output and server root |
+| `packs/<pack>/library.json` | Optional display name and console notes for one build; a rebuild clears it |
 | `packs/.modsync-build/` | Temporary build and backup folders; safe to remove when no build runs |
 
 ## Troubleshooting
