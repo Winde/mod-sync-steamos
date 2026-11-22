@@ -9,8 +9,11 @@ import labels from "./labels";
 import { loadPack, packSummary } from "./manifest";
 import * as recipes from "./recipes";
 import { projectRoot } from "./root";
+import { createDeviceStore } from "./devices";
+import { createPairingStore } from "./pairing";
 import { createServer } from "./server";
 import * as util from "./util";
+import type { DeviceView } from "./devices";
 import type { Driver } from "./drivers";
 import type { PairingStore, PairRequestView } from "./pairing";
 import type { BuildOption, BuildProgress, ContentsSummary, PackSummary, Recipe, Variant } from "./types";
@@ -117,7 +120,13 @@ export interface ConsoleState {
   lan: { detected: string; addresses: util.LanAddress[] };
   build: BuildJobSummary | null;
   pairRequests: PairRequestView[];
-  guide: { installCommand: string; firewallCommand: string; installUrl: string };
+  devices: DeviceView[];
+  guide: {
+    installCommand: string;
+    manualInstallCommand: string;
+    firewallCommand: string;
+    installUrl: string;
+  };
 }
 
 export interface LoginItemResult {
@@ -138,6 +147,8 @@ export interface ConsoleOptions {
   setLaunchAtLogin?: (enabled: boolean) => LoginItemResult;
   onServerChange?: (status: ServerStatus) => void;
   tokenStore?: ConsoleTokenStore;
+  /** Paired-device credential store; defaults beside the console config. */
+  devicesFile?: string;
 }
 
 export interface Console {
@@ -155,6 +166,8 @@ export interface Console {
   removePack: (id: string) => Promise<void>;
   revealPack: (id: string) => void;
   revealPacksDir: () => void;
+  revokeDevice: (id: string) => DeviceView[];
+  revokeAllDevices: () => DeviceView[];
   isRunning: () => boolean;
 }
 
@@ -324,6 +337,8 @@ export function createConsole(options: ConsoleOptions): Console {
   const webDir = path.join(projectRoot, "web");
   let tokenStorage = options.tokenStore || null;
   let config = loadConfig();
+  const devicesFile = path.resolve(options.devicesFile || path.join(path.dirname(configFile), "devices.json"));
+  const devices = createDeviceStore({ file: devicesFile, legacyToken: config.token });
   let runtime: ServerRuntime | null = null;
   let serverError: string | null = null;
   let loginError: string | null = null;
@@ -564,14 +579,14 @@ export function createConsole(options: ConsoleOptions): Console {
     const base = runtime ? runtime.url : plannedUrl();
     const host = runtime ? runtime.host : plannedHost();
     const loopback = host === "127.0.0.1" || host === "localhost";
-    const token = config.token;
     return {
       installUrl: labels.installUrl,
       installCommand: loopback
         ? "Loopback only — change Bind to the LAN option to get the Client install command."
         : base
-          ? labels.serve.install(base, token)
+          ? labels.serve.installPairing(base)
           : "Start the server to get the Client install command.",
+      manualInstallCommand: loopback || !base ? "" : labels.serve.install(base, config.token),
       firewallCommand: labels.serve.firewall(runtime ? runtime.port : config.port),
     };
   }
@@ -594,6 +609,7 @@ export function createConsole(options: ConsoleOptions): Console {
       lan: { detected: util.detectLanIp(), addresses: util.lanAddresses() },
       build: jobSummary(activeJob || lastJob),
       pairRequests: runtime ? runtime.pairing.list() : [],
+      devices: devices.list(),
       guide: guide(),
     };
   }
@@ -615,9 +631,14 @@ export function createConsole(options: ConsoleOptions): Console {
       emit();
       throw new Error(serverError);
     }
+    const pairing = createPairingStore({
+      tokenFactory: ({ device, address, deviceId }) => devices.issue({ name: device, address, deviceId }).token,
+    });
     const server = createServer({
       packsDir: config.packsDir,
       token,
+      devices,
+      pairing,
       baseUrl: `http://${host}:${port}`,
     });
     try {
@@ -740,6 +761,7 @@ export function createConsole(options: ConsoleOptions): Console {
     config = next;
     recipeCache = null;
     saveConfig(config);
+    if (!sameToken(next.token, before.token)) devices.setLegacyToken(next.token);
     if (next.launchAtLogin !== before.launchAtLogin) applyLaunchAtLogin(next.launchAtLogin);
     if (runtime) {
       const restart = next.packsDir !== before.packsDir
@@ -753,6 +775,20 @@ export function createConsole(options: ConsoleOptions): Console {
       }
     }
     return state();
+  }
+
+  function revokeDevice(id: string): DeviceView[] {
+    const key = String(id || "").trim();
+    if (!key) throw new Error("Device id is required.");
+    if (!devices.revoke(key)) throw new Error("Device not found.");
+    emit();
+    return devices.list();
+  }
+
+  function revokeAllDevices(): DeviceView[] {
+    devices.revokeAll();
+    emit();
+    return devices.list();
   }
 
   function startBuild(input: { recipeId: string; source?: string; version?: string; copy?: boolean; driverOptions?: Record<string, unknown> }): BuildJobSummary {
@@ -976,6 +1012,17 @@ export function createConsole(options: ConsoleOptions): Console {
       if (!accepted) return sendJson(res, 404, { error: "Pairing request not found or expired." });
       return sendJson(res, 200, { ok: true, pairRequests: runtime.pairing.list() });
     }
+    if (url.pathname === "/api/devices/revoke" && method === "POST") {
+      const body = await readJsonBody(req);
+      try {
+        return sendJson(res, 200, { ok: true, devices: revokeDevice(String(body.id || "")) });
+      } catch (err) {
+        return sendJson(res, 404, { error: util.errorMessage(err) });
+      }
+    }
+    if (url.pathname === "/api/devices/revoke-all" && method === "POST") {
+      return sendJson(res, 200, { ok: true, devices: revokeAllDevices() });
+    }
     if (url.pathname === "/api/settings" && method === "POST") {
       const body = await readJsonBody(req);
       return sendJson(res, 200, await updateSettings(body as Partial<ConsoleConfig> & { workingSource?: { recipeId: string; source: string } }));
@@ -1084,6 +1131,8 @@ export function createConsole(options: ConsoleOptions): Console {
     removePack,
     revealPack,
     revealPacksDir,
+    revokeDevice,
+    revokeAllDevices,
     isRunning: () => !!runtime,
   };
 }

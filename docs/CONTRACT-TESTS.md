@@ -14,7 +14,7 @@ splitting, or renaming modules does not require touching these tests.
 | `pack-cli.test.js` | `modsync pack` writes a valid `pack.json`/`files.json`, payload, profile, tools, and art for a requested version; prints build progress |
 | `pack-bg3-cli.test.js` | the BG3 pack builder writes the same external format: platform-tagged BG3SE/BG3LE files, native template, install metadata, and normalized contents |
 | `pack-loader-contract.test.js` | ER packs expose one launcher template and platform-tagged Windows/Linux loader runtimes; the installer does not select them by game |
-| `repository-http.test.js` | token auth, catalog, pack documents, art, full and ranged file streaming, loopback default, refusal to bind all interfaces |
+| `repository-http.test.js` | device/manual token auth, catalog, pack documents, art, full and ranged file streaming, loopback default, refusal to bind all interfaces |
 | `agent-install.test.js` | `/api/state`, install job lifecycle, complete TV output (hashes, `current.txt`, launcher), resume from `.part`, launch errors, BOM config, dashboard assets |
 | `agent-install-gates.test.js` | a mismatched build, a running game, a secondary game process, and a missing Proton prefix block install before the TV pack directory exists |
 | `agent-install-policy.test.js` | a pack that omits a build, prefix, running-state, or disk precondition is not blocked by hidden installer policy; the declared checks are authoritative |

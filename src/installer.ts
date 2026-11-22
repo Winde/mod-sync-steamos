@@ -70,11 +70,12 @@ async function downloadResumable(
   url: string,
   dest: string,
   token: string,
+  clientHeaders: Record<string, string>,
   signal: AbortSignal | undefined,
 ): Promise<void> {
   let start = 0;
   try { start = fs.statSync(dest).size; } catch { /* no partial download yet */ }
-  const headers: Record<string, string> = { "x-modsync-token": token };
+  const headers: Record<string, string> = { ...clientHeaders, "x-modsync-token": token };
   if (start > 0) headers.Range = `bytes=${start}-`;
   const res = await fetch(url, { headers, signal });
   if (res.status === 416) return; // already complete; caller verifies hash
@@ -92,6 +93,8 @@ export async function installPack({
   filesDoc,
   remoteBase,
   token,
+  deviceId = "",
+  deviceName = "",
   root,
   game,
   signal,
@@ -103,6 +106,8 @@ export async function installPack({
   filesDoc: FilesDoc;
   remoteBase: string;
   token: string;
+  deviceId?: string;
+  deviceName?: string;
   root: string;
   game: SteamGame | null;
   signal?: AbortSignal;
@@ -118,6 +123,9 @@ export async function installPack({
   const target = paths.resolve(pack, game);
   const files = paths.filesFor(filesDoc.files, target.variant);
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
+  const clientHeaders: Record<string, string> = {};
+  if (deviceId) clientHeaders["x-modsync-device"] = deviceId;
+  if (deviceName) clientHeaders["x-modsync-device-name"] = deviceName;
 
   if (!game) throw new Error(`${pack.game.title} was not found in the Steam libraries.`);
   if (!files.length) throw new Error(`This pack has no files for ${target.variant}.`);
@@ -222,7 +230,7 @@ export async function installPack({
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (signal?.aborted) throw abortError();
       try {
-        await downloadResumable(url, tmp, token, signal);
+        await downloadResumable(url, tmp, token, clientHeaders, signal);
         const hash = await sha256File(tmp);
         if (hash !== file.sha256) {
           fs.rmSync(tmp, { force: true });

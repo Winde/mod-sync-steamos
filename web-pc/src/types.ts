@@ -101,6 +101,15 @@ export interface PairRequestState {
   createdAt: string;
 }
 
+export interface DeviceState {
+  id: string;
+  name: string;
+  address: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+  legacy: boolean;
+}
+
 export interface LanAddress {
   name: string;
   address: string;
@@ -123,7 +132,13 @@ export interface ConsoleState {
   lan: { detected: string; addresses: LanAddress[] };
   build: BuildJobState | null;
   pairRequests: PairRequestState[];
-  guide: { installCommand: string; firewallCommand: string; installUrl: string };
+  devices: DeviceState[];
+  guide: {
+    installCommand: string;
+    manualInstallCommand: string;
+    firewallCommand: string;
+    installUrl: string;
+  };
 }
 
 export interface SettingsDraft {

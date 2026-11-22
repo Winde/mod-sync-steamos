@@ -11,11 +11,13 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
 1. The pack library lists the packs in `packs/`, with version, size, and path.
    **Change folder** switches to another folder and lists its packs; it is
    disabled while a build runs.
-2. **Pack server → Start server** shows a URL and token; **Stop server** closes
-   it. If port 8787 is busy, stop the old CLI `serve` or change the port.
-3. **Show**, **Copy**, and **New token** reveal and replace the token. Save
-   settings; a running server restarts and the install one-liner uses the new
-   token.
+2. **Pack server → Start server** shows a URL and the tokenless install
+   one-liner; **Stop server** closes it. If port 8787 is busy, stop the old CLI
+   `serve` or change the port.
+3. **Paired devices** lists approved TVs. Revoke one and confirm the others stay
+   connected. **Revoke all** clears the list. The **manual token** in Settings is
+   for CLI and unattended installs; rotating it revokes legacy clients and
+   restarts a running server.
 4. **Rebuild** opens the build dialog with the remembered working install.
    A build log and percentage are shown, and a failed build leaves the old pack
    in place.
@@ -25,11 +27,12 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
 7. **Check for updates** in the footer reports that the build is current, or
    offers the latest release. It does not run on its own. In an installed
    Windows build, **Install x.y.z** asks for confirmation, installs the update,
-   and the Server reopens with the new version; packs, settings, and the token
-   are still there.
-8. With an old or wrong token, the Client shows **Pair with the Server**. The
-   Server console lists the TV under the pack library; **Allow** connects it and
-   the Client keeps the token after a restart. **Deny** leaves it paired out.
+   and the Server reopens with the new version; packs, settings, paired devices,
+   and tokens are still there.
+8. A new Client shows the pairing request in the Server console. **Allow** issues
+   its own device token and it reconnects without asking after a restart.
+   **Deny** leaves it unpaired. Revoking that device forces it to pair again
+   without touching another TV.
 
 ## 0b. Stop old listeners
 

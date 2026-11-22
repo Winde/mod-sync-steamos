@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, copyText, desktopBridge, messageOf, randomToken } from "./api";
 import {
   BuildModal,
+  DevicesPanel,
   GuidePanel,
   Header,
   PackLibrary,
@@ -15,6 +16,7 @@ import type {
   BuildFormState,
   BuildJobState,
   ConsoleState,
+  DeviceState,
   ModalState,
   PackState,
   SettingsDraft,
@@ -53,7 +55,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pairBusy, setPairBusy] = useState(false);
-  const [tokenVisible, setTokenVisible] = useState(false);
+  const [deviceBusy, setDeviceBusy] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState("");
@@ -242,6 +244,36 @@ export default function App() {
     }
   };
 
+  const revokeDevice = async (device: DeviceState) => {
+    setDeviceBusy(true);
+    try {
+      const result = await api<{ devices: DeviceState[] }>("/api/devices/revoke", {
+        method: "POST",
+        body: JSON.stringify({ id: device.id }),
+      });
+      setData((current) => current ? { ...current, devices: result.devices } : current);
+      toast(`Revoked ${device.name}.`, "success");
+    } catch (err) {
+      toast(messageOf(err), "error");
+    } finally {
+      setDeviceBusy(false);
+    }
+  };
+
+  const revokeAllDevices = async () => {
+    if (!window.confirm("Revoke every paired device? Each TV will need to pair again.")) return;
+    setDeviceBusy(true);
+    try {
+      const result = await api<{ devices: DeviceState[] }>("/api/devices/revoke-all", { method: "POST" });
+      setData((current) => current ? { ...current, devices: result.devices } : current);
+      toast("Revoked all paired devices.", "success");
+    } catch (err) {
+      toast(messageOf(err), "error");
+    } finally {
+      setDeviceBusy(false);
+    }
+  };
+
   const confirmRemove = async () => {
     if (!modal || modal.kind !== "remove") return;
     setBusy(true);
@@ -397,10 +429,7 @@ export default function App() {
           <aside className="side">
             <ServerPanel
               data={data}
-              tokenVisible={tokenVisible}
-              onToggleToken={() => setTokenVisible((value) => !value)}
               onCopyUrl={() => { void copy(data?.server.url || "", "Server URL"); }}
-              onCopyToken={() => { void copy(data?.settings.token || "", "Token"); }}
               onOpenUrl={() => {
                 const url = data?.server.url;
                 if (url) window.open(url, "_blank", "noopener");
@@ -409,6 +438,12 @@ export default function App() {
                 document.querySelector(".settingsform")?.scrollIntoView({ behavior: "smooth", block: "start" });
                 document.getElementById("server-token")?.focus();
               }}
+            />
+            <DevicesPanel
+              data={data}
+              busy={deviceBusy}
+              onRevoke={(device) => { void revokeDevice(device); }}
+              onRevokeAll={() => { void revokeAllDevices(); }}
             />
             {settingsDraft && data ? (
               <SettingsPanel
@@ -427,8 +462,8 @@ export default function App() {
             )}
             <GuidePanel
               data={data}
-              tokenVisible={tokenVisible}
               onCopyInstall={() => { void copy(data?.guide.installCommand || "", "Install command"); }}
+              onCopyManualInstall={() => { void copy(data?.guide.manualInstallCommand || "", "Manual install command"); }}
               onCopyFirewall={() => { void copy(data?.guide.firewallCommand || "", "Firewall command"); }}
             />
           </aside>

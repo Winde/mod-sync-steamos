@@ -167,6 +167,14 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 .updateinstall { display: flex; flex-direction: column; gap: 10px; }
 .updateinstall .hint { margin: 0; }
 .pairlist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.devicelist { display: flex; flex-direction: column; }
+.devicerow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.devicerow:last-child { border-bottom: 0; padding-bottom: 0; }
+.devicename { display: flex; align-items: center; gap: 7px; font-weight: 650; overflow-wrap: anywhere; }
+.devicemeta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.manualinstall { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.manualinstall summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.manualinstall[open] summary { color: var(--fg); }
 .pairrequest { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .pairrequest .hint { margin-top: 3px; }
 .pairrequest .actions { flex: 0 0 auto; }

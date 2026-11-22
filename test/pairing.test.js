@@ -98,17 +98,28 @@ test("a TV pairs once and persists the approved token", async (t) => {
   const paired = await waitForState(agentUrl, (state) => state.pc?.auth === "ok");
   assert.equal(paired.pc.online, true);
   assert.equal(paired.pairing.status, "approved");
-  assert.deepEqual(saved, { pcUrl: packServer.url, token: "pair-token" });
-  assert.equal(h.readJson(agentConfig).token, "pair-token");
+  assert.equal(saved.pcUrl, packServer.url);
+  assert.match(saved.token, /^ms_/);
+  assert.equal(h.readJson(agentConfig).token, saved.token);
 
   const wrong = await fetch(`${packServer.url}/api/packs`, {
     headers: { "x-modsync-token": "wrong-token" },
   });
   assert.equal(wrong.status, 403);
   const right = await fetch(`${packServer.url}/api/packs`, {
-    headers: { "x-modsync-token": "pair-token" },
+    headers: { "x-modsync-token": saved.token },
   });
   assert.equal(right.status, 200);
+
+  // A TV that still has the old shared token keeps working and is identified
+  // as a legacy device by its address.
+  const legacy = await fetch(`${packServer.url}/api/packs`, {
+    headers: { "x-modsync-token": "pair-token" },
+  });
+  assert.equal(legacy.status, 200);
+  const devices = (await service.state()).devices;
+  assert.ok(devices.some((device) => !device.legacy && /^ModSync Client/.test(device.name)));
+  assert.ok(devices.some((device) => device.legacy && device.address === "127.0.0.1"));
 
   // A later launch reads the saved token and stays connected without asking
   // the Server to approve the TV again.

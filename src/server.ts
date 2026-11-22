@@ -7,6 +7,7 @@ import { loadPack, packSummary } from "./manifest";
 import labels from "./labels";
 import { createPairingStore } from "./pairing";
 import { errorMessage, safeJoin } from "./util";
+import type { DeviceStore } from "./devices";
 import type { PairingStore } from "./pairing";
 import type { ArtInfo, PackSummary } from "./types";
 
@@ -97,26 +98,35 @@ export interface PackServer extends http.Server {
   pairing: PairingStore;
 }
 
+function headerValue(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] || "" : value || "";
+}
+
 export function createServer({
   packsDir,
   token,
+  devices,
+  pairing: providedPairing,
   baseUrl,
 }: {
   packsDir: string;
   token?: string | null;
+  devices?: DeviceStore;
+  pairing?: PairingStore;
   baseUrl?: string;
 }): PackServer {
   const tokens = new Set(String(token || "").split(",").map((value) => value.trim()).filter(Boolean));
-  const pairing = createPairingStore({ token: [...tokens][0] || "" });
+  const pairing = providedPairing || createPairingStore({ token: [...tokens][0] || "" });
 
   async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = new URL(req.url || "/", baseUrl || "http://localhost");
     const headerToken = req.headers["x-modsync-token"];
     const given = url.searchParams.get("token")
-      || (Array.isArray(headerToken) ? headerToken[0] : headerToken)
+      || headerValue(headerToken)
       || "";
-    const authorized = tokens.has(given);
     const address = req.socket.remoteAddress;
+    const deviceId = headerValue(req.headers["x-modsync-device"]);
+    const deviceName = headerValue(req.headers["x-modsync-device-name"]);
 
     if (url.pathname === "/api/health") {
       return sendJson(res, 200, { ok: true, name: "modsync", version: "0.1.0" });
@@ -134,7 +144,7 @@ export function createServer({
         return sendJson(res, 400, { error: errorMessage(err) });
       }
       try {
-        return sendJson(res, 202, pairing.request({ device: body.device, address }));
+        return sendJson(res, 202, pairing.request({ device: body.device, deviceId: body.deviceId, address }));
       } catch (err) {
         return sendJson(res, 429, { error: errorMessage(err) });
       }
@@ -145,6 +155,9 @@ export function createServer({
       if (result.status === "missing") return sendJson(res, 404, { error: "pairing request not found" });
       return sendJson(res, 200, result);
     }
+    const authorized = devices
+      ? devices.authorize(given, { address, deviceId, name: deviceName }) !== null
+      : tokens.has(given);
     if (!authorized) return sendJson(res, 403, { error: "bad or missing token" });
 
     const parts = url.pathname.split("/").filter(Boolean);

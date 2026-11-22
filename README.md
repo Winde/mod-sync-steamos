@@ -39,8 +39,8 @@ the four EE games); the driver only knows the game's layout and loader.
 The Server console uses the same source/output fields.
 
 `serve` binds loopback by default. `--lan` binds the detected LAN IPv4 and
-prints the URL/token the Client needs; `--host <ip>` picks a specific interface.
-The server is token-protected and never binds `0.0.0.0`.
+prints the URL the Client needs; `--host <ip>` picks a specific interface. The
+server is token-protected and never binds `0.0.0.0`.
 
 The Client installs a self-contained AppImage. It does **not** need Node, a
 browser kiosk, or SSH; the Server only serves the installer and pack files over
@@ -51,9 +51,9 @@ HTTP.
 There are two separate Electron apps:
 
 - **ModSync Server** — the new app that owns the packs and the LAN server. It
-  lists packs, rebuilds or removes them, controls the server, and manages the
-  token. It runs on Windows or Linux. It is the app on the machine that serves
-  packs.
+  lists packs, rebuilds or removes them, controls the server, and manages paired
+  devices and the manual token. It runs on Windows or Linux. It is the app on
+  the machine that serves packs.
 - **ModSync Client** — the pre-existing app that installs, updates, rolls back,
   and launches packs on the machine that plays the game. It runs on SteamOS
   (AppImage) or Windows (NSIS). Its **Check for updates** header button checks
@@ -65,14 +65,19 @@ The Server console:
   size, file count, and build date. **Change folder** points the library at an
   existing packs folder. Each card can rebuild the pack from its working
   install, open the folder, or remove it.
-- **Pack server** — start and stop the LAN server, copy its URL, token, and the
+- **Pack server** — start and stop the LAN server, copy its URL, and copy the
   Client install one-liner. A server error (busy port, no LAN address) is shown
-  in the same card. A TV with an old or missing token appears as a pairing
-  request; **Allow** sends it the current token once.
-- **Settings** — packs folder, bind address, port, token (with generate), start
-  the server on launch, start ModSync Server at sign-in, and minimize to the
-  tray instead of the taskbar. The app starts hidden in the tray for sign-in
-  starts.
+  in the same card. A TV with no device token appears as a pairing request;
+  **Allow** issues that TV its own device token.
+- **Paired devices** — lists the TVs approved by this console. **Revoke**
+  removes one device without affecting the others; **Revoke all** clears the
+  list. TVs that still use the old shared token appear as **manual token**
+  devices.
+- **Settings** — packs folder, bind address, port, manual token (with generate),
+  start the server on launch, start ModSync Server at sign-in, and minimize to
+  the tray instead of the taskbar. The manual token is for CLI and unattended
+  installs; paired TVs do not use it. Rotating it revokes legacy clients and
+  restarts a running server, but paired TVs keep working.
 - **Update check** — the footer asks GitHub for the latest release only when
   you press **Check for updates**. On Windows the installed Server updates
   itself: it downloads the new installer with visible progress, verifies its
@@ -85,7 +90,8 @@ The Server console:
   working mod install and game are never touched.
 
 The Server console serves its own UI on `127.0.0.1` only. The LAN pack server
-stays a separate listener with the token you set in the console.
+stays a separate listener; it accepts per-device tokens issued through pairing
+and the manual token from Settings.
 
 ```powershell
 # Development: Server on Windows, Client on Linux by default
@@ -113,17 +119,20 @@ Windows, or `~/ModSync/packs` on Linux. The Client keeps its data under
 1. Install the pack's game via Steam. On Linux, launch it once so its Proton
    prefix exists. ModSync shows the pack's own notes and preconditions before
    install.
-2. In Desktop Mode, run the install one-liner printed by `serve`:
+2. In Desktop Mode, run the install one-liner printed by the Server console:
    ```bash
    curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
-     | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '<token>'
+     | bash -s -- --pc 'http://<PC-LAN-IP>:8787'
    ```
 3. The installer puts `ModSync.AppImage` in `~/Applications`, writes
    `~/ModSync/agent.json`, and adds the ModSync Steam shortcut and art
    automatically. Restart Steam once if it is not visible.
-4. Open ModSync and install the pack. Default-exe packs (BG3) use the regular
-   Steam game link; loader/alternate-exe packs add their own shortcut.
-5. Launch from Game Mode. Saves stay local to each machine in v1.
+4. Open ModSync. The first launch asks the Server for access; press **Allow**
+   on the pairing request in the Server console. The TV gets its own device
+   token and does not ask again.
+5. Install the pack. Default-exe packs (BG3) use the regular Steam game link;
+   loader/alternate-exe packs add their own shortcut.
+6. Launch from Game Mode. Saves stay local to each machine in v1.
 
 ## Network (one-time, generic)
 

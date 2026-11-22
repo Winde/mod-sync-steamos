@@ -73,14 +73,25 @@ function fixture(overrides = {}) {
     lan: { detected: "192.168.1.20", addresses: [{ name: "Ethernet", address: "192.168.1.20" }] },
     build: null,
     pairRequests: [],
+    devices: [],
     guide: {
-      installCommand: "curl -fsSL 'install.sh' | bash -s -- --pc 'http://192.168.1.20:8787' --token 'token-1234'",
+      installCommand: "curl -fsSL 'install.sh' | bash -s -- --pc 'http://192.168.1.20:8787'",
+      manualInstallCommand: "curl -fsSL 'install.sh' | bash -s -- --pc 'http://192.168.1.20:8787' --token 'token-1234'",
       firewallCommand: 'New-NetFirewallRule -DisplayName "ModSync HTTP 8787"',
       installUrl: "https://example.invalid/install.sh",
     },
     ...overrides,
   };
 }
+
+const deviceSummary = {
+  id: "dev-1",
+  name: "Living room TV",
+  address: "192.168.1.50",
+  createdAt: "2026-11-21T12:00:00.000Z",
+  lastSeenAt: "2026-11-22T12:00:00.000Z",
+  legacy: false,
+};
 
 function response(value, status = 200) {
   return {
@@ -419,6 +430,71 @@ test("Server console installs a Windows update after confirmation", async () => 
     await waitFor(window, (w) => /Downloading ModSync Server 0\.6\.0/.test(w.document.querySelector(".callout.installing")?.textContent || ""));
     await waitFor(window, (w) => /100%/.test(w.document.querySelector(".progressmeta")?.textContent || ""));
     assert.match(doc.querySelector(".progressmeta").textContent, /100(\.0)? B of 100(\.0)? B/);
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console lists paired devices and revokes one", async () => {
+  let posted = null;
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/devices/revoke") && init.method === "POST") {
+      posted = JSON.parse(init.body);
+      return response({ ok: true, devices: [] });
+    }
+    if (String(url).endsWith("/api/state")) return response(fixture({ devices: [deviceSummary] }));
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    const row = doc.querySelector(".devicerow");
+    assert.match(row.textContent, /Living room TV/);
+    assert.match(row.textContent, /192\.168\.1\.50/);
+    row.querySelector('[data-action="revoke-device"]').click();
+    await waitFor(window, () => posted !== null);
+    assert.deepEqual(posted, { id: "dev-1" });
+    await waitFor(window, (w) => !w.document.querySelector(".devicerow"));
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console revokes all paired devices after confirmation", async () => {
+  let posted = 0;
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/devices/revoke-all") && init.method === "POST") {
+      posted++;
+      return response({ ok: true, devices: [] });
+    }
+    if (String(url).endsWith("/api/state")) return response(fixture({ devices: [deviceSummary] }));
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  window.confirm = () => true;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    window.document.querySelector('[data-action="revoke-all-devices"]').click();
+    await waitFor(window, () => posted === 1);
+    await waitFor(window, (w) => !w.document.querySelector(".devicerow"));
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console keeps the manual token out of the normal install command", async () => {
+  const dom = await boot(async (url) => response(String(url).endsWith("/api/state") ? fixture() : {}));
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    const command = doc.querySelector("#guide-body .codeblock").textContent;
+    assert.match(command, /--pc/);
+    assert.doesNotMatch(command, /--token/);
+    assert.ok(doc.querySelector(".servercard").textContent.includes("pair automatically"));
   } finally {
     window.close();
   }

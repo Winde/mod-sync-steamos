@@ -40,10 +40,13 @@ The useful flow is:
 3. Run the Client installer/update.
 4. **Pack server → Stop server**.
 
-The token in **Settings** is the live token. Change or generate it there; a
-running server restarts and the install one-liner updates. A TV with an old or
-missing token shows up as a pairing request in the Server console; **Allow**
-sends it the current token once, and the Client keeps it in `agent.json`.
+A TV with no device token shows up as a pairing request in the Server console;
+**Allow** issues it a device token, and the Client keeps it in `agent.json`.
+The token in **Settings** is the **manual token** for CLI and unattended
+installs, and for older Clients with the shared token. Change or generate it
+there; a running server restarts, legacy clients are revoked, and paired TVs
+keep their own tokens. The **Paired devices** panel can revoke one TV or all of
+them.
 
 ## Steam Machine: one-time setup
 
@@ -51,17 +54,19 @@ sends it the current token once, and the Client keeps it in `agent.json`.
    the Proton prefix.
 2. Set the game to update only when launched, and keep the build the pack needs
    (Graceborne: 1.17 / `25827938`).
-3. In Desktop Mode, run the install one-liner printed by `serve`:
+3. In Desktop Mode, run the install one-liner printed by the Server console:
    ```bash
    curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
-     | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '<token>'
+     | bash -s -- --pc 'http://<PC-LAN-IP>:8787'
    ```
    This installs `~/Applications/ModSync.AppImage`, writes `agent.json`, and
    registers the ModSync Steam shortcut and art.
 4. Restart Steam once if the ModSync shortcut is not visible.
-5. Open ModSync and install the pack. Default-exe packs use the regular Steam
-   game link; loader/alternate-exe packs add their own shortcut.
-6. Launch the game once from the correct link. It creates the mod save.
+5. Open ModSync and approve its pairing request in the Server console. The TV
+   gets its own device token.
+6. Install the pack. Default-exe packs use the regular Steam game link;
+   loader/alternate-exe packs add their own shortcut.
+7. Launch the game once from the correct link. It creates the mod save.
 
 ## Every install or update
 
@@ -127,7 +132,7 @@ The base game and saves are never touched.
 The PC server is a temporary sync service, not a Windows service. Start it when
 the TV needs bytes; stop it afterwards. The console can start it with Windows
 sign-in, or you can start it by hand. It binds one private LAN address, needs a
-token, and is scoped to the local subnet.
+device token or the manual token, and is scoped to the local subnet.
 
 ## Interim vs target
 

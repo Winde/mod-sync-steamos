@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, net, shell } from "electron";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -46,10 +47,22 @@ function configPath(): string {
 
 function loadConfig(): AgentConfig {
   const file = configPath();
+  const config: AgentConfig = { root: path.join(os.homedir(), "ModSync") };
   if (file && fs.existsSync(file)) {
-    try { return readJson<AgentConfig>(file); } catch (err) { console.error(`[modsync] ${file}: ${errorMessage(err)}`); }
+    try { Object.assign(config, readJson<AgentConfig>(file)); } catch (err) { console.error(`[modsync] ${file}: ${errorMessage(err)}`); }
   }
-  return { root: path.join(os.homedir(), "ModSync") };
+  if (!config.deviceId) {
+    config.deviceId = crypto.randomUUID();
+    const target = file || path.join(os.homedir(), "ModSync", "agent.json");
+    try {
+      let current: Record<string, unknown> = {};
+      try { current = readJson<Record<string, unknown>>(target); } catch { /* first run writes a new file */ }
+      writeJson(target, { ...current, deviceId: config.deviceId });
+    } catch (err) {
+      console.error(`[modsync] ${target}: ${errorMessage(err)}`);
+    }
+  }
+  return config;
 }
 
 function saveConnection(connection: { pcUrl: string; token: string }): void {

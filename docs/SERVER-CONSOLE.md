@@ -5,7 +5,8 @@ pack server. It is a separate Electron application from the Client, and runs on
 Windows or Linux. Your usual setup is Server on Windows and Client on SteamOS.
 
 The console UI is served from `127.0.0.1` only. The pack server is a separate
-listener that binds one LAN address and uses the token shown in the console.
+listener that binds one LAN address and accepts paired-device tokens plus the
+manual token from Settings.
 
 ## Start it
 
@@ -27,22 +28,29 @@ packs folder and `--server-config <file>` (or the legacy `--console-config`) ove
 
 The **Pack server** card has one primary action:
 
-- **Start server** binds the selected address and port. The card shows the URL,
-  token, and the Client install one-liner while it runs.
+- **Start server** binds the selected address and port. The card shows the URL
+  and the Client install one-liner while it runs.
 - **Stop server** closes the LAN listener. The control UI stays open.
 
 The server is meant to run only while the Client installs or updates a
 pack. It refuses `0.0.0.0` and is never port-forwarded. Use a single LAN IPv4 if
 the server has VPN or virtual adapters.
 
-The token in **Settings** is the live token. **New token** generates a random
-replacement; saving restarts a running server so the change takes effect
-immediately. Copy the install one-liner again after changing it.
+A TV with no device token appears in the pack library as a pairing request.
+**Allow** issues that TV its own device token; **Deny** dismisses it. The Client
+stores the token and reconnects without asking again. Revoke it later in
+**Paired devices** without affecting other TVs.
 
-A TV that has the wrong token or no token yet appears in the pack library as a
-pairing request. **Allow** sends it the current token; **Deny** dismisses it.
-The Client stores the token and reconnects without asking again. Changing the
-token later requires one new approval per TV.
+The **Paired devices** panel lists every approved TV with its address and last
+seen time. **Revoke** removes one device; **Revoke all** clears the list. A TV
+that still has the old shared token appears as **manual token**; the Server
+identifies it by its stable device id when it sends one, or by its address when
+it does not.
+
+The **manual token** in **Settings** is for CLI and unattended installs, and for
+older Clients with the shared token. **New manual token** generates a random
+replacement; saving restarts a running server, revokes legacy clients, and
+leaves paired TVs working.
 
 ## Pack library
 
@@ -86,8 +94,10 @@ available for detail but no longer drives progress.
   the desktop folder picker, type the path and use **Save settings**.
 - **Bind** — automatic LAN address, loopback only, or one specific address.
 - **Port** — default `8787`.
-- **Token** — at least four characters, no spaces, commas, or single quotes. The current value is masked;
-  **Show** reveals it and **Copy** puts it on the clipboard.
+- **Manual token** — at least four characters, no spaces, commas, or single
+  quotes. Used by CLI and unattended installs, and accepted from older Clients
+  with the shared token. The current value is masked; **Show** reveals it.
+  Paired TVs do not use this token and are not affected when it changes.
 - **Start the pack server when ModSync starts** — keeps the server in sync with
   the app's own lifecycle.
 - **Start ModSync Server when I sign in** — registers the app's login item.
@@ -111,9 +121,9 @@ button. It contacts GitHub only when pressed. If a newer release exists, an
 **Install x.y.z** button appears next to it on an installed Windows Server.
 Confirming it downloads the new NSIS installer with a live progress bar,
 verifies its SHA-256 checksum, runs it silently, and reopens the Server when the
-install finishes. Packs, settings, and the token are kept. Elsewhere the button
-is **Update x.y.z** and opens the releases page. Otherwise the footer reports
-that the build is current.
+install finishes. Packs, settings, paired devices, and tokens are kept.
+Elsewhere the button is **Update x.y.z** and opens the releases page. Otherwise
+the footer reports that the build is current.
 
 The Client has the same manual **Check for updates** chip in its header. It no
 longer checks at launch. On the Linux AppImage the Client downloads and verifies
@@ -123,8 +133,10 @@ the new build itself; the Windows build opens the releases page.
 
 | Path | Purpose |
 |---|---|
-| `state/console.json` (checkout) | Console settings, token, packs folder, remembered sources |
+| `state/console.json` (checkout) | Console settings, manual token, packs folder, remembered sources |
 | `%APPDATA%/ModSync Server/console.json` (installed) | Same, for the installed build |
+| `state/devices.json` (checkout) | Paired-device token hashes, names, addresses, legacy tombstones |
+| `%APPDATA%/ModSync Server/devices.json` (installed) | Same, for the installed build |
 | `packs/` (checkout) | Default pack output and server root |
 | `Documents/ModSync/packs` (installed) | Default pack output and server root |
 | `packs/.modsync-build/` | Temporary build and backup folders; safe to remove when no build runs |

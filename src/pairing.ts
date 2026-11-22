@@ -18,8 +18,15 @@ export interface PairRequestView {
   createdAt: string;
 }
 
+export interface PairingTokenRequest {
+  id: string;
+  device: string;
+  address: string;
+  deviceId: string | null;
+}
+
 export interface PairingStore {
-  request(input: { device?: unknown; address?: string }): { requestId: string; status: "pending" };
+  request(input: { device?: unknown; deviceId?: unknown; address?: string }): { requestId: string; status: "pending" };
   status(id: string, address: string): { status: PairingStatus; token?: string };
   list(): PairRequestView[];
   approve(id: string): boolean;
@@ -29,9 +36,11 @@ export interface PairingStore {
 interface PairRecord {
   id: string;
   device: string;
+  deviceId: string | null;
   address: string;
   createdAt: number;
   status: "pending" | "approved" | "denied";
+  token?: string;
 }
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
@@ -51,13 +60,23 @@ function cleanDevice(value: unknown): string {
   return (text || "ModSync Client").slice(0, MAX_DEVICE_LENGTH);
 }
 
+function cleanDeviceId(value: unknown): string | null {
+  const text = String(value || "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim();
+  return text ? text.slice(0, 128) : null;
+}
+
 export function createPairingStore({
   token,
+  tokenFactory,
   ttlMs = DEFAULT_TTL_MS,
 }: {
-  token: string;
+  token?: string;
+  tokenFactory?: (request: PairingTokenRequest) => string;
   ttlMs?: number;
 }): PairingStore {
+  const fixedToken = String(token || "");
   const requests = new Map<string, PairRecord>();
   const byAddress = new Map<string, string[]>();
   const attempts = new Map<string, number[]>();
@@ -85,7 +104,7 @@ export function createPairingStore({
       .filter((record): record is PairRecord => !!record && record.status === "pending");
   }
 
-  function request({ device, address }: { device?: unknown; address?: string }): { requestId: string; status: "pending" } {
+  function request({ device, deviceId, address }: { device?: unknown; deviceId?: unknown; address?: string }): { requestId: string; status: "pending" } {
     const now = Date.now();
     prune(now);
     const from = cleanAddress(address);
@@ -97,8 +116,9 @@ export function createPairingStore({
     attempts.set(from, recent);
 
     const deviceName = cleanDevice(device);
+    const clientId = cleanDeviceId(deviceId);
     const pending = pendingFor(from);
-    const existing = pending.find((entry) => entry.device === deviceName);
+    const existing = pending.find((entry) => (clientId && entry.deviceId === clientId) || (!clientId && entry.device === deviceName));
     if (existing) return { requestId: existing.id, status: "pending" };
     if (pending.length >= MAX_PENDING_PER_ADDRESS) {
       throw new Error("Too many pending pairing requests.");
@@ -107,6 +127,7 @@ export function createPairingStore({
     const record: PairRecord = {
       id: crypto.randomUUID(),
       device: deviceName,
+      deviceId: clientId,
       address: from,
       createdAt: now,
       status: "pending",
@@ -122,7 +143,7 @@ export function createPairingStore({
     prune();
     const record = requests.get(id);
     if (!record || cleanAddress(address) !== record.address) return { status: "missing" };
-    if (record.status === "approved") return { status: "approved", token };
+    if (record.status === "approved") return { status: "approved", token: record.token || fixedToken };
     if (record.status === "denied") return { status: "denied" };
     return { status: "pending" };
   }
@@ -144,6 +165,14 @@ export function createPairingStore({
     prune();
     const record = requests.get(id);
     if (!record || record.status !== "pending") return false;
+    if (tokenFactory) {
+      record.token = tokenFactory({
+        id: record.id,
+        device: record.device,
+        address: record.address,
+        deviceId: record.deviceId,
+      });
+    }
     record.status = "approved";
     return true;
   }

@@ -6,7 +6,8 @@ listener, and only on the LAN.
 ## Two servers, one listener
 
 - **PC pack server** (`modsync serve --lan`) — the only LAN listener. Serves
-  pack metadata and files. Token required.
+  pack metadata and files. A paired device token, or the manual token for
+  CLI/unattended installs, is required.
 - **Electron app on the TV** — runs the installer in-process. Its renderer talks
   to the main process over IPC, not HTTP. It does not listen on the LAN. If a
   local control API is kept for automation, it binds `127.0.0.1` and uses a
@@ -51,18 +52,25 @@ choose one with `--host <ip>`.
 
 Test from the TV: `curl http://<PC-LAN-IP>:8787/api/health`.
 
-## Token
+## Tokens
 
-`serve` generates a random token per run unless `--token` is supplied. The token
-is required by `/api/*`. The install one-liner includes it; the TV app stores it
-in `~/ModSync/agent.json`. The dashboard is local and never exposes the token to
-the browser.
+A TV normally gets its own device token through pairing. If it gets `HTTP 403`,
+it asks `/api/pair/request`; the Server console shows the request, and **Allow**
+issues a random token for that device. The Server stores only the token hash;
+the Client saves the token in `~/ModSync/agent.json`. Later launches connect
+without another approval. Revoke one TV from **Paired devices** without touching
+the others.
 
-The Server app can also pair a TV without typing the token. If the TV gets
-`HTTP 403`, it asks `/api/pair/request`. The Server console shows the request,
-and **Allow** sends the current token to that TV. The Client saves the token in
-`agent.json`, so later launches connect without another approval. The approval
-is per token: rotating the Server token requires approving the TV again.
+The Server also keeps a **manual token**. It is accepted for CLI and unattended
+installs, and for older Clients that still have the shared token. A legacy
+Client is identified by its stable device id when it sends one, or by its
+address when it does not. Those clients appear as **manual token** devices.
+Rotating the manual token revokes every legacy client; paired device tokens stay
+valid. The normal install one-liner does not include the manual token.
+
+`modsync serve` (without the Server console) has no approval UI, so it prints the
+tokenized install one-liner. The Electron Server console prints the pairing
+one-liner instead.
 
 ## Steam Machine install
 
@@ -70,12 +78,14 @@ In Desktop Mode:
 
 ```bash
 curl -fsSL 'https://github.com/Winde/mod-sync-steamos/releases/latest/download/install.sh' \
-  | bash -s -- --pc 'http://<PC-LAN-IP>:8787' --token '…'
+  | bash -s -- --pc 'http://<PC-LAN-IP>:8787'
 ```
 
 The installer downloads `ModSync.AppImage` into `~/Applications`, verifies its
 checksum, writes `~/ModSync/agent.json`, creates the desktop entry, and adds the
-ModSync Steam shortcut and art.
+ModSync Steam shortcut and art. Open ModSync once and approve the pairing
+request in the Server console. For an unattended install, add `--token '…'` with
+the manual token from Settings.
 
 ## Pairing and changing IPs
 
@@ -86,8 +96,9 @@ Do not hardcode a PC address in the client. The intended Electron flow is:
 
 If the stored address stops answering, rediscover or let the user re-pair. If
 the Server rejects the stored token, the Client request appears in the Server
-console for one-click approval. The token stays in `agent.json`; the base URL
-is not a secret.
+console for one-click approval. The Client also stores a stable device id in
+`agent.json`; the Server uses it to keep a legacy client on the same device
+record when its IP changes. The base URL is not a secret.
 
 ## Updates
 

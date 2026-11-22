@@ -47,6 +47,8 @@ export interface AgentConfig {
   port?: number | string;
   pcUrl?: string;
   token?: string;
+  /** Stable installation id used to identify this TV during a legacy-token migration. */
+  deviceId?: string;
   steamRoot?: string;
   steamLibraries?: string[];
 }
@@ -181,6 +183,12 @@ export function createAgent(config: AgentOptions): Agent {
   const port = Number(config.port || 8788);
   let pcUrl = String(config.pcUrl || "").replace(/\/+$/, "");
   let token = config.token || "";
+  const deviceId = String(config.deviceId || "").trim() || crypto.randomUUID();
+  const deviceName = os.hostname();
+  const deviceHeaders = (): Record<string, string> => ({
+    "x-modsync-device": deviceId,
+    "x-modsync-device-name": deviceName,
+  });
   let pairing: PairingState = { status: "idle", message: null };
   let pairingRun = 0;
   const pairWaitMs = 2 * 60 * 1000;
@@ -249,7 +257,7 @@ export function createAgent(config: AgentOptions): Agent {
     if (!pcUrl) return (remoteCache = { at: Date.now(), packs: [], error: "PC URL is not configured" });
     try {
       const packs = await util.fetchJson<PackSummary[]>(`${pcUrl}/api/packs`, {
-        headers: { "x-modsync-token": token },
+        headers: { ...deviceHeaders(), "x-modsync-token": token },
         signal: AbortSignal.timeout(fetchTimeoutMs),
       });
       remoteCache = { at: Date.now(), packs, error: null };
@@ -276,7 +284,7 @@ export function createAgent(config: AgentOptions): Agent {
         const request = await util.fetchJson<{ requestId?: string }>(`${pcUrl}/api/pair/request`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ device: `ModSync Client (${os.hostname()})` }),
+          body: JSON.stringify({ device: `ModSync Client (${deviceName})`, deviceId }),
           signal: AbortSignal.timeout(fetchTimeoutMs),
         });
         const requestId = String(request.requestId || "");
@@ -395,8 +403,9 @@ export function createAgent(config: AgentOptions): Agent {
     const remote = await fetchRemote(true);
     const summary = (remote.packs || []).find((p) => p.id === id);
     if (!summary) throw new Error(`Pack not found: ${id}`);
-    const pack = await util.fetchJson<Pack>(`${pcUrl}/api/packs/${encodeURIComponent(id)}/pack.json`, { headers: { "x-modsync-token": token } });
-    const files = await util.fetchJson<FilesDoc>(`${pcUrl}/api/packs/${encodeURIComponent(id)}/files.json`, { headers: { "x-modsync-token": token } });
+    const headers = { ...deviceHeaders(), "x-modsync-token": token };
+    const pack = await util.fetchJson<Pack>(`${pcUrl}/api/packs/${encodeURIComponent(id)}/pack.json`, { headers });
+    const files = await util.fetchJson<FilesDoc>(`${pcUrl}/api/packs/${encodeURIComponent(id)}/files.json`, { headers });
     return { pack, files };
   }
 
@@ -435,7 +444,7 @@ export function createAgent(config: AgentOptions): Agent {
       if (!game) throw new Error(`${pack.game.title} was not found in the Steam libraries.`);
       log(`Installing ${pack.name} ${pack.mod.version}`);
       await installer.installPack({
-        pack, filesDoc: files, remoteBase: pcUrl, token, root, game,
+        pack, filesDoc: files, remoteBase: pcUrl, token, deviceId, deviceName, root, game,
         signal: job.controller.signal,
         confirmed: readConfirmations()[packId] || {},
         progress: (p: ProgressUpdate) => { Object.assign(job, p); },
@@ -502,7 +511,7 @@ export function createAgent(config: AgentOptions): Agent {
       } catch { /* fall back to the PC */ }
     }
     const res = await fetch(`${pcUrl}/api/packs/${encodeURIComponent(packId)}/art/${encodeURIComponent(key)}`, {
-      headers: { "x-modsync-token": token },
+      headers: { ...deviceHeaders(), "x-modsync-token": token },
     });
     if (!res.ok) throw new Error(`art HTTP ${res.status}`);
     const buf = Buffer.from(await res.arrayBuffer());

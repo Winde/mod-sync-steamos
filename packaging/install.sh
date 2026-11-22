@@ -29,7 +29,7 @@ Usage: install.sh [options]
 
   --version vX.Y.Z   Install a specific release (default: latest)
   --pc <url>         PC pack server URL, e.g. http://192.168.1.20:8787
-  --token <token>    PC pack server token
+  --token <token>    Manual token for an unattended install (optional)
   --no-steam         Install the app but do not add a Steam shortcut
   --force-art        Replace library artwork changed in Steam with the packaged set
   --uninstall        Remove the AppImage, desktop entry and icon (keeps packs)

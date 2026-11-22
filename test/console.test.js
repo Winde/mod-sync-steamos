@@ -107,6 +107,12 @@ test("Server console lists, rebuilds, serves, and removes packs", async (t) => {
   assert.equal((await authorized.json()).length, 1);
   assert.equal((await fetch(`${status.url}/api/packs`)).status, 403);
 
+  const legacyDevice = (await service.state()).devices.find((device) => device.legacy);
+  assert.ok(legacyDevice);
+  service.revokeDevice(legacyDevice.id);
+  assert.equal((await service.state()).devices.length, 0);
+  assert.equal((await fetch(`${status.url}/api/packs?token=test-token-1`)).status, 403);
+
   const rotated = await service.updateSettings({ token: "test-token-2" });
   assert.equal(rotated.server.running, true);
   assert.equal((await fetch(`${rotated.server.url}/api/packs?token=test-token-1`)).status, 403);

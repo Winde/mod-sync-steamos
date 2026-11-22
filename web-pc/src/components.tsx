@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { desktopBridge, formatBytes, formatDate, maskToken, platformName } from "./api";
+import { desktopBridge, formatBytes, formatDate, platformName } from "./api";
 import type {
   BuildFormState,
   BuildJobState,
   ConsoleState,
   ContentsItemState,
   ContentsState,
+  DeviceState,
   PackState,
   PairRequestState,
   SettingsDraft,
@@ -306,12 +307,9 @@ export function ContentsModal({ pack, onClose }: {
   );
 }
 
-export function ServerPanel({ data, tokenVisible, onToggleToken, onCopyUrl, onCopyToken, onOpenUrl, onGoToSettings }: {
+export function ServerPanel({ data, onCopyUrl, onOpenUrl, onGoToSettings }: {
   data: ConsoleState | null;
-  tokenVisible: boolean;
-  onToggleToken: () => void;
   onCopyUrl: () => void;
-  onCopyToken: () => void;
   onOpenUrl: () => void;
   onGoToSettings: () => void;
 }) {
@@ -359,13 +357,6 @@ export function ServerPanel({ data, tokenVisible, onToggleToken, onCopyUrl, onCo
               <button className="btn small" data-action="open-url" onClick={onOpenUrl}>Open</button>
               <button className="btn small" data-action="copy-url" onClick={onCopyUrl}>Copy</button>
             </div>
-            <div className="copyrow">
-              <span className="label">Token</span>
-              <span className="value">{tokenVisible ? data.settings.token : "••••••••••••••••"}</span>
-              <button className="btn small" data-action="toggle-token" onClick={onToggleToken}>{tokenVisible ? "Hide" : "Show"}</button>
-              <button className="btn small" data-action="copy-token" onClick={onCopyToken}>Copy</button>
-              <button className="btn small ghost" data-action="goto-settings" onClick={onGoToSettings}>Change</button>
-            </div>
             {error}
           </>
         ) : (
@@ -391,7 +382,59 @@ export function ServerPanel({ data, tokenVisible, onToggleToken, onCopyUrl, onCo
             <p className="hint">Use the Start server button above when the SteamOS client needs to install or update a pack.</p>
           </>
         )}
+        <p className="hint">TVs pair automatically. Approve them in the pack library; the manual token in Settings is only for CLI or unattended installs.</p>
       </div>
+    </section>
+  );
+}
+
+export function DevicesPanel({ data, busy, onRevoke, onRevokeAll }: {
+  data: ConsoleState | null;
+  busy: boolean;
+  onRevoke: (device: DeviceState) => void;
+  onRevokeAll: () => void;
+}) {
+  const devices = data?.devices || [];
+  return (
+    <section className="panel">
+      <div className="panelhead compact">
+        <div>
+          <h2>Paired devices</h2>
+          <p className="muted">TVs approved by this console. Revoking one does not affect the others.</p>
+        </div>
+        {devices.length ? (
+          <button className="btn small danger" data-action="revoke-all-devices" disabled={busy} onClick={onRevokeAll}>Revoke all</button>
+        ) : null}
+      </div>
+      {devices.length ? (
+        <div className="devicelist">
+          {devices.map((device) => (
+            <div className="devicerow" key={device.id}>
+              <div>
+                <div className="devicename">
+                  {device.name}
+                  {device.legacy ? <span className="badge amber">manual token</span> : null}
+                </div>
+                <div className="devicemeta">
+                  {device.address || "unknown address"} · last seen {device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "never"}
+                </div>
+              </div>
+              <button
+                className="btn small danger"
+                data-action="revoke-device"
+                data-id={device.id}
+                disabled={busy}
+                onClick={() => onRevoke(device)}
+              >Revoke</button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">No devices yet. A new TV appears as a pairing request in the pack library.</p>
+      )}
+      {devices.some((device) => device.legacy) ? (
+        <p className="hint">Manual-token clients can reconnect until you rotate the manual token in Settings.</p>
+      ) : null}
     </section>
   );
 }
@@ -464,18 +507,19 @@ export function SettingsPanel({ draft, data, saving, saved, onChange, onBrowsePa
             <input id="server-port" className="input" type="number" min="1" max="65535" step="1" value={draft.port} onChange={(event) => onChange({ port: event.target.value })} />
           </div>
           <div>
-            <label htmlFor="server-token">Token</label>
+            <label htmlFor="server-token">Manual token</label>
             <div className="inputrow">
               <input id="server-token" className="input" type={showToken ? "text" : "password"} spellCheck={false} value={draft.token} onChange={(event) => onChange({ token: event.target.value })} />
               <button id="token-toggle" className="btn small" type="button" onClick={() => setShowToken((value) => !value)}>{showToken ? "Hide" : "Show"}</button>
             </div>
+            <p className="hint">For CLI and older clients. Paired TVs receive their own device token.</p>
           </div>
         </div>
         <div className="actions">
-          <button id="token-generate" className="btn small" type="button" onClick={onGenerateToken}>New token</button>
+          <button id="token-generate" className="btn small" type="button" onClick={onGenerateToken}>New manual token</button>
           <span className="hint">
             {data.app.tokenStorage === "protected" ? "Saved with OS user protection." : "Saved in the console config file."}{" "}
-            A running server restarts when the token changes.
+            Changing it restarts a running server and revokes legacy clients; paired TVs keep working.
           </span>
         </div>
         <label className="check">
@@ -504,13 +548,12 @@ export function SettingsPanel({ draft, data, saving, saved, onChange, onBrowsePa
   );
 }
 
-export function GuidePanel({ data, tokenVisible, onCopyInstall, onCopyFirewall }: {
+export function GuidePanel({ data, onCopyInstall, onCopyManualInstall, onCopyFirewall }: {
   data: ConsoleState | null;
-  tokenVisible: boolean;
   onCopyInstall: () => void;
+  onCopyManualInstall: () => void;
   onCopyFirewall: () => void;
 }) {
-  const installCommand = data ? maskToken(data.guide.installCommand, data.settings.token) : "";
   return (
     <details className="panel help">
       <summary>
@@ -525,11 +568,20 @@ export function GuidePanel({ data, tokenVisible, onCopyInstall, onCopyFirewall }
           <>
             {data.settings.bind === "loopback" ? <div className="callout">Loopback mode is for testing on this server. The SteamOS client cannot reach a loopback server.</div> : null}
             <h3>1. Install the app on the TV</h3>
-            <pre className="codeblock">{installCommand}</pre>
+            <pre className="codeblock">{data.guide.installCommand}</pre>
             <div className="actions">
               <button className="btn small" data-action="copy-install" onClick={onCopyInstall}>Copy</button>
-              {data.settings.bind !== "loopback" && !tokenVisible ? <span className="hint">Copying includes the token.</span> : null}
+              <span className="hint">The TV pairs after install. Approve it in the pack library.</span>
             </div>
+            {data.guide.manualInstallCommand ? (
+              <details className="manualinstall">
+                <summary>Manual install (contains the manual token)</summary>
+                <p className="hint">For unattended installs. The TV connects with the manual token from Settings instead of pairing.</p>
+                <div className="actions">
+                  <button className="btn small" data-action="copy-manual-install" onClick={onCopyManualInstall}>Copy manual command</button>
+                </div>
+              </details>
+            ) : null}
             <h3>2. Let the client reach this server</h3>
             <p className="hint">Allow the port once from an admin PowerShell. Local subnet only.</p>
             <pre className="codeblock">{data.guide.firewallCommand}</pre>
