@@ -125,8 +125,7 @@ test("the BG3 driver records the active module list in the pack", async () => {
     assert.deepEqual(result.pack.contents.inactive, ["extra.pak"]);
 
     assert.equal(result.pack.platforms["linux-native"].exe, "bin/bg3");
-    assert.equal(result.pack.platforms["linux-native"].gameProcess, "bg3.bg3le-real");
-    assert.equal(result.pack.platforms["linux-native"].gameProcessAlt, "bg3");
+    assert.equal(result.pack.platforms["linux-native"].gameProcess, "bg3");
     assert.equal(result.pack.platforms["linux-native"].template, "games/bg3-native.sh");
     assert.equal(result.pack.platforms["linux-proton"].gameProcess, "bg3.exe");
     assert.match(result.pack.platforms["linux-proton"].dataDir, /^%PREFIX%/);

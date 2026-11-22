@@ -96,8 +96,6 @@ test("native BG3 install wraps the game and reverts cleanly", { skip, timeout: 1
   assert.equal(applied.version, "1.0.0");
   assert.equal(applied.platform, "linux-native");
   assert.deepEqual(applied.skipped, ["bg3se"]);
-  assert.equal(applied.nativeLoader.wrapper, "bin/bg3");
-  assert.equal(applied.nativeLoader.real, "bin/bg3.bg3le-real");
 
   const loaderSnapshot = path.join(
     installedRoot,
@@ -118,26 +116,24 @@ test("native BG3 install wraps the game and reverts cleanly", { skip, timeout: 1
     /modsync-1\.0\.0/,
   );
   assert.equal(
-    fs.readFileSync(path.join(dataHome, "bg3le", "build", "libbg3le.so"), "utf8"),
+    fs.readFileSync(path.join(dataHome, "bg3le", "lib", "libbg3le.so"), "utf8"),
     "bg3le-0.4.6",
   );
   assert.equal(fs.existsSync(path.join(gameRoot, "bin/DWrite.dll")), false);
 
-  const wrapper = fs.readFileSync(path.join(gameRoot, "bin/bg3"), "utf8");
-  assert.match(wrapper, /ModSync BG3LE wrapper/);
-  assert.match(wrapper, /bg3\.bg3le-real/);
-  assert.equal(
-    fs.readFileSync(path.join(gameRoot, "bin/bg3.bg3le-real"), "utf8"),
-    "vanilla-native",
-  );
+  // BG3LE only attaches when /proc/self/exe is named bg3. The game binary
+  // must stay Steam's own; the old loader renamed it and disabled BG3LE.
+  assert.equal(fs.readFileSync(path.join(gameRoot, "bin/bg3"), "utf8"), "vanilla-native");
+  assert.equal(fs.existsSync(path.join(gameRoot, "bin/bg3.bg3le-real")), false);
 
   const launcher = fs.readFileSync(
     path.join(installedRoot, "launchers", `launch-${MOD_ID}.sh`),
     "utf8",
   );
-  assert.match(launcher, /ModSync BG3LE wrapper/);
-  assert.match(launcher, /bg3\.bg3le-real/);
-  assert.match(launcher, /mods\/\$MOD\/versions\/\$VER\/tools\/bg3le/);
+  assert.match(launcher, /steam -applaunch/);
+  assert.match(launcher, /bg3le-launch/);
+  assert.doesNotMatch(launcher, /bg3\.bg3le-real/);
+  assert.doesNotMatch(launcher, /ModSync BG3LE wrapper/);
 
   // Removing the pack restores the original binary and vanilla data files.
   const cleared = await request(agent.base, "/api/storage/clear", {

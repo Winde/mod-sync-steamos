@@ -119,6 +119,40 @@ partial downloads. From there you can:
 
 The base game and saves are never touched.
 
+## When the game crashes on the Steam Machine
+
+Collect the logs before changing anything. On the Steam Machine, run the
+collector from a checkout (or copy it over) and send the archive:
+
+```bash
+bash scripts/collect-bg3-logs.sh
+# ~/bg3-logs-<date>-<time>.tgz
+```
+
+It gathers the ModSync install/agent logs, the pack's launch logs, BG3LE's
+`~/.local/share/bg3le` logs, BG3's `Player.log` / `Player-prev.log`, the active
+`modsettings.lsx`, the game's `bin/` listing, and the BG3 launch options. It
+does not include saves or account credentials.
+
+For BG3 specifically, the useful paths are:
+
+| Path | What it answers |
+|---|---|
+| `~/.local/share/bg3le/logs/*.log` and `launch.log` | Did BG3LE attach, and how far did it get? No files means it never attached. |
+| `~/.local/share/Larian Studios/Baldur's Gate 3/Player.log` | BG3's own startup log and the last mod it tried to load. |
+| `<game>/bin/gold.log`, `<game>/bin/db/attachments` | Larian crash dumps and the launcher log. |
+| `~/ModSync/logs/agent.log`, `install.log` | What ModSync installed and where. |
+| `~/ModSync/packs/<pack>/logs/launch-bg3-native-*.log` | What the native launcher did. |
+
+If the whole machine rebooted or froze rather than the game exiting, also run
+`journalctl -b -1 -p err --no-pager` after it comes back; that previous-boot
+kernel log is the only place a driver or GPU crash shows up.
+
+Native Baldur's Gate 3 is a Steam Deck build; Larian does not support it on
+desktop Linux. On an NVIDIA + Wayland desktop the known launch crash is fixed
+by `SDL_VIDEODRIVER=x11` in Steam's launch options, or by running the game
+under Proton. The pack supports both the native and Proton variants.
+
 ## What runs when
 
 | Time | PC server | Steam Machine |

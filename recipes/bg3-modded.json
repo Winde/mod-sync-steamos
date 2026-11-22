@@ -22,8 +22,7 @@
       "dataDir": "%DATA_HOME%/Larian Studios/Baldur's Gate 3",
       "saveDir": "%DATA_HOME%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
       "exe": "bin/bg3",
-      "gameProcess": "bg3.bg3le-real",
-      "gameProcessAlt": "bg3",
+      "gameProcess": "bg3",
       "shortcut": "Baldur's Gate 3 (with mods)",
       "template": "games/bg3-native.sh"
     }
@@ -41,7 +40,7 @@
     },
     {
       "title": "Native Linux is self-contained",
-      "body": "On the native Linux build, this pack bundles BG3LE and installs a reversible game-binary wrapper. Use the Baldur's Gate 3 (with mods) entry; it repairs the wrapper after a Steam game update and then launches the real Steam app.",
+      "body": "On the native Linux build, the pack leaves Steam's game binary untouched and installs the bundled BG3LE files in the standard per-user location. The current launcher starts the game through Steam without preloading BG3LE, so data mods load but Script Extender mods may not.",
       "tone": "info"
     }
   ],

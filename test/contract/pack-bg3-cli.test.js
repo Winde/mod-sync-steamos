@@ -64,8 +64,7 @@ test("BG3 pack CLI produces a complete multi-platform pack contract", { timeout:
   assert.equal(pack.launch.type, "steam");
   assert.equal(pack.launch.mode, "default");
   assert.equal(pack.platforms["linux-native"].exe, "bin/bg3");
-  assert.equal(pack.platforms["linux-native"].gameProcess, "bg3.bg3le-real");
-  assert.equal(pack.platforms["linux-native"].gameProcessAlt, "bg3");
+  assert.equal(pack.platforms["linux-native"].gameProcess, "bg3");
   assert.equal(pack.platforms["linux-native"].template, "games/bg3-native.sh");
 
   // Contents are normalized for the dashboard and the refresh script.

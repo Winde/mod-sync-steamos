@@ -76,7 +76,7 @@ test("BG3 apply switches versions and reverts to the original files", (t) => {
   assert.equal(fs.existsSync(path.join(packRoot, "applied.json")), false);
 });
 
-test("BG3 apply on a native Linux build installs BG3LE and wraps the game binary", (t) => {
+test("BG3 apply on a native Linux build installs BG3LE without touching the game binary", (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-bg3-native-"));
   const oldDataHome = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = path.join(base, "datahome");
@@ -95,7 +95,9 @@ test("BG3 apply on a native Linux build installs BG3LE and wraps the game binary
   const src = path.join(packRoot, "mods", "bg3", "versions", "1.0.0");
   write(path.join(gameRoot, "bin", "bg3"), "native-binary");
   write(path.join(packRoot, "tools", "bg3le", "build", "libbg3le.so"), "library");
-  write(path.join(packRoot, "tools", "bg3le", "install.py"), "installer");
+  write(path.join(packRoot, "tools", "bg3le", "installer", "bg3le-launch"), "#!/bin/sh\n");
+  write(path.join(packRoot, "tools", "bg3le", "client", "bg3lua"), "#!/bin/sh\n");
+  write(path.join(packRoot, "tools", "bg3le", "VERSION"), "v0.4.6\n");
   write(path.join(src, "Mods", "a.pak"), "native-a");
   write(path.join(src, "modsettings.lsx"), "native-settings");
   write(path.join(src, "bg3se", "DWrite.dll"), "windows-dll");
@@ -110,13 +112,17 @@ test("BG3 apply on a native Linux build installs BG3LE and wraps the game binary
   assert.equal(fs.readFileSync(path.join(dataDir, "PlayerProfiles", "Public", "modsettings.lsx"), "utf8"), "native-settings");
   assert.equal(fs.existsSync(path.join(gameRoot, "bin", "DWrite.dll")), false);
   assert.equal(fs.readFileSync(path.join(dataDir, "Script Extender", "Test", "Config.json"), "utf8"), "windows-config");
-  assert.equal(fs.readFileSync(path.join(gameRoot, "bin", "bg3.bg3le-real"), "utf8"), "native-binary");
-  assert.match(fs.readFileSync(path.join(gameRoot, "bin", "bg3"), "utf8"), /ModSync BG3LE wrapper/);
-  assert.equal(fs.readFileSync(path.join(process.env.XDG_DATA_HOME, "bg3le", "build", "libbg3le.so"), "utf8"), "library");
-  assert.equal(applied.nativeLoader.wrapper, "bin/bg3");
+  assert.equal(fs.readFileSync(path.join(gameRoot, "bin", "bg3"), "utf8"), "native-binary");
+  assert.equal(fs.existsSync(path.join(gameRoot, "bin", "bg3.bg3le-real")), false);
+  const bg3le = path.join(process.env.XDG_DATA_HOME, "bg3le");
+  assert.equal(fs.readFileSync(path.join(bg3le, "lib", "libbg3le.so"), "utf8"), "library");
+  assert.equal(fs.readFileSync(path.join(bg3le, "bin", "bg3le-launch"), "utf8"), "#!/bin/sh\n");
+  assert.equal(fs.readFileSync(path.join(bg3le, "client", "bg3lua"), "utf8"), "#!/bin/sh\n");
+  assert.equal(fs.readFileSync(path.join(bg3le, "version"), "utf8"), "v0.4.6\n");
+  assert.equal(applied.nativeLoader.lib, path.join(bg3le, "lib", "libbg3le.so"));
   const planBefore = plan({ pack, root });
   assert.equal(planBefore.ok, true);
-  assert.ok(planBefore.actions.some((action) => action.includes("original Baldur's Gate 3 executable")));
+  assert.ok(planBefore.actions.some((action) => action.includes("Remove the bundled BG3LE directory")));
 
   revertBg3({ pack, root, log: () => { } });
   assert.equal(fs.existsSync(path.join(dataDir, "Mods", "a.pak")), false);

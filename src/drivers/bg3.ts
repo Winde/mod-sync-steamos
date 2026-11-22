@@ -55,8 +55,7 @@ const DEFAULT_PLATFORMS: Platforms = {
     dataDir: "%DATA_HOME%/Larian Studios/Baldur's Gate 3",
     saveDir: "%DATA_HOME%/Larian Studios/Baldur's Gate 3/PlayerProfiles",
     exe: "bin/bg3",
-    gameProcess: "bg3.bg3le-real",
-    gameProcessAlt: "bg3",
+    gameProcess: "bg3",
     shortcut: "Baldur's Gate 3 (with mods)",
     template: "games/bg3-native.sh",
   },
@@ -423,7 +422,7 @@ export async function buildPack({
   notes.push({
     title: "Script Extender",
     body: bg3seFiles
-      ? "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. BG3LE is bundled for the native Linux build and installed with the pack."
+      ? "BG3 Script Extender (DWrite.dll) is included for Windows and Proton. The native Linux build keeps Steam's game binary untouched and installs the bundled BG3LE files in the standard per-user location; the current launcher does not preload BG3LE, so Script Extender mods may not load."
       : "This pack has no BG3 Script Extender files. Install BG3SE (Windows/Proton) or BG3LE (native Linux) before using Script Extender mods.",
     tone: bg3seFiles ? "info" : "warning",
   });

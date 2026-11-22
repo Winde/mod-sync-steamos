@@ -19,7 +19,7 @@ splitting, or renaming modules does not require touching these tests.
 | `agent-install-gates.test.js` | a mismatched build, a running game, a secondary game process, and a missing Proton prefix block install before the TV pack directory exists |
 | `agent-install-policy.test.js` | a pack that omits a build, prefix, running-state, or disk precondition is not blocked by hidden installer policy; the declared checks are authoritative |
 | `agent-bg3-overlay.test.js` | BG3 install/update/rollback/pack removal keep the game data directory and Script Extender files reversible |
-| `agent-bg3-native.test.js` | native Linux BG3 installs BG3LE, wraps `bin/bg3`, skips Windows BG3SE files, and reverts the wrapper and data files on removal (Linux only) |
+| `agent-bg3-native.test.js` | native Linux BG3 installs BG3LE in the canonical per-user layout, leaves `bin/bg3` untouched, skips Windows BG3SE files, and reverts the loader and data files on removal (Linux only) |
 | `agent-rollback.test.js` | two installed versions, pointer switch, both versions kept, version list and status; offline listing, BOM pack data, and offline rollback |
 | `agent-offline.test.js` | an installed pack remains listed after the PC server stops |
 | `agent-storage.test.js` | `/api/storage` usage report, staging/old-version/log/pack clearing, invalid input, pack removal safety, and the running-game and active-install guards |

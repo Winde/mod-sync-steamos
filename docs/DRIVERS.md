@@ -94,7 +94,7 @@ custom install steps (e.g. WeiDU).
 |---|---|---|---|---|
 | ELDEN RING | Overlay | `eldenring` | me3 | v1; build 25827938 / 1.17; recipes for Graceborne and Convergence |
 | Skyrim SE | Overlay/profile | `skyrim-se` | SKSE + MO2/Vortex | save paths/MO2 profile later |
-| Baldur's Gate 3 | Profile | `bg3` | BG3SE on Windows/Proton, BG3LE on native Linux, modsettings | implemented |
+| Baldur's Gate 3 | Profile | `bg3` | BG3SE on Windows/Proton, BG3LE on native Linux, modsettings | implemented; native BG3LE files are installed without changing Steam's `bin/bg3` |
 | Baldur's Gate EE | Snapshot overlay | `bg1` | EEex/InfinityLoader optional | SoD DLC merger is a base-prep step; EET is separate |
 | Baldur's Gate II EE | Snapshot overlay | `bg2` | EEex/InfinityLoader optional | EET is a total conversion and needs replay/base delta |
 | Icewind Dale EE | Snapshot overlay | `iwdee` | EEex/InfinityLoader optional | Expansions are part of the base game |
