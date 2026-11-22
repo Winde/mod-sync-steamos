@@ -209,6 +209,7 @@ if (!app.requestSingleInstanceLock()) {
       setTimeout(() => app.quit(), CLOSING_OVERLAY_MS);
     });
     ipcMain.handle("modsync:releases", () => shell.openExternal(RELEASES_PAGE));
+    ipcMain.on("modsync:quit", () => app.quit());
 
     const url = await startAgent();
     createWindow(url);

@@ -547,7 +547,12 @@ export default function App() {
     if (confirmRef.current) { dismissConfirm(); return; }
     if (downloadRef.current) { setDownload(null); return; }
     if (viewRef.current === "storage" || viewRef.current === "details") { setView("home"); return; }
-    if (libraryViewRef.current === "packs") setLibraryView("games");
+    if (libraryViewRef.current === "packs") { setLibraryView("games"); return; }
+    // A running job owns the screen, and a failed one has its own Back button.
+    if (jobRef.current?.status === "running") return;
+    if (jobRef.current?.status === "error") { setJob(null); return; }
+    // Nothing left to go back to: home is the way out, as on the other TV apps.
+    window.modsyncDesktop?.quit?.();
   };
 
   keyHandlerRef.current = (event: KeyboardEvent) => {

@@ -5,6 +5,7 @@ const api = {
   checkUpdate: (): Promise<unknown> => ipcRenderer.invoke("modsync:update-check"),
   installUpdate: (): Promise<void> => ipcRenderer.invoke("modsync:update-install"),
   openReleases: (): Promise<void> => ipcRenderer.invoke("modsync:releases"),
+  quit: (): void => ipcRenderer.send("modsync:quit"),
 };
 
 contextBridge.exposeInMainWorld("modsyncDesktop", api);

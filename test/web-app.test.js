@@ -434,6 +434,34 @@ test("details shows notes, checks, and the recent log", async () => {
   }
 });
 
+test("B closes details first and quits from home", async () => {
+  let quits = 0;
+  const dom = await boot({
+    fetchImpl: routedFetch({
+      "/api/state": jsonResponse(stateFixture(packFixture())),
+      "/api/logs": textResponse("line one\n"),
+    }),
+    desktop: { quit: () => { quits++; } },
+  });
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".hero h1")?.textContent === "Graceborne");
+    const doc = window.document;
+    const pressB = () => window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "b" }));
+
+    doc.querySelector('[data-action="details"]').click();
+    await waitFor(window, (w) => w.document.querySelector("#overlay .panel h2")?.textContent === "Graceborne");
+    pressB();
+    await waitFor(window, (w) => w.document.querySelector("#overlay").classList.contains("hidden"));
+    assert.equal(quits, 0);
+
+    pressB();
+    await waitFor(window, () => quits === 1);
+  } finally {
+    window.close();
+  }
+});
+
 test("the client checks for app updates only when asked", async () => {
   let checks = 0;
   let opened = 0;

@@ -13,6 +13,7 @@ export interface ModsyncDesktop {
   checkUpdate(): Promise<UpdateInfo | null>;
   installUpdate(): Promise<void>;
   openReleases(): Promise<void>;
+  quit(): void;
   pickFolder?(title?: string): Promise<string | null>;
 }
 
