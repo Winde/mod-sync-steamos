@@ -58,6 +58,21 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospac
 .pill.error { border-color: rgba(248, 113, 113, 0.4); color: #fecaca; }
 .pill.error .dot { background: var(--danger); }
 
+.viewtabs { display: flex; align-items: center; gap: 5px; margin-top: -4px; }
+.viewtab {
+  appearance: none; cursor: pointer; color: #9aa6b8;
+  border: 1px solid transparent; border-radius: 8px;
+  background: transparent; padding: 7px 11px;
+  font-size: 13px; font-weight: 650; display: inline-flex; align-items: center; gap: 7px;
+}
+.viewtab:hover { color: var(--fg); background: rgba(17, 24, 34, 0.7); }
+.viewtab.on { color: var(--fg); background: rgba(17, 24, 34, 0.96); border-color: var(--line-strong); }
+.viewtab:focus-visible { outline: 2px solid var(--red-soft); outline-offset: 2px; }
+.viewcount {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1); color: #cbd5e1;
+  font-size: 10.5px; text-align: center;
+}
 .layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.85fr); gap: 18px; align-items: start; }
 .side { display: flex; flex-direction: column; gap: 18px; }
 .panel {
@@ -363,6 +378,7 @@ textarea.input { resize: vertical; min-height: 84px; font: inherit; line-height:
   flex-wrap: wrap; font-size: 12.5px;
 }
 .contentsname { min-width: 0; overflow-wrap: anywhere; }
+.contentsmeta { display: block; color: #6f7b8f; font-size: 10.5px; margin-top: 2px; }
 .contentsside { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .contentsside code {
   flex: 0 1 auto; color: #6f7b8f; font-size: 10.5px; text-align: right;
@@ -385,6 +401,51 @@ textarea.input { resize: vertical; min-height: 84px; font: inherit; line-height:
 .reviewform textarea.input { min-height: 64px; }
 .contentsnote { margin: 16px 0 6px; color: var(--muted); font-size: 12px; }
 .contentsinactive { color: #8b96a8; font-size: 11.5px; line-height: 1.6; overflow-wrap: anywhere; }
+
+.cataloghint { margin: -4px 0 12px; max-width: 76ch; }
+.catalogtools {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 12px;
+}
+.catalogtools .input[type="search"] { flex: 1 1 260px; }
+.catalogreviewed { flex: 0 0 auto; }
+.cataloglist { display: flex; flex-direction: column; gap: 8px; }
+.catalogcard {
+  border: 1px solid var(--line); border-radius: 10px;
+  background: rgba(8, 12, 18, 0.6); padding: 11px 13px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.catalogcard.historical { border-style: dashed; opacity: 0.82; }
+.cataloghead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cataloghead > div { min-width: 0; }
+.catalogname { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
+.cataloggame { color: var(--muted); font-size: 11.5px; margin-top: 2px; overflow-wrap: anywhere; }
+.catalogmeta { display: flex; flex-wrap: wrap; gap: 5px; }
+.catalogpath {
+  color: #6f7b8f; font-size: 10.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.catalogpath code { font-size: 10.5px; }
+.catalogreview {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  color: var(--muted); font-size: 12px;
+}
+.catalogdetails {
+  display: flex; flex-direction: column; gap: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 7px;
+  color: #9aa6b8; font-size: 11.5px; overflow-wrap: anywhere;
+}
+.catalogdetails b { color: #cbd5e1; font-weight: 600; }
+.catalogactions { display: flex; gap: 7px; flex-wrap: wrap; }
+.catalogcard .reviewform { margin-top: 2px; }
+.docspreview {
+  margin: 0; max-height: 55vh; overflow: auto;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: rgba(4, 7, 11, 0.8); padding: 12px 14px;
+  color: #cbd5e1; font-size: 11.5px; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.docspreview + .actions { margin-top: 14px; }
 
 .toasts { position: fixed; right: 22px; bottom: 22px; z-index: 30; display: flex; flex-direction: column; gap: 8px; max-width: min(420px, 80vw); }
 .toast {

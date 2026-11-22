@@ -48,6 +48,15 @@ On the server machine, `npm run dev:server` opens the Server console. Check with
    its own device token and it reconnects without asking after a restart.
    **Deny** leaves it unpaired. Revoking that device forces it to pair again
    without touching another TV.
+11. Open **Mods & docs**. The catalog lists mods from every current pack, with
+   game, version/method metadata when the driver found it, current pack usage,
+   and reviews. Search and the game filter narrow the list; **Details** shows
+   first/last seen, build history, and load-order hints. **Copy Markdown**
+   copies the catalog export.
+12. On a pack card, **Docs** opens the generated `DOCS.md` in the console. It
+   should contain the pack metadata, mod table, order hints, inactive files,
+   notes, preconditions, and package summary. `npm run docs` regenerates the
+   file for every pack without rebuilding.
 
 ## 0b. Stop old listeners
 

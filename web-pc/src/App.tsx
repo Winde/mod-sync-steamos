@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, chooseImageFile, copyText, desktopBridge, fileToDataUrl, messageOf, randomToken } from "./api";
 import {
   BuildModal,
+  CatalogPanel,
   DevicesPanel,
   EditPackModal,
   GuidePanel,
@@ -17,6 +18,7 @@ import type {
   BuildFormState,
   BuildJobState,
   BuildStartOptions,
+  CatalogEntryState,
   ConsoleState,
   ContentsItemState,
   DeviceState,
@@ -56,6 +58,7 @@ function sameDraft(a: SettingsDraft, b: SettingsDraft): boolean {
 
 export default function App() {
   const [data, setData] = useState<ConsoleState | null>(null);
+  const [view, setView] = useState<"packs" | "docs">("packs");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pairBusy, setPairBusy] = useState(false);
@@ -264,6 +267,29 @@ export default function App() {
       }),
     } : current);
     return result.review;
+  };
+
+  const saveCatalogReview = async (entry: CatalogEntryState, rating: number, body: string): Promise<ModReviewState | null> => {
+    const result = await api<{ review: ModReviewState | null }>("/api/reviews", {
+      method: "POST",
+      body: JSON.stringify({ gameId: entry.gameId, modId: entry.modId, name: entry.name, rating, body }),
+    });
+    await refresh();
+    return result.review;
+  };
+
+  const copyCatalogDocs = async () => {
+    try {
+      const result = await api<{ markdown: string }>("/api/catalog/export");
+      const ok = await copyText(result.markdown);
+      toast(ok ? "Catalog Markdown copied." : "Could not copy the catalog Markdown.", ok ? "success" : "error");
+    } catch (err) {
+      toast(messageOf(err), "error");
+    }
+  };
+
+  const loadPackDocs = async (pack: PackState): Promise<{ markdown: string; file: string }> => {
+    return api<{ markdown: string; file: string }>(`/api/packs/${encodeURIComponent(pack.id)}/docs`, { method: "POST" });
   };
 
   const updatePacks = (packs: PackState[]) => {
@@ -531,26 +557,56 @@ export default function App() {
     <>
       <div className="app">
         <Header data={data} busy={busy} onToggleServer={() => { void toggleServer(); }} />
+        <nav className="viewtabs" aria-label="Console views">
+          <button
+            className={`viewtab${view === "packs" ? " on" : ""}`}
+            type="button"
+            data-action="view-packs"
+            aria-pressed={view === "packs"}
+            onClick={() => setView("packs")}
+          >Pack library</button>
+          <button
+            className={`viewtab${view === "docs" ? " on" : ""}`}
+            type="button"
+            data-action="view-docs"
+            aria-pressed={view === "docs"}
+            onClick={() => setView("docs")}
+          >
+            Mods &amp; docs
+            <span className="viewcount">{data?.catalog?.summary.mods || 0}</span>
+          </button>
+        </nav>
         <main className="layout">
-          <PackLibrary
-            data={data}
-            error={error}
-            job={data?.build || null}
-            pairBusy={pairBusy}
-            busy={busy}
-            onRefresh={() => { void refresh(); }}
-            onBuildNew={() => openBuild()}
-            onRebuild={(pack) => openBuild(pack.recipeId || undefined, pack.id)}
-            onReveal={(id) => { void revealPack(id); }}
-            onRemove={openRemove}
-            onEdit={openEdit}
-            onPickImage={(pack) => { void pickPackImage(pack); }}
-            onSaveReview={saveModReview}
-            onShowBuild={() => openBuild(data?.build?.recipeId, data?.build?.packId)}
-            onChangeFolder={() => { void changePacksFolder(); }}
-            onApprovePair={(id) => { void answerPair(id, "approve"); }}
-            onDenyPair={(id) => { void answerPair(id, "deny"); }}
-          />
+          {view === "docs" ? (
+            <CatalogPanel
+              data={data}
+              busy={busy}
+              onSaveReview={saveCatalogReview}
+              onExport={() => { void copyCatalogDocs(); }}
+            />
+          ) : (
+            <PackLibrary
+              data={data}
+              error={error}
+              job={data?.build || null}
+              pairBusy={pairBusy}
+              busy={busy}
+              onRefresh={() => { void refresh(); }}
+              onBuildNew={() => openBuild()}
+              onRebuild={(pack) => openBuild(pack.recipeId || undefined, pack.id)}
+              onReveal={(id) => { void revealPack(id); }}
+              onRemove={openRemove}
+              onEdit={openEdit}
+              onPickImage={(pack) => { void pickPackImage(pack); }}
+              onSaveReview={saveModReview}
+              onShowBuild={() => openBuild(data?.build?.recipeId, data?.build?.packId)}
+              onLoadDocs={loadPackDocs}
+              onCopy={(text, label) => { void copy(text, label); }}
+              onChangeFolder={() => { void changePacksFolder(); }}
+              onApprovePair={(id) => { void answerPair(id, "approve"); }}
+              onDenyPair={(id) => { void answerPair(id, "deny"); }}
+            />
+          )}
           <aside className="side">
             <ServerPanel
               data={data}

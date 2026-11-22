@@ -148,6 +148,23 @@ export interface ContentsItem {
   optional?: boolean;
   /** Stable identity of this mod, used to keep its review across rebuilds. */
   id?: string;
+  /**
+   * Stable catalog identity when the driver has a better key than the label
+   * (for example a BG3 module UUID). Reviews and catalog history use it.
+   */
+  catalogId?: string;
+  /** Mod version, when the source install exposes one. */
+  version?: string;
+  author?: string;
+  /** Source label or page, when the source install exposes one. */
+  source?: string;
+  /** How the mod reaches the game, for example "BG3 pak" or "WeiDU". */
+  installMethod?: string;
+  /** Number of WeiDU components, when the driver knows it. */
+  components?: number;
+  /** me3 package order hints. */
+  loadAfter?: string[];
+  loadBefore?: string[];
 }
 
 export interface ContentsSummary {

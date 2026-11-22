@@ -89,6 +89,9 @@ export function contentsFor({ recipe, source, version }: ContentsInput): Content
       label: entry.label,
       path: entry.path,
       active: entry.enabled,
+      installMethod: "me3 profile",
+      loadAfter: Array.isArray(entry.loadAfter) ? entry.loadAfter : [],
+      loadBefore: Array.isArray(entry.loadBefore) ? entry.loadBefore : [],
     })),
     inactive: [],
   };

@@ -45,6 +45,8 @@
     "test": "node --test",
     "precontents": "npm run build",
     "contents": "node scripts/refresh-contents.js",
+    "predocs": "npm run build",
+    "docs": "node scripts/refresh-docs.js",
     "prepacks:check": "npm run build",
     "packs:check": "node scripts/audit-packs.js",
     "prefetch:bg3le": "npm run build",

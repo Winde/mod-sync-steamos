@@ -100,6 +100,26 @@ are keyed by game + mod id, so a mod keeps its review when the pack is rebuilt,
 when another pack includes the same mod, or when the pack is removed. They live
 in `reviews.json` beside the console config.
 
+## Mods and docs
+
+The **Mods & docs** view is the long-lived catalog behind the pack library. It
+records every mod seen in a built pack, even after that pack is rebuilt or
+removed. Each entry keeps the game, version, install method, author/source when
+the driver exposes them, load-order hints, first/last seen time, current pack
+usage, build history, and the mod's review. Use the search box, game filter, and
+**Reviewed only** switch to narrow the list; **Details** shows the build history
+and order hints. **Copy Markdown** exports the whole catalog.
+
+The catalog lives in `catalog.json` beside the console config. It is rebuilt
+from packs when they change, so existing packs are picked up automatically.
+
+Every build also writes a `DOCS.md` into the pack folder. The **Docs** action on
+a pack card opens that file in the console; it contains the pack metadata, mod
+table, load-order hints, inactive files, notes, preconditions, and package
+summary. A rebuild replaces it. `npm run docs` regenerates it for every pack
+without rebuilding, and `npm run contents` refreshes both the recorded contents
+and the docs.
+
 Two packs built from the same recipe share the same game + mod, so the Client
 installs one at a time; the Server keeps both builds and can switch between them.
 

@@ -87,6 +87,9 @@ test("the Infinity driver builds a generic snapshot with InfinityLoader", async 
     assert.equal(result.pack.contents.count, 2);
     assert.equal(result.pack.contents.itemsLabel, "Installed mods");
     assert.deepEqual(result.pack.contents.items.map((item) => item.label), ["MODA", "MODB"]);
+    assert.deepEqual(result.pack.contents.items.map((item) => item.version), ["1.0", "1.0"]);
+    assert.deepEqual(result.pack.contents.items.map((item) => item.installMethod), ["WeiDU", "WeiDU"]);
+    assert.deepEqual(result.pack.contents.items.map((item) => item.components), [1, 1]);
 
     const loaded = loadPack(out);
     const targets = loaded.files.files.map((file) => file.target);

@@ -23,7 +23,7 @@ splitting, or renaming modules does not require touching these tests.
 | `agent-rollback.test.js` | two installed versions, pointer switch, both versions kept, version list and status; offline listing, BOM pack data, and offline rollback |
 | `agent-offline.test.js` | an installed pack remains listed after the PC server stops |
 | `agent-storage.test.js` | `/api/storage` usage report, staging/old-version/log/pack clearing, invalid input, pack removal safety, and the running-game and active-install guards |
-| `contents-refresh.test.js` | `scripts/refresh-contents.js` refreshes both an ER and a BG3 pack through the driver interface, with no game-specific branch |
+| `contents-refresh.test.js` | `scripts/refresh-contents.js` refreshes both an ER and a BG3 pack through the driver interface, with no game-specific branch, and regenerates their docs |
 | `agent-multi-pack.test.js` | multiple packs are merged and sorted by game then pack name |
 | `agent-preconditions.test.js` | required `manual` checks block, confirm, and unblock via the API |
 | `steam-shortcuts.test.js` | `register` writes one shortcut with header/portrait/grid/hero/logo/icon art, updates instead of duplicating, collapses existing duplicates, and finds Flatpak Steam roots |
@@ -56,8 +56,8 @@ Two offline tests wait for the agent's 2.5-second remote-catalog cache to expire
 ## White-box tests
 
 `test/preconditions.test.js`, `test/rollback.test.js`, `test/smoke.test.js`,
-`test/storage.test.js`, `test/steam.test.js`, and `test/console.test.js` import
-the compiled functions from `dist/` directly. They are useful characterization
+`test/storage.test.js`, `test/steam.test.js`, `test/catalog-docs.test.js`, and
+`test/console.test.js` import the compiled functions from `dist/` directly. They are useful characterization
 tests, but they are tied to current module boundaries and will need import
 updates when those modules are split. `test/web-app.test.js` and
 `test/web-pc.test.js` load the compiled React renderers into jsdom with a stub

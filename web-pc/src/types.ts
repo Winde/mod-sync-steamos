@@ -30,6 +30,14 @@ export interface ContentsItemState {
   optional?: boolean;
   /** Stable identity for this mod's review. */
   modId: string;
+  catalogId?: string;
+  version?: string;
+  author?: string;
+  source?: string;
+  installMethod?: string;
+  components?: number;
+  loadAfter?: string[];
+  loadBefore?: string[];
   review?: ModReviewState | null;
 }
 
@@ -49,6 +57,50 @@ export interface ModReviewState {
   rating: number;
   body: string;
   updatedAt: string;
+}
+
+export interface CatalogBuildState {
+  packId: string;
+  packName: string;
+  packVersion: string;
+  builtAt: string;
+}
+
+export interface CatalogEntryState {
+  gameId: string;
+  gameTitle: string;
+  modId: string;
+  name: string;
+  version: string;
+  author: string;
+  source: string;
+  installMethod: string;
+  path: string;
+  components?: number;
+  loadAfter: string[];
+  loadBefore: string[];
+  active: boolean;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  aliases: string[];
+  builds: CatalogBuildState[];
+  usedBy: CatalogBuildState[];
+  present: boolean;
+  review: ModReviewState | null;
+}
+
+export interface CatalogViewState {
+  schema: 1;
+  generatedAt: string;
+  entries: CatalogEntryState[];
+  games: Array<{ id: string; title: string; count: number }>;
+  summary: {
+    mods: number;
+    games: number;
+    packs: number;
+    present: number;
+    reviewed: number;
+  };
 }
 
 export interface PackState {
@@ -144,6 +196,7 @@ export interface ConsoleState {
   settings: SettingsState;
   packs: PackState[];
   recipes: RecipeState[];
+  catalog: CatalogViewState;
   lan: { detected: string; addresses: LanAddress[] };
   build: BuildJobState | null;
   pairRequests: PairRequestState[];

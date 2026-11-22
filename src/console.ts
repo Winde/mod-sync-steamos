@@ -3,10 +3,12 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { URL } from "node:url";
+import { createCatalogStore } from "./catalog";
 import * as drivers from "./drivers";
 import { contentType, readJsonBody } from "./http";
 import labels from "./labels";
 import { loadPack, packSummary } from "./manifest";
+import * as packDocs from "./pack-docs";
 import * as packImage from "./pack-image";
 import { libraryFile, normalizePackLibraryName, readPackLibrary, savePackLibrary } from "./pack-library";
 import * as recipes from "./recipes";
@@ -19,6 +21,7 @@ import * as util from "./util";
 import type { DeviceView } from "./devices";
 import type { Driver } from "./drivers";
 import type { PairingStore, PairRequestView } from "./pairing";
+import type { CatalogPackInput, CatalogStoredEntry, CatalogView } from "./catalog";
 import type { ModReview, ReviewInput } from "./reviews";
 import type { BuildOption, BuildProgress, ContentsItem, ContentsSummary, PackSummary, Recipe, Variant } from "./types";
 
@@ -152,6 +155,7 @@ export interface ConsoleState {
   settings: ConsoleConfig;
   packs: ConsolePack[];
   recipes: ConsoleRecipe[];
+  catalog: CatalogView;
   lan: { detected: string; addresses: util.LanAddress[] };
   build: BuildJobSummary | null;
   pairRequests: PairRequestView[];
@@ -186,6 +190,8 @@ export interface ConsoleOptions {
   devicesFile?: string;
   /** Mod review database; defaults beside the console config. */
   reviewsFile?: string;
+  /** Long-lived mod catalog; defaults beside the console config. */
+  catalogFile?: string;
 }
 
 export interface Console {
@@ -204,6 +210,9 @@ export interface Console {
   updatePackImage: (id: string, input: { path?: unknown; data?: unknown }) => ConsolePack[];
   clearPackImage: (id: string) => ConsolePack[];
   saveReview: (input: ReviewInput) => ModReview | null;
+  catalog: () => CatalogView;
+  exportCatalog: () => string;
+  writePackDocs: (id: string) => { markdown: string; file: string };
   removePack: (id: string) => Promise<void>;
   revealPack: (id: string) => void;
   revealPacksDir: () => void;
@@ -382,6 +391,8 @@ export function createConsole(options: ConsoleOptions): Console {
   const devices = createDeviceStore({ file: devicesFile, legacyToken: config.token });
   const reviewsFile = path.resolve(options.reviewsFile || path.join(path.dirname(configFile), "reviews.json"));
   const reviews = createReviewStore(reviewsFile);
+  const catalogFile = path.resolve(options.catalogFile || path.join(path.dirname(configFile), "catalog.json"));
+  const catalogStore = createCatalogStore(catalogFile);
   let runtime: ServerRuntime | null = null;
   let serverError: string | null = null;
   let loginError: string | null = null;
@@ -539,12 +550,29 @@ export function createConsole(options: ConsoleOptions): Console {
     return out;
   }
 
-  function contentsItemId(item: ContentsItem): string {
+  function contentsReviewIds(item: ContentsItem): string[] {
     // Packs built before reviews were per mod have no item id. Their label is
-    // the same name the driver now records, minus the WeiDU component count, so
+    // the same name the driver records, minus the WeiDU component count, so
     // reviews made on those packs still follow the mod after a rebuild.
     const label = String(item.label || "").trim().replace(/\s+\(\d+\)$/, "").trim();
-    return String(item.id || label || item.path || "").trim();
+    return [...new Set([
+      item.catalogId,
+      item.id,
+      label,
+      item.path,
+    ].map((value) => String(value || "").trim()).filter(Boolean))];
+  }
+
+  function contentsItemId(item: ContentsItem): string {
+    return contentsReviewIds(item)[0] || "";
+  }
+
+  function reviewForContents(gameId: string, item: ContentsItem): ModReview | null {
+    for (const id of contentsReviewIds(item)) {
+      const review = reviews.get(gameId, id);
+      if (review) return review;
+    }
+    return null;
   }
 
   function contentsWithReviews(gameId: string, contents: ContentsSummary | null): ConsoleContentsSummary | null {
@@ -556,10 +584,42 @@ export function createConsole(options: ConsoleOptions): Console {
         return {
           ...item,
           modId,
-          review: modId ? reviews.get(gameId, modId) : null,
+          review: modId ? reviewForContents(gameId, item) : null,
         };
       }),
     };
+  }
+
+  function catalogPackInput(pack: ConsolePack): CatalogPackInput {
+    return {
+      id: pack.id,
+      name: pack.name,
+      version: pack.mod.version,
+      gameId: pack.game.id,
+      gameTitle: pack.game.title,
+      builtAt: pack.modifiedAt,
+      contents: pack.contents,
+    };
+  }
+
+  function catalogReviewFor(entry: CatalogStoredEntry): ModReview | null {
+    for (const id of [entry.modId, ...entry.aliases]) {
+      const review = reviews.get(entry.gameId, id);
+      if (review) return review;
+    }
+    return null;
+  }
+
+  function catalogView(packs: ConsolePack[] = listPacks()): CatalogView {
+    return catalogStore.view(
+      packs.filter((pack) => pack.valid).map(catalogPackInput),
+      catalogReviewFor,
+    );
+  }
+
+  function exportCatalog(): string {
+    const catalog = catalogView();
+    return packDocs.renderCatalogDoc(catalog.entries, { generatedAt: catalog.generatedAt });
   }
 
   function listPacks(): ConsolePack[] {
@@ -667,6 +727,7 @@ export function createConsole(options: ConsoleOptions): Console {
   }
 
   async function state(): Promise<ConsoleState> {
+    const packs = listPacks();
     return {
       app: {
         version: options.version || "0.0.0",
@@ -679,8 +740,9 @@ export function createConsole(options: ConsoleOptions): Console {
       },
       server: serverStatus(),
       settings: { ...config, working: { ...config.working } },
-      packs: listPacks(),
+      packs,
       recipes: listRecipes(),
+      catalog: catalogView(packs),
       lan: { detected: util.detectLanIp(), addresses: util.lanAddresses() },
       build: jobSummary(activeJob || lastJob),
       pairRequests: runtime ? runtime.pairing.list() : [],
@@ -960,6 +1022,13 @@ export function createConsole(options: ConsoleOptions): Console {
         // selected cover belong to one built pack and are not carried into the
         // replacement.
         fs.rmSync(libraryFile(tempOut), { force: true });
+        try {
+          packDocs.writePackDoc(tempOut);
+          log("Wrote DOCS.md");
+        } catch (err) {
+          // A documentation failure should not discard a valid pack build.
+          log(`Could not write documentation: ${util.errorMessage(err)}`);
+        }
         job.phase = "swapping";
         if (fs.existsSync(finalOut)) {
           fs.rmSync(backup, { recursive: true, force: true });
@@ -975,6 +1044,7 @@ export function createConsole(options: ConsoleOptions): Console {
         if (createNew && newPackName) {
           try {
             savePackLibrary(finalOut, { name: newPackName });
+            try { packDocs.writePackDoc(finalOut); } catch { /* docs are optional */ }
           } catch (err) {
             log(`Could not save the new pack name: ${util.errorMessage(err)}`);
           }
@@ -987,6 +1057,7 @@ export function createConsole(options: ConsoleOptions): Console {
         job.percent = 100;
         job.finishedAt = new Date().toISOString();
         job.result = { version: result.pack.mod.version, files: result.files, totalBytes: result.totalBytes };
+        try { catalogView(); } catch (err) { log(`Could not update the mod catalog: ${util.errorMessage(err)}`); }
         log(`Done: ${result.pack.mod.version}, ${result.files} files, ${util.formatBytes(result.totalBytes)}`);
       } catch (err) {
         job.status = "error";
@@ -1042,6 +1113,11 @@ export function createConsole(options: ConsoleOptions): Console {
     const root = packRoot(id);
     if (!fs.existsSync(path.join(root, "pack.json"))) throw new Error(`Pack not found: ${id}`);
     savePackLibrary(root, { name: input.name, notes: input.notes });
+    // Notes are part of the generated docs. Refresh an existing file without
+    // creating one for a pack that was never documented.
+    if (fs.existsSync(packDocs.packDocFile(root))) {
+      try { packDocs.writePackDoc(root); } catch { /* documentation must not block a save */ }
+    }
     return listPacks();
   }
 
@@ -1079,6 +1155,13 @@ export function createConsole(options: ConsoleOptions): Console {
 
   function saveReview(input: ReviewInput): ModReview | null {
     return reviews.set(input);
+  }
+
+  function writePackDocs(id: string): { markdown: string; file: string } {
+    const root = packRoot(id);
+    if (!fs.existsSync(path.join(root, "pack.json"))) throw new Error(`Pack not found: ${id}`);
+    const markdown = packDocs.writePackDoc(root);
+    return { markdown, file: packDocs.packDocFile(root) };
   }
 
   async function removePack(id: string): Promise<void> {
@@ -1148,6 +1231,12 @@ export function createConsole(options: ConsoleOptions): Console {
     }
     if (url.pathname === "/api/status" && method === "GET") {
       return sendJson(res, 200, { server: serverStatus(), build: jobSummary(activeJob || lastJob) });
+    }
+    if (url.pathname === "/api/catalog" && method === "GET") {
+      return sendJson(res, 200, catalogView());
+    }
+    if (url.pathname === "/api/catalog/export" && method === "GET") {
+      return sendJson(res, 200, { markdown: exportCatalog() });
     }
     if (url.pathname === "/api/server/start" && method === "POST") {
       try { return sendJson(res, 200, await startServer()); } catch (err) {
@@ -1244,6 +1333,10 @@ export function createConsole(options: ConsoleOptions): Console {
         packs: updatePackLibrary(id, { name: body.name, notes: body.notes }),
       });
     }
+    if (url.pathname.startsWith("/api/packs/") && method === "POST" && url.pathname.endsWith("/docs")) {
+      const id = decodeURIComponent(url.pathname.split("/")[3] || "");
+      return sendJson(res, 200, { ok: true, ...writePackDocs(id) });
+    }
     if (url.pathname.startsWith("/api/packs/") && method === "POST" && url.pathname.endsWith("/reveal")) {
       const id = decodeURIComponent(url.pathname.split("/")[3] || "");
       revealPack(id);
@@ -1325,6 +1418,9 @@ export function createConsole(options: ConsoleOptions): Console {
     updatePackImage,
     clearPackImage,
     saveReview,
+    catalog: () => catalogView(),
+    exportCatalog,
+    writePackDocs,
     removePack,
     revealPack,
     revealPacksDir,

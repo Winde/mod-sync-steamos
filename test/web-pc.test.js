@@ -76,6 +76,43 @@ function fixture(overrides = {}) {
       packExists: true,
       buildOptions: [],
     }],
+    catalog: {
+      schema: 1,
+      generatedAt: "2026-11-22T12:00:00.000Z",
+      entries: [{
+        gameId: "eldenring",
+        gameTitle: "ELDEN RING",
+        modId: "Graceborne",
+        name: "Graceborne",
+        version: "",
+        author: "Mod author",
+        source: "Nexus Mods",
+        installMethod: "me3 profile",
+        path: "mods/graceborne/versions/0.2.7/mod",
+        loadAfter: ["extra"],
+        loadBefore: [],
+        active: true,
+        firstSeenAt: "2026-11-21T12:00:00.000Z",
+        lastSeenAt: "2026-11-21T12:00:00.000Z",
+        aliases: ["mods/graceborne/versions/0.2.7/mod"],
+        builds: [{
+          packId: "eldenring-graceborne",
+          packName: "Graceborne",
+          packVersion: "0.2.7",
+          builtAt: "2026-11-21T12:00:00.000Z",
+        }],
+        usedBy: [{
+          packId: "eldenring-graceborne",
+          packName: "Graceborne",
+          packVersion: "0.2.7",
+          builtAt: "2026-11-21T12:00:00.000Z",
+        }],
+        present: true,
+        review: null,
+      }],
+      games: [{ id: "eldenring", title: "ELDEN RING", count: 1 }],
+      summary: { mods: 1, games: 1, packs: 1, present: 1, reviewed: 0 },
+    },
     lan: { detected: "192.168.1.20", addresses: [{ name: "Ethernet", address: "192.168.1.20" }] },
     build: null,
     pairRequests: [],
@@ -729,6 +766,83 @@ test("Server console revokes all paired devices after confirmation", async () =>
     window.document.querySelector('[data-action="revoke-all-devices"]').click();
     await waitFor(window, () => posted === 1);
     await waitFor(window, (w) => !w.document.querySelector(".devicerow"));
+  } finally {
+    window.close();
+  }
+});
+
+test("Server console documents mods in the catalog and opens pack docs", async () => {
+  const posted = [];
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/api/reviews") && init.method === "POST") {
+      const body = JSON.parse(init.body);
+      posted.push(body);
+      return response({
+        ok: true,
+        review: { ...body, body: body.body.trim(), updatedAt: "2026-11-22T12:00:00.000Z" },
+      });
+    }
+    if (String(url).endsWith("/api/packs/eldenring-graceborne/docs") && init.method === "POST") {
+      return response({
+        ok: true,
+        file: "C:\\ModSync\\packs\\eldenring-graceborne\\DOCS.md",
+        markdown: "# Graceborne\n\n## Mods\n\n- Graceborne\n",
+      });
+    }
+    if (String(url).endsWith("/api/catalog/export")) {
+      return response({ markdown: "# Mod catalog\n\n- Graceborne\n" });
+    }
+    if (String(url).endsWith("/api/state")) return response(fixture());
+    return response({});
+  };
+  const dom = await boot(fetchImpl);
+  const { window } = dom;
+  try {
+    await waitFor(window, (w) => w.document.querySelector(".packtitle")?.textContent === "Graceborne");
+    const doc = window.document;
+    assert.equal(doc.querySelector('[data-action="view-docs"] .viewcount').textContent, "1");
+
+    doc.querySelector('[data-action="view-docs"]').click();
+    await waitFor(window, (w) => w.document.querySelector(".catalogname")?.textContent === "Graceborne");
+    assert.match(doc.querySelector(".cataloggame").textContent, /me3 profile/);
+    assert.match(doc.querySelector(".catalogmeta").textContent, /In Graceborne/);
+    assert.match(doc.querySelector(".catalogmeta").textContent, /Mod author/);
+    assert.match(doc.querySelector(".catalogmeta").textContent, /Nexus Mods/);
+    assert.match(doc.querySelector(".catalogpanel").textContent, /1 mod · 1 in current packs/);
+
+    const search = doc.querySelector("#catalog-search");
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(search, "does-not-exist");
+    search.dispatchEvent(new window.Event("input", { bubbles: true }));
+    await waitFor(window, (w) => !w.document.querySelector(".catalogcard"));
+    assert.match(doc.querySelector(".catalogpanel .empty").textContent, /No mods match/);
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(search, "");
+    search.dispatchEvent(new window.Event("input", { bubbles: true }));
+    await waitFor(window, (w) => !!w.document.querySelector(".catalogcard"));
+
+    doc.querySelector('[data-action="review-catalog-mod"]').click();
+    await waitFor(window, (w) => !!w.document.querySelector(".catalogcard .reviewform"));
+    doc.querySelectorAll(".catalogcard .reviewform .star")[3].click();
+    const textarea = doc.querySelector(".catalogcard .reviewform textarea");
+    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set.call(textarea, "Still the best overhaul.");
+    textarea.dispatchEvent(new window.Event("input", { bubbles: true }));
+    doc.querySelector(".catalogcard .reviewform").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await waitFor(window, () => posted.length === 1);
+    assert.deepEqual(posted[0], {
+      gameId: "eldenring",
+      modId: "Graceborne",
+      name: "Graceborne",
+      rating: 4,
+      body: "Still the best overhaul.",
+    });
+    await waitFor(window, (w) => /Still the best overhaul/.test(w.document.querySelector(".catalogreview")?.textContent || ""));
+
+    doc.querySelector('[data-action="view-packs"]').click();
+    await waitFor(window, (w) => !!w.document.querySelector(".packtitle"));
+    doc.querySelector('[data-action="docs"]').click();
+    await waitFor(window, (w) => /# Graceborne/.test(w.document.querySelector(".docspreview")?.textContent || ""));
+    assert.match(doc.querySelector(".modalhead").textContent, /DOCS\.md/);
+    doc.querySelector('[data-action="close-docs"]').click();
+    await waitFor(window, (w) => !w.document.querySelector(".docspreview"));
   } finally {
     window.close();
   }

@@ -38,6 +38,12 @@ Pack identity lives in `recipes/<id>.json` (Graceborne, Convergence, BG3, and
 the four EE games); the driver only knows the game's layout and loader.
 The Server console uses the same source/output fields.
 
+Every build writes a human-readable `DOCS.md` into the pack folder, and the
+Server console keeps a durable mod catalog beside its config. The catalog
+survives rebuilds and pack removal; open **Mods & docs** in the console to
+browse it, review a mod, or copy the whole catalog as Markdown. Run
+`npm run docs` to regenerate `DOCS.md` for every built pack without rebuilding.
+
 `serve` binds loopback by default. `--lan` binds the detected LAN IPv4 and
 prints the URL the Client needs; `--host <ip>` picks a specific interface. The
 server is token-protected and never binds `0.0.0.0`.
@@ -64,7 +70,11 @@ The Server console:
 - **Pack library** — lists the packs in the selected folder, shows version,
   size, file count, and build date. **Change folder** points the library at an
   existing packs folder. Each card can rebuild the pack from its working
-  install, open the folder, or remove it.
+  install, open its generated `DOCS.md`, open the folder, or remove it.
+- **Mods & docs** — a persistent catalog of every mod seen in a pack: game,
+  version, install method, author/source when the driver finds them, load-order
+  hints, first/last seen, current pack usage, and the review that belongs to the
+  mod rather than one build. **Copy Markdown** exports the catalog.
 - **Pack server** — start and stop the LAN server, copy its URL, and copy the
   Client install one-liner. A server error (busy port, no LAN address) is shown
   in the same card. A TV with no device token appears as a pairing request;

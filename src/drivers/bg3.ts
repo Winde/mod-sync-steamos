@@ -108,6 +108,8 @@ interface Bg3Mod {
   version64: string;
   md5: string;
   publishHandle: string;
+  author: string;
+  description: string;
   builtin: boolean;
   [key: string]: unknown;
 }
@@ -131,6 +133,28 @@ function decodeXmlEntities(value: string): string {
   });
 }
 
+/**
+ * BG3 stores a mod version in a 64-bit integer:
+ * major << 55 | minor << 47 | revision << 31 | build.
+ * `1.0.0.0` is the common `36028797018963968`.
+ */
+export function decodeVersion64(value: unknown): string {
+  const text = String(value == null ? "" : value).trim();
+  if (!text) return "";
+  try {
+    const code = BigInt(text);
+    if (code <= 0n) return "";
+    const major = code >> 55n;
+    const minor = (code >> 47n) & 0xffn;
+    const revision = (code >> 31n) & 0xffffn;
+    const build = code & 0x7fffffffn;
+    if (major > 0xffffn) return "";
+    return `${major}.${minor}.${revision}.${build}`;
+  } catch {
+    return "";
+  }
+}
+
 export function parseModSettings(xml: string): Bg3Mod[] {
   const mods: Bg3Mod[] = [];
   for (const match of String(xml).matchAll(/<node id="ModuleShortDesc">([\s\S]*?)<\/node>/g)) {
@@ -147,6 +171,8 @@ export function parseModSettings(xml: string): Bg3Mod[] {
       version64: attrs.Version64 || "",
       md5: attrs.MD5 || "",
       publishHandle: attrs.PublishHandle || "",
+      author: attrs.Author || "",
+      description: attrs.Description || "",
       builtin: BUILTIN_MODULES.has(folder) || BUILTIN_MODULES.has(attrs.Name),
     });
   }
@@ -245,11 +271,19 @@ function contentsFrom(source: string, paks: string[]): ContentsSummary {
     itemsLabel: "Included mods",
     items: mods.map((mod, index) => {
       const file = matches.get(index);
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mod.id)
+        ? mod.id.toLowerCase()
+        : "";
       return {
         id: mod.name || mod.folder || mod.id,
+        catalogId: uuid ? `uuid:${uuid}` : undefined,
         label: mod.name,
         path: file ? `Mods/${file}` : undefined,
         active: true,
+        version: decodeVersion64(mod.version64) || undefined,
+        author: mod.author || undefined,
+        source: mod.publishHandle && mod.publishHandle !== "0" ? `mod.io:${mod.publishHandle}` : undefined,
+        installMethod: "BG3 pak",
       };
     }),
     inactive,

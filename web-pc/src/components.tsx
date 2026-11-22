@@ -5,6 +5,7 @@ import type {
   BuildFormState,
   BuildJobState,
   BuildStartOptions,
+  CatalogEntryState,
   ConsoleState,
   ContentsItemState,
   ContentsState,
@@ -139,7 +140,7 @@ export function PairRequests({ requests, busy, onApprove, onDeny }: {
   );
 }
 
-export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onEdit, onPickImage, onSaveReview, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
+export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onEdit, onPickImage, onSaveReview, onShowBuild, onLoadDocs, onCopy, onChangeFolder, onApprovePair, onDenyPair }: {
   data: ConsoleState | null;
   error: string | null;
   job: BuildJobState | null;
@@ -154,11 +155,14 @@ export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBui
   onPickImage: (pack: PackState) => void;
   onSaveReview: (pack: PackState, item: ContentsItemState, rating: number, body: string) => Promise<ModReviewState | null>;
   onShowBuild: () => void;
+  onLoadDocs: (pack: PackState) => Promise<{ markdown: string; file: string }>;
+  onCopy: (text: string, label: string) => void;
   onChangeFolder: () => void;
   onApprovePair: (id: string) => void;
   onDenyPair: (id: string) => void;
 }) {
   const [contentsPack, setContentsPack] = useState<PackState | null>(null);
+  const [docsPack, setDocsPack] = useState<PackState | null>(null);
   const [gameFilter, setGameFilter] = useState("");
   const games: Array<{ id: string; title: string }> = [];
   const seenGames = new Set<string>();
@@ -329,6 +333,9 @@ export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBui
                 {pack.valid ? (
                   <button className="btn small" data-action="edit" data-id={pack.id} onClick={() => onEdit(pack)}>Edit details</button>
                 ) : null}
+                {pack.valid ? (
+                  <button className="btn small" data-action="docs" data-id={pack.id} onClick={() => setDocsPack(pack)}>Docs</button>
+                ) : null}
                 <button className="btn small" data-action="reveal" data-id={pack.id} onClick={() => onReveal(pack.id)}>Open folder</button>
                 <button className="btn small danger" data-action="remove" data-id={pack.id} onClick={() => onRemove(pack)}>Remove</button>
               </div>
@@ -342,6 +349,14 @@ export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBui
           pack={contentsPack}
           onSaveReview={(item, rating, body) => onSaveReview(contentsPack, item, rating, body)}
           onClose={() => setContentsPack(null)}
+        />
+      ) : null}
+      {docsPack ? (
+        <PackDocsModal
+          pack={docsPack}
+          onLoad={onLoadDocs}
+          onCopy={onCopy}
+          onClose={() => setDocsPack(null)}
         />
       ) : null}
     </section>
@@ -418,10 +433,19 @@ export function ContentsModal({ pack, onSaveReview, onClose }: {
               const review = reviewFor(item);
               const hasReview = !!review && (!!review.rating || !!review.body.trim());
               const isEditing = editing === item.modId;
+              const meta = [
+                item.version,
+                item.installMethod,
+                item.components && item.components > 1 ? `${item.components} components` : "",
+                item.author,
+              ].filter(Boolean).join(" · ");
               return (
                 <div className={`contentsrow${item.active === false ? " inactive" : ""}`} key={item.modId || `${item.label}-${index}`}>
                   <div className="contentsitem">
-                    <span className="contentsname">{item.label || item.path || "Unnamed item"}{item.active === false ? " (inactive)" : ""}</span>
+                    <span className="contentsname">
+                      {item.label || item.path || "Unnamed item"}{item.active === false ? " (inactive)" : ""}
+                      {meta ? <span className="contentsmeta">{meta}</span> : null}
+                    </span>
                     <span className="contentsside">
                       {item.path ? <code>{item.path}</code> : null}
                       <button
@@ -510,6 +534,311 @@ export function ContentsModal({ pack, onSaveReview, onClose }: {
       ) : null}
       <div className="actions">
         <button className="btn primary" data-action="close-contents" onClick={onClose}>Close</button>
+      </div>
+    </Modal>
+  );
+}
+
+function catalogKey(entry: CatalogEntryState): string {
+  return `${entry.gameId}::${entry.modId}`;
+}
+
+function catalogReviewMark(review: ModReviewState | null): string {
+  if (!review?.rating) return "Not reviewed";
+  return `${"★".repeat(review.rating)}${"☆".repeat(Math.max(0, 5 - review.rating))}`;
+}
+
+export function CatalogPanel({ data, busy, onSaveReview, onExport }: {
+  data: ConsoleState | null;
+  busy: boolean;
+  onSaveReview: (entry: CatalogEntryState, rating: number, body: string) => Promise<ModReviewState | null>;
+  onExport: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [gameFilter, setGameFilter] = useState("");
+  const [reviewedOnly, setReviewedOnly] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftRating, setDraftRating] = useState(0);
+  const [draftBody, setDraftBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [reviewEdits, setReviewEdits] = useState<Record<string, ModReviewState | null>>({});
+
+  const catalog = data?.catalog;
+  const games = catalog?.games || [];
+  const activeGame = games.some((game) => game.id === gameFilter) ? gameFilter : "";
+  const needle = query.trim().toLowerCase();
+
+  const reviewFor = (entry: CatalogEntryState): ModReviewState | null => {
+    const key = catalogKey(entry);
+    if (Object.prototype.hasOwnProperty.call(reviewEdits, key)) return reviewEdits[key];
+    return entry.review || null;
+  };
+
+  const entries = (catalog?.entries || []).filter((entry) => {
+    if (activeGame && entry.gameId !== activeGame) return false;
+    const review = reviewFor(entry);
+    if (reviewedOnly && !(review?.rating || review?.body.trim())) return false;
+    if (!needle) return true;
+    return [
+      entry.name,
+      entry.gameTitle,
+      entry.version,
+      entry.author,
+      entry.source,
+      entry.path,
+      entry.installMethod,
+      review?.body || "",
+      ...entry.usedBy.map((build) => `${build.packName} ${build.packVersion}`),
+    ].join(" ").toLowerCase().includes(needle);
+  });
+
+  const startEdit = (entry: CatalogEntryState) => {
+    const review = reviewFor(entry);
+    setEditing(catalogKey(entry));
+    setDraftRating(review?.rating || 0);
+    setDraftBody(review?.body || "");
+    setError("");
+  };
+
+  const save = async (entry: CatalogEntryState, rating: number, body: string) => {
+    setSaving(true);
+    setError("");
+    try {
+      const review = await onSaveReview(entry, rating, body);
+      setReviewEdits((current) => ({ ...current, [catalogKey(entry)]: review }));
+      setEditing(null);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const summary = catalog
+    ? `${catalog.summary.mods} mod${catalog.summary.mods === 1 ? "" : "s"} · ${catalog.summary.present} in current packs · ${catalog.summary.reviewed} reviewed`
+    : "Loading the catalog…";
+
+  return (
+    <section className="panel catalogpanel">
+      <div className="panelhead">
+        <div>
+          <h1>Mods &amp; docs</h1>
+          <div className="librarypath">
+            <span className="muted">{summary}</span>
+            {catalog ? <code title={catalog.generatedAt}>updated {formatDate(catalog.generatedAt)}</code> : null}
+          </div>
+        </div>
+        <div className="headactions">
+          <button className="btn small" data-action="export-catalog" disabled={!catalog?.summary.mods || busy} onClick={onExport}>Copy Markdown</button>
+        </div>
+      </div>
+      <p className="hint cataloghint">
+        The catalog keeps every mod seen in a pack, including packs you rebuild or remove. Reviews belong to the mod, not one build.
+      </p>
+      <div className="catalogtools">
+        <input
+          id="catalog-search"
+          className="input"
+          type="search"
+          aria-label="Search mods"
+          placeholder="Search mods, authors, sources, paths…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        {games.length > 1 ? (
+          <label className="gamefilter">
+            <span>Game</span>
+            <select className="input" value={activeGame} onChange={(event) => setGameFilter(event.target.value)}>
+              <option value="">All games</option>
+              {games.map((game) => <option key={game.id} value={game.id}>{game.title} ({game.count})</option>)}
+            </select>
+          </label>
+        ) : null}
+        <label className="check catalogreviewed">
+          <input type="checkbox" aria-label="Reviewed only" checked={reviewedOnly} onChange={(event) => setReviewedOnly(event.target.checked)} />
+          <span>Reviewed only</span>
+        </label>
+      </div>
+      {error ? <div className="callout error">{error}</div> : null}
+      {!data ? <div className="empty"><strong>Connecting to the console…</strong></div> : null}
+      {data && !catalog ? (
+        <div className="empty">
+          <strong>The catalog is empty</strong>
+          <span>Build a pack and its mods will appear here.</span>
+        </div>
+      ) : null}
+      {data && catalog && !entries.length ? (
+        <div className="empty">
+          <strong>No mods match</strong>
+          <span>{catalog.summary.mods ? "Try another search or filter." : "Build a pack to record its mods."}</span>
+        </div>
+      ) : null}
+      <div className="cataloglist">
+        {entries.map((entry) => {
+          const key = catalogKey(entry);
+          const review = reviewFor(entry);
+          const hasReview = !!review && (!!review.rating || !!review.body.trim());
+          const isEditing = editing === key;
+          const isExpanded = expanded === key;
+          const details = [
+            entry.loadAfter.length ? `after ${entry.loadAfter.join(", ")}` : "",
+            entry.loadBefore.length ? `before ${entry.loadBefore.join(", ")}` : "",
+          ].filter(Boolean);
+          return (
+            <article className={`catalogcard${entry.present ? "" : " historical"}`} key={key}>
+              <div className="cataloghead">
+                <div>
+                  <div className="catalogname">{entry.name || entry.modId}</div>
+                  <div className="cataloggame">
+                    {entry.gameTitle}
+                    {entry.installMethod ? ` · ${entry.installMethod}` : ""}
+                    {entry.components && entry.components > 1 ? ` · ${entry.components} components` : ""}
+                  </div>
+                </div>
+                <span className={`badge${review?.rating ? " stars" : ""}`} title={review?.updatedAt ? `Updated ${formatDate(review.updatedAt)}` : undefined}>
+                  {catalogReviewMark(review)}
+                </span>
+              </div>
+              <div className="catalogmeta">
+                {entry.version ? <span className="badge">{entry.version}</span> : null}
+                {entry.present ? (
+                  <span className="badge" title={entry.usedBy.map((build) => `${build.packName} ${build.packVersion}`).join(", ")}>
+                    In {entry.usedBy.length === 1 ? entry.usedBy[0].packName : `${entry.usedBy.length} packs`}
+                  </span>
+                ) : <span className="badge amber">Not in a current pack</span>}
+                {entry.active === false ? <span className="badge">inactive</span> : null}
+                {entry.author ? <span className="badge">{entry.author}</span> : null}
+                {entry.source ? <span className="badge">{entry.source}</span> : null}
+              </div>
+              {entry.path ? <div className="catalogpath"><code>{entry.path}</code></div> : null}
+              {hasReview ? (
+                <div className="catalogreview">
+                  {review?.rating ? <span className="reviewstars">{"★".repeat(review.rating)}{"☆".repeat(Math.max(0, 5 - review.rating))}</span> : null}
+                  {review?.body ? <span className="reviewbody">{review.body}</span> : null}
+                </div>
+              ) : null}
+              {isExpanded ? (
+                <div className="catalogdetails">
+                  {entry.usedBy.length ? (
+                    <div><b>Current packs:</b> {entry.usedBy.map((build) => `${build.packName} ${build.packVersion}`).join(", ")}</div>
+                  ) : null}
+                  {details.length ? <div><b>Order hints:</b> {details.join("; ")}</div> : null}
+                  {entry.firstSeenAt ? <div><b>First seen:</b> {formatDate(entry.firstSeenAt)}</div> : null}
+                  {entry.lastSeenAt ? <div><b>Last seen:</b> {formatDate(entry.lastSeenAt)}</div> : null}
+                  {entry.builds.length ? (
+                    <div><b>Build history:</b> {entry.builds.slice(-6).map((build) => `${build.packName} ${build.packVersion}`).join(", ")}</div>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="catalogactions">
+                <button className="btn small" type="button" onClick={() => setExpanded(isExpanded ? null : key)}>
+                  {isExpanded ? "Hide details" : "Details"}
+                </button>
+                <button
+                  className="btn small"
+                  type="button"
+                  data-action="review-catalog-mod"
+                  data-mod-id={entry.modId}
+                  onClick={() => { if (isEditing) setEditing(null); else startEdit(entry); }}
+                >{hasReview ? "Edit review" : "Review"}</button>
+              </div>
+              {isEditing ? (
+                <form
+                  className="reviewform"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void save(entry, draftRating, draftBody);
+                  }}
+                >
+                  <div className="stars" role="group" aria-label={`Rating for ${entry.name}`}>
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <button
+                        key={value}
+                        className={`star${value <= draftRating ? " on" : ""}`}
+                        type="button"
+                        aria-label={`${value} of 5 stars`}
+                        aria-pressed={value === draftRating}
+                        title={value === draftRating ? "Clear rating" : `${value} of 5 stars`}
+                        onClick={() => setDraftRating((current) => current === value ? 0 : value)}
+                      >★</button>
+                    ))}
+                    <span className="hint">{draftRating ? `${draftRating} of 5` : "Not rated"}</span>
+                  </div>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    maxLength={4000}
+                    aria-label={`Review for ${entry.name}`}
+                    placeholder="What you think of this mod…"
+                    value={draftBody}
+                    onChange={(event) => setDraftBody(event.target.value)}
+                  />
+                  {error ? <p className="hint error">{error}</p> : null}
+                  <div className="actions">
+                    <button className="btn primary small" type="submit" disabled={saving}>{saving ? "Saving…" : "Save review"}</button>
+                    {hasReview ? (
+                      <button className="btn small" type="button" disabled={saving} onClick={() => { void save(entry, 0, ""); }}>Clear review</button>
+                    ) : null}
+                    <button className="btn small" type="button" disabled={saving} onClick={() => setEditing(null)}>Cancel</button>
+                  </div>
+                </form>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function PackDocsModal({ pack, onLoad, onCopy, onClose }: {
+  pack: PackState;
+  onLoad: (pack: PackState) => Promise<{ markdown: string; file: string }>;
+  onCopy: (text: string, label: string) => void;
+  onClose: () => void;
+}) {
+  const [markdown, setMarkdown] = useState("");
+  const [file, setFile] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const load = onLoad;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    load(pack).then((result) => {
+      if (!active) return;
+      setMarkdown(result.markdown);
+      setFile(result.file);
+    }).catch((err) => {
+      if (active) setError(messageOf(err));
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+    // The modal is opened for one pack; loading again on parent renders would
+    // regenerate the same file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pack.id]);
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="modalhead">
+        <div>
+          <h2>{pack.name || pack.id}</h2>
+          <p className="muted">{file || "Generating DOCS.md…"}</p>
+        </div>
+        <button className="btn small" data-action="close-docs" onClick={onClose}>Close</button>
+      </div>
+      {loading ? <p className="muted">Generating documentation…</p> : null}
+      {error ? <div className="callout error">{error}</div> : null}
+      {markdown ? <pre className="docspreview">{markdown}</pre> : null}
+      <div className="actions">
+        <button className="btn primary" data-action="copy-docs" disabled={!markdown} onClick={() => onCopy(markdown, "Pack documentation")}>Copy Markdown</button>
+        <button className="btn" data-action="close-docs-bottom" onClick={onClose}>Close</button>
       </div>
     </Modal>
   );

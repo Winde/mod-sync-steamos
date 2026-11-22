@@ -133,6 +133,10 @@ export interface WeiDUMod {
   tp2: string;
   folder: string;
   components: number;
+  /** Version parsed from the WeiDU.log comment when present. */
+  version?: string;
+  /** First component/name comment, useful as a human hint in docs. */
+  component?: string;
 }
 
 export interface WeiDUInfo {
@@ -215,6 +219,19 @@ function parseBuildOptions(driverOptions: Record<string, unknown> | undefined): 
   };
 }
 
+function weiduComment(line: string): { component: string; version: string } {
+  const marker = line.indexOf("//");
+  if (marker < 0) return { component: "", version: "" };
+  const comment = line.slice(marker + 2).trim();
+  if (!comment) return { component: "", version: "" };
+  const versionMatch = /(?:^|[\s:(])v?(\d+(?:\.\d+){1,3})\s*$/i.exec(comment);
+  const version = versionMatch ? versionMatch[1] : "";
+  const component = versionMatch
+    ? comment.slice(0, versionMatch.index).replace(/[\s:(-]+$/, "").trim()
+    : comment;
+  return { component, version };
+}
+
 export function parseWeiDU(text: string): WeiDUInfo {
   const lines: string[] = [];
   const mods = new Map<string, WeiDUMod>();
@@ -231,6 +248,9 @@ export function parseWeiDU(text: string): WeiDUInfo {
     const folder = tp2.split("/")[0] || tp2;
     const entry = mods.get(key) || { tp2, folder, components: 0 };
     entry.components++;
+    const comment = weiduComment(line);
+    if (!entry.component && comment.component) entry.component = comment.component;
+    if (!entry.version && comment.version) entry.version = comment.version;
     mods.set(key, entry);
   }
   return { components, mods: [...mods.values()], lines };
@@ -505,6 +525,9 @@ export function contentsForGame(game: InfinityGame, { source }: ContentsInput): 
         label: mod.components > 1 ? `${mod.folder} (${mod.components})` : mod.folder,
         path: mod.tp2,
         active: true,
+        version: mod.version,
+        installMethod: "WeiDU",
+        components: mod.components,
       })),
       inactive: [],
     };
@@ -517,7 +540,7 @@ export function contentsForGame(game: InfinityGame, { source }: ContentsInput): 
     count: files.length,
     itemsLabel: "Manual overlay files",
     items: files.length
-      ? [{ id: "override", label: `Manual overlay (${files.length} files)`, path: "override/", active: true }]
+      ? [{ id: "override", label: `Manual overlay (${files.length} files)`, path: "override/", active: true, installMethod: "overlay" }]
       : [],
     inactive: [],
   };

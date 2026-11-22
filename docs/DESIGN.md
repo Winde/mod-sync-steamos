@@ -48,6 +48,7 @@ profiles/          loader profile (me3 for ELDEN RING; modsettings for BG3)
 tools/             loader runtime (me3 Linux/Windows)
 art/               grid/hero/logo/icon
 README.md
+DOCS.md            generated mod list, versions, notes, and package summary
 ```
 
 A pack never contains the base game or saves. A pack built under a second id
@@ -185,6 +186,45 @@ default is the generic `launch-steam.sh`. Loader templates live under
 passed to the template as `LOADER` and `LOADER_SUPPORT`. `profilePattern` is
 the versioned profile path used by rollback and old-version cleanup. The
 dashboard summarizes `install` with `install.label`.
+
+### Contents metadata
+
+`contents.items` is the pack's recorded mod list. Drivers may add documentation
+metadata beside the required `label`/`path`:
+
+```json
+{
+  "id": "Test Mod",
+  "catalogId": "uuid:11111111-1111-1111-1111-111111111111",
+  "label": "Test Mod",
+  "path": "Mods/TestMod_uuid.pak",
+  "active": true,
+  "version": "1.0.0.0",
+  "author": "Author",
+  "source": "mod.io:1",
+  "installMethod": "BG3 pak",
+  "components": 3,
+  "loadAfter": ["Base"],
+  "loadBefore": []
+}
+```
+
+`catalogId` is the stable identity used by the Server's mod catalog, and by
+reviews when present. BG3 uses the module UUID. The Infinity drivers
+use the WeiDU TP2 folder as `id`, and me3 uses the profile package label/path.
+Older packs without either field keep working through the label fallback.
+
+The Server keeps `catalog.json` beside its console config. It records one entry
+per game + stable mod id, with build history and first/last seen times, and it
+does not delete entries when a pack is rebuilt or removed. Reviews are merged
+from `reviews.json` at read time, so the catalog remains a view rather than a
+second review store. The catalog is derived from packs; a pack with no contents
+list contributes no entries.
+
+Every build writes `DOCS.md` into the pack folder from `pack.json`,
+`files.json`, and the catalog metadata. The file is generated output: use
+`npm run docs` to refresh it without rebuilding. It is not part of
+`files.json`, so the pack server does not stream it to the TV.
 
 ### Notes
 

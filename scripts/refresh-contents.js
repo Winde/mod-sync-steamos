@@ -12,6 +12,7 @@ const path = require("node:path");
 const { parseArgs } = require("node:util");
 const { loadRecipe } = require("../dist/src/recipes");
 const { driverFor } = require("../dist/src/drivers");
+const { writePackDoc } = require("../dist/src/pack-docs");
 
 const repoRoot = path.resolve(__dirname, "..");
 
@@ -45,6 +46,11 @@ function main() {
     });
     pack.contents = contents;
     fs.writeFileSync(packFile, JSON.stringify(pack, null, 2) + "\n");
+    try {
+      writePackDoc(packRoot);
+    } catch (err) {
+      console.warn(`${pack.id}: could not write documentation: ${err instanceof Error ? err.message : err}`);
+    }
     changed++;
     const itemCount = contents.items?.length ?? 0;
     console.log(`${pack.id}: ${contents.count} items (${itemCount} files)`);

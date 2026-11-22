@@ -122,7 +122,7 @@ savefile = "ER0000.graceborne.sl2"
 [[packages]]
 enabled = true
 path = '../mods/graceborne/versions/1.0.0/mod'
-load_after = []
+load_after = ["extra"]
 load_before = []
 
 [[packages]]
@@ -145,6 +145,9 @@ load_before = []
     assert.equal(contents.count, 2);
     assert.deepEqual(contents.items.map((item) => item.label), ["Graceborne", "extra", "optional"]);
     assert.deepEqual(contents.items.map((item) => item.active), [true, true, false]);
+    assert.deepEqual(contents.items[0].loadAfter, ["extra"]);
+    assert.deepEqual(contents.items[0].loadBefore, []);
+    assert.equal(contents.items[0].installMethod, "me3 profile");
   } finally {
     fs.rmSync(src, { recursive: true, force: true });
   }

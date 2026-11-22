@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildOptions, buildPack, contentsFor, parseModSettings } = require("../dist/src/drivers/bg3");
+const { buildOptions, buildPack, contentsFor, decodeVersion64, parseModSettings } = require("../dist/src/drivers/bg3");
 const { loadRecipe } = require("../dist/src/recipes");
 const { loadPack } = require("../dist/src/manifest");
 
@@ -22,6 +22,13 @@ function moduleNode({ name, folder, id }) {
     <attribute id="Version64" type="int64" value="36028797018963968"/>
   </node>`;
 }
+
+test("BG3 Version64 decodes to a display version", () => {
+  assert.equal(decodeVersion64("36028797018963968"), "1.0.0.0");
+  assert.equal(decodeVersion64(String(2n << 55n)), "2.0.0.0");
+  assert.equal(decodeVersion64(""), "");
+  assert.equal(decodeVersion64("not-a-number"), "");
+});
 
 test("BG3 contents match published pak names without crossing duplicate prefixes", () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "modsync-bg3-contents-"));
@@ -63,6 +70,10 @@ test("BG3 contents match published pak names without crossing duplicate prefixes
 
     const contents = contentsFor({ recipe: loadRecipe("bg3-modded"), source, version: "2026.11.21" });
     const byLabel = Object.fromEntries(contents.items.map((item) => [item.label, item.path]));
+    const pathOfUndeath = contents.items.find((item) => item.label === "Path of Undeath");
+    assert.equal(pathOfUndeath.installMethod, "BG3 pak");
+    assert.equal(pathOfUndeath.version, "1.0.0.0");
+    assert.match(pathOfUndeath.catalogId, /^uuid:/);
     assert.equal(contents.count, 8);
     assert.equal(byLabel["Path of Undeath"], "Mods/Path of Undeath.pak");
     assert.equal(byLabel["Valkrana's Skeleton Crew"], "Mods/Valkrana's Skeleton Crew.pak");

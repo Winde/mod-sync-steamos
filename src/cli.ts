@@ -6,6 +6,7 @@ import * as util from "./util";
 import { driverFor } from "./drivers";
 import * as recipes from "./recipes";
 import { loadPack, packSummary } from "./manifest";
+import * as packDocs from "./pack-docs";
 import { createServer } from "./server";
 import { createAgent } from "./agent";
 import labels from "./labels";
@@ -166,6 +167,12 @@ async function cmdPack(values: CliValues): Promise<void> {
     driverOptions,
     log: (m) => console.log(m),
   });
+  try {
+    packDocs.writePackDoc(result.packRoot);
+    console.log(`Docs: ${packDocs.packDocFile(result.packRoot)}`);
+  } catch (err) {
+    console.warn(`WARNING: could not write pack documentation: ${util.errorMessage(err)}`);
+  }
   console.log(`\nPack: ${result.packRoot}`);
   console.log(`Version: ${result.pack.mod.version}`);
   console.log(`Files: ${result.files}`);
