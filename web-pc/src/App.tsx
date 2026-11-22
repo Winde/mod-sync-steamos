@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, copyText, desktopBridge, messageOf, randomToken } from "./api";
+import { api, chooseImageFile, copyText, desktopBridge, fileToDataUrl, messageOf, randomToken } from "./api";
 import {
   BuildModal,
   DevicesPanel,
@@ -252,6 +252,56 @@ export default function App() {
     }
   };
 
+  const updatePacks = (packs: PackState[]) => {
+    setData((current) => current ? { ...current, packs } : current);
+  };
+
+  const pickPackImage = async (pack: PackState): Promise<string | null> => {
+    setBusy(true);
+    try {
+      const bridge = desktopBridge();
+      let body: { path?: string; data?: string };
+      if (bridge?.pickImage) {
+        const picked = await bridge.pickImage("Choose a pack image");
+        if (!picked) return null;
+        body = { path: picked };
+      } else {
+        const file = await chooseImageFile();
+        if (!file) return null;
+        body = { data: await fileToDataUrl(file) };
+      }
+      const result = await api<{ packs: PackState[] }>(`/api/packs/${encodeURIComponent(pack.id)}/image`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      updatePacks(result.packs);
+      toast("Pack image updated.", "success");
+      return result.packs.find((entry) => entry.id === pack.id)?.artUrl || null;
+    } catch (err) {
+      toast(messageOf(err), "error");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearPackImage = async (pack: PackState): Promise<string | null> => {
+    setBusy(true);
+    try {
+      const result = await api<{ packs: PackState[] }>(`/api/packs/${encodeURIComponent(pack.id)}/image/clear`, {
+        method: "POST",
+      });
+      updatePacks(result.packs);
+      toast("Custom pack image removed.", "success");
+      return result.packs.find((entry) => entry.id === pack.id)?.artUrl || null;
+    } catch (err) {
+      toast(messageOf(err), "error");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const startBuild = async (form: BuildFormState, options: BuildStartOptions = {}) => {
     if (!form.source.trim()) {
       toast("Choose the working install folder.", "error");
@@ -472,15 +522,17 @@ export default function App() {
             data={data}
             error={error}
             job={data?.build || null}
+            pairBusy={pairBusy}
+            busy={busy}
             onRefresh={() => { void refresh(); }}
             onBuildNew={() => openBuild()}
             onRebuild={(pack) => openBuild(pack.recipeId || undefined, pack.id)}
             onReveal={(id) => { void revealPack(id); }}
             onRemove={openRemove}
             onEdit={openEdit}
+            onPickImage={(pack) => { void pickPackImage(pack); }}
             onShowBuild={() => openBuild(data?.build?.recipeId, data?.build?.packId)}
             onChangeFolder={() => { void changePacksFolder(); }}
-            pairBusy={pairBusy}
             onApprovePair={(id) => { void answerPair(id, "approve"); }}
             onDenyPair={(id) => { void answerPair(id, "deny"); }}
           />
@@ -578,6 +630,8 @@ export default function App() {
           pack={modal.pack}
           busy={busy}
           onSave={(input) => { void savePackEdits(input); }}
+          onPickImage={pickPackImage}
+          onClearImage={clearPackImage}
           onClose={closeModal}
         />
       ) : null}

@@ -19,12 +19,18 @@ export interface PackLibraryEntry {
   schema: 1;
   name?: string;
   notes?: string;
+  /** Pack-relative path of the console-selected cover, e.g. `art/bg3/modsync-cover.png`. */
+  image?: string;
+  /** The `art.grid` value to restore when the custom cover is removed. */
+  imageOriginal?: string;
   updatedAt: string;
 }
 
 export interface PackLibraryInput {
   name?: unknown;
   notes?: unknown;
+  image?: unknown;
+  imageOriginal?: unknown;
 }
 
 export function libraryFile(packRoot: string): string {
@@ -40,6 +46,22 @@ export function normalizePackLibraryName(value: unknown): string {
     throw new Error("Pack name cannot contain line breaks or control characters.");
   }
   return name;
+}
+
+function safePackImagePath(value: unknown): string {
+  const rel = String(value == null ? "" : value).trim().replace(/\\/g, "/");
+  if (!rel) return "";
+  if (!rel.startsWith("art/") || rel.split("/").includes("..") || rel.includes("\u0000")) return "";
+  return rel;
+}
+
+export function normalizePackImagePath(value: unknown): string {
+  const rel = String(value == null ? "" : value).trim().replace(/\\/g, "/");
+  if (!rel) return "";
+  if (!rel.startsWith("art/") || rel.split("/").includes("..") || rel.includes("\u0000")) {
+    throw new Error("Pack image path must be a relative path under art/.");
+  }
+  return rel;
 }
 
 function normalizeNotes(value: unknown): string {
@@ -60,13 +82,19 @@ export function readPackLibrary(packRoot: string): PackLibraryEntry | null {
     const raw = readJson<Record<string, unknown>>(file);
     const name = typeof raw.name === "string" ? raw.name.trim() : "";
     const notes = typeof raw.notes === "string" ? raw.notes.trim() : "";
-    if (!name && !notes) return null;
+    const image = safePackImagePath(raw.image);
+    const imageOriginal = safePackImagePath(raw.imageOriginal);
+    if (!name && !notes && !image) return null;
     const entry: PackLibraryEntry = {
       schema: 1,
       updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : "",
     };
     if (name) entry.name = name;
     if (notes) entry.notes = notes;
+    if (image) {
+      entry.image = image;
+      if (imageOriginal) entry.imageOriginal = imageOriginal;
+    }
     return entry;
   } catch {
     return null;
@@ -75,13 +103,17 @@ export function readPackLibrary(packRoot: string): PackLibraryEntry | null {
 
 /**
  * Apply a partial update. An omitted field keeps its current value; an empty
- * string clears it. Clearing both removes the sidecar.
+ * string clears it. Clearing every field removes the sidecar.
  */
 export function savePackLibrary(packRoot: string, input: PackLibraryInput): PackLibraryEntry | null {
   const current = readPackLibrary(packRoot);
   const name = input.name === undefined ? current?.name || "" : normalizePackLibraryName(input.name);
   const notes = input.notes === undefined ? current?.notes || "" : normalizeNotes(input.notes);
-  if (!name && !notes) {
+  const image = input.image === undefined ? current?.image || "" : normalizePackImagePath(input.image);
+  const imageOriginal = input.imageOriginal === undefined
+    ? current?.imageOriginal || ""
+    : normalizePackImagePath(input.imageOriginal);
+  if (!name && !notes && !image) {
     fs.rmSync(libraryFile(packRoot), { force: true });
     return null;
   }
@@ -91,6 +123,10 @@ export function savePackLibrary(packRoot: string, input: PackLibraryInput): Pack
   };
   if (name) entry.name = name;
   if (notes) entry.notes = notes;
+  if (image) {
+    entry.image = image;
+    if (imageOriginal) entry.imageOriginal = imageOriginal;
+  }
   writeJson(libraryFile(packRoot), entry);
   return entry;
 }

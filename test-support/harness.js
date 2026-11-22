@@ -119,9 +119,6 @@ function workingInstall({ versions = ["0.2.7"], payloadBytes = 0 } = {}) {
     write(root, `tools/me3-linux/bin/win64/${name}`, `fake me3 windows ${name}\n`);
     write(root, `tools/me3-win/bin/${name}`, `fake me3 windows ${name}\n`);
   }
-  for (const name of ["grid", "hero", "logo", "icon"]) {
-    write(root, `art/graceborne/${name}.png`, PNG);
-  }
   return root;
 }
 

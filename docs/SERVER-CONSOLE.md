@@ -76,13 +76,18 @@ a short preview under the card metadata. Actions:
   name. The working install is read-only. The build is staged under
   `.modsync-build/`; the old pack folder is replaced only after the new build
   succeeds, so a failure leaves it untouched.
-- A rebuild always starts with a clean library: the custom display name and
-  notes are cleared. The rating and review are kept because they are stored per
-  game + mod. The confirmation warns about this before the build starts.
+- A rebuild always starts with a clean library: the custom display name, notes,
+  and selected cover are cleared. The rating and review are kept because they
+  are stored per game + mod. The confirmation warns about this before the build
+  starts.
 - **Edit details** renames the pack and adds notes, a rating, and a review.
   The name and notes are stored in `packs/<pack>/library.json` for the current
   build. The name and notes are also served to the Client: the notes appear with
-  the pack's other install notes.
+  the pack's other install notes. **Pack image** in the same dialog selects a
+  PNG cover; clicking the cover in the library opens the same picker. The image
+  is written into the pack folder and its `files.json`, so the Server, the
+  library, and the TV use the selected cover. A custom cover can be removed to
+  restore the driver's default art.
 - **Open folder** reveals the pack directory in Explorer.
 - **Remove** deletes the pack folder and its payload after a confirmation. It
   does not touch the game, saves, or the working mod install.

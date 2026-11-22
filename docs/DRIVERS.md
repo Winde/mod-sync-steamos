@@ -58,10 +58,13 @@ generated `pack.json` remains the definition the agent serves.
 - `id` — `eldenring`
 - `buildPack({ recipe, source, out, link, driverOptions, progress, log })` —
   read the working install and write `pack.json`, `files.json`,
-  payload, profile/tools/art. The recipe is required and owns the pack's id,
-  name, save file, `notes`, and `preconditions`; they are data, not driver code.
+  payload, profile/tools/default art. The recipe is required and owns the pack's
+  id, name, save file, `notes`, and `preconditions`; they are data, not driver code.
   Drivers call `progress({ phase, done, total, bytesDone, bytesTotal })` as
   they copy and hash, so the Server does not parse log text for status.
+  Elden Ring no longer reads `art/` from the working install; every build starts
+  with the generic ModSync art, and the Server console can replace the cover
+  after the build.
 - `buildOptions()` — declare the driver-specific fields the Server build form
   should show. Each option has a `key`, `label`, `type` (`directory` or `text`),
   and optional `placeholder`/`help`. BG3 declares `gameRoot` and `bg3leRoot`;

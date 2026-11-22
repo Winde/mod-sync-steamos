@@ -390,6 +390,18 @@ if (!app.requestSingleInstanceLock()) {
         : await dialog.showOpenDialog(options);
       return result.canceled ? null : result.filePaths[0] || null;
     });
+    ipcMain.handle("modsync:pick-image", async (event, title?: string) => {
+      const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
+      const options: OpenDialogOptions = {
+        title: typeof title === "string" && title.trim() ? title : "Choose a pack image",
+        properties: ["openFile"],
+        filters: [{ name: "PNG image", extensions: ["png"] }],
+      };
+      const result = parent
+        ? await dialog.showOpenDialog(parent, options)
+        : await dialog.showOpenDialog(options);
+      return result.canceled ? null : result.filePaths[0] || null;
+    });
 
     const url = await startConsole();
     console.log(`[modsync] server console: ${url}`);

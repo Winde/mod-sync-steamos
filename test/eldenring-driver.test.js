@@ -32,9 +32,6 @@ path = '../mods/${mod}/versions/${version}/mod'
 load_after = []
 load_before = []
 `);
-    for (const art of ["grid", "hero", "logo", "icon"]) {
-      write(path.join(src, "art", mod, `${art}.png`), `art-${mod}-${art}`);
-    }
   }
   write(path.join(src, "tools", "me3-linux", "bin", "me3"), "#!/bin/sh\n");
   for (const name of ["me3.exe", "me3-launcher.exe", "me3_mod_host.dll"]) {
@@ -65,6 +62,14 @@ test("the Elden Ring driver builds recipes without knowing the mod ids in code",
     assert.equal(grace.pack.loader.saveFile, "ER0000.graceborne.sl2");
     assert.equal(grace.pack.launch.profile, undefined);
     assert.equal(grace.pack.launch.saveFile, undefined);
+    assert.deepEqual(
+      fs.readFileSync(path.join(outRoot, "grace", "art", "graceborne", "grid.png")),
+      fs.readFileSync(path.join(__dirname, "..", "web", "modsync-grid.png")),
+    );
+    assert.deepEqual(
+      fs.readFileSync(path.join(outRoot, "convergence", "art", "convergence", "grid.png")),
+      fs.readFileSync(path.join(__dirname, "..", "web", "modsync-grid.png")),
+    );
     assert.equal(grace.pack.contents.count, 1);
     assert.equal(grace.pack.contents.itemsLabel, "Included packages");
     assert.match(grace.pack.contents.items[0].path, /mods\/graceborne\/versions\/1\.0\.0\/mod/);

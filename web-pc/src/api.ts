@@ -56,6 +56,32 @@ export function desktopBridge(): DesktopBridge | null {
   return (window as Window & { modsyncDesktop?: DesktopBridge }).modsyncDesktop || null;
 }
 
+export function chooseImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png";
+    input.style.display = "none";
+    const done = (file: File | null) => {
+      input.remove();
+      resolve(file);
+    };
+    input.addEventListener("change", () => done(input.files?.[0] || null), { once: true });
+    input.addEventListener("cancel", () => done(null), { once: true });
+    document.body.append(input);
+    input.click();
+  });
+}
+
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("Could not read the image."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function maskToken(text: string, token: string): string {
   return token ? text.split(token).join("••••••••") : text;
 }

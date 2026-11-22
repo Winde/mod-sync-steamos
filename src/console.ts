@@ -7,6 +7,7 @@ import * as drivers from "./drivers";
 import { contentType, readJsonBody } from "./http";
 import labels from "./labels";
 import { loadPack, packSummary } from "./manifest";
+import * as packImage from "./pack-image";
 import { libraryFile, normalizePackLibraryName, readPackLibrary, savePackLibrary } from "./pack-library";
 import * as recipes from "./recipes";
 import { createReviewStore } from "./reviews";
@@ -66,6 +67,8 @@ export interface ConsolePack {
   modifiedAt: string;
   recipeId: string | null;
   artUrl: string;
+  /** True when the cover was chosen in the console rather than built by the driver. */
+  artCustom: boolean;
   /** Console notes kept in the pack's own `library.json`. */
   notes: string;
   /** Review for this game + mod pair, shared by every pack of the mod. */
@@ -189,6 +192,8 @@ export interface Console {
   listRecipes: () => ConsoleRecipe[];
   startBuild: (input: BuildRequest) => BuildJobSummary;
   updatePackLibrary: (id: string, input: { name?: unknown; notes?: unknown }) => ConsolePack[];
+  updatePackImage: (id: string, input: { path?: unknown; data?: unknown }) => ConsolePack[];
+  clearPackImage: (id: string) => ConsolePack[];
   saveReview: (input: ReviewInput) => ModReview | null;
   removePack: (id: string) => Promise<void>;
   revealPack: (id: string) => void;
@@ -565,6 +570,7 @@ export function createConsole(options: ConsoleOptions): Console {
             ? summary.recipe
             : recipeIds.has(summary.id) ? summary.id : null,
           artUrl: `/api/packs/${encodeURIComponent(summary.id)}/art/grid?v=${encodeURIComponent(modifiedAt)}`,
+          artCustom: !!library?.image,
           error: null,
         });
       } catch (err) {
@@ -586,6 +592,7 @@ export function createConsole(options: ConsoleOptions): Console {
           modifiedAt,
           recipeId: recipeIds.has(entry.name) ? entry.name : null,
           artUrl: "",
+          artCustom: false,
           error: util.errorMessage(err),
         });
       }
@@ -919,8 +926,9 @@ export function createConsole(options: ConsoleOptions): Console {
           filesDoc.pack = packId;
           util.writeJson(filesFile, filesDoc);
         }
-        // A rebuild starts with a clean library. Custom names and notes belong
-        // to one built pack and are not carried into the replacement.
+        // A rebuild starts with a clean library. Custom names, notes, and the
+        // selected cover belong to one built pack and are not carried into the
+        // replacement.
         fs.rmSync(libraryFile(tempOut), { force: true });
         job.phase = "swapping";
         if (fs.existsSync(finalOut)) {
@@ -1004,6 +1012,38 @@ export function createConsole(options: ConsoleOptions): Console {
     const root = packRoot(id);
     if (!fs.existsSync(path.join(root, "pack.json"))) throw new Error(`Pack not found: ${id}`);
     savePackLibrary(root, { name: input.name, notes: input.notes });
+    return listPacks();
+  }
+
+  function updatePackImage(id: string, input: { path?: unknown; data?: unknown }): ConsolePack[] {
+    const root = packRoot(id);
+    if (!fs.existsSync(path.join(root, "pack.json"))) throw new Error(`Pack not found: ${id}`);
+
+    let png: Buffer;
+    const source = typeof input.path === "string" ? input.path.trim() : "";
+    if (source) {
+      const file = path.resolve(source);
+      if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Image not found: ${file}`);
+      if (fs.statSync(file).size > packImage.PACK_IMAGE_MAX_BYTES) {
+        throw new Error(`Pack image must be no larger than ${packImage.PACK_IMAGE_MAX_BYTES / 1024 / 1024} MB.`);
+      }
+      png = fs.readFileSync(file);
+    } else if (typeof input.data === "string") {
+      const match = /^data:image\/png;base64,([\s\S]+)$/i.exec(input.data.trim());
+      if (!match) throw new Error("Choose a PNG image.");
+      png = Buffer.from(match[1].replace(/\s+/g, ""), "base64");
+    } else {
+      throw new Error("Choose an image first.");
+    }
+
+    packImage.setPackImage(root, png);
+    return listPacks();
+  }
+
+  function clearPackImage(id: string): ConsolePack[] {
+    const root = packRoot(id);
+    if (!fs.existsSync(path.join(root, "pack.json"))) throw new Error(`Pack not found: ${id}`);
+    packImage.clearPackImage(root);
     return listPacks();
   }
 
@@ -1153,6 +1193,18 @@ export function createConsole(options: ConsoleOptions): Console {
       revealPacksDir();
       return sendJson(res, 200, { ok: true });
     }
+    if (url.pathname.startsWith("/api/packs/") && method === "POST" && url.pathname.endsWith("/image")) {
+      const id = decodeURIComponent(url.pathname.split("/")[3] || "");
+      const body = await readJsonBody(req, 12_000_000);
+      return sendJson(res, 200, {
+        ok: true,
+        packs: updatePackImage(id, { path: body.path, data: body.data }),
+      });
+    }
+    if (url.pathname.startsWith("/api/packs/") && method === "POST" && url.pathname.endsWith("/image/clear")) {
+      const id = decodeURIComponent(url.pathname.split("/")[3] || "");
+      return sendJson(res, 200, { ok: true, packs: clearPackImage(id) });
+    }
     if (url.pathname.startsWith("/api/packs/") && method === "POST" && url.pathname.endsWith("/library")) {
       const id = decodeURIComponent(url.pathname.split("/")[3] || "");
       const body = await readJsonBody(req);
@@ -1239,6 +1291,8 @@ export function createConsole(options: ConsoleOptions): Console {
     listRecipes,
     startBuild,
     updatePackLibrary,
+    updatePackImage,
+    clearPackImage,
     saveReview,
     removePack,
     revealPack,

@@ -12,6 +12,7 @@ const api = {
   },
   openReleases: (): Promise<void> => ipcRenderer.invoke("modsync:releases"),
   pickFolder: (title?: string): Promise<string | null> => ipcRenderer.invoke("modsync:pick-folder", title),
+  pickImage: (title?: string): Promise<string | null> => ipcRenderer.invoke("modsync:pick-image", title),
 };
 
 contextBridge.exposeInMainWorld("modsyncDesktop", api);

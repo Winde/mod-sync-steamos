@@ -393,12 +393,15 @@ test("Server console renames a pack and saves its notes and review", async () =>
     const doc = window.document;
     assert.match(doc.querySelector(".packnotes").textContent, /Keep online off/);
     assert.equal(doc.querySelector(".badge.stars").textContent, "★★★☆☆");
+    assert.ok(doc.querySelector('[data-action="change-art"]'));
 
     doc.querySelector('[data-action="edit"]').click();
     await waitFor(window, (w) => !!w.document.querySelector("#pack-display-name"));
     assert.equal(doc.querySelector("#pack-display-name").value, "Graceborne");
     assert.equal(doc.querySelector("#pack-notes").value, "Keep online off.");
     assert.equal(doc.querySelector("#pack-review").value, "Solid.");
+    assert.ok(doc.querySelector(".imagefield .artbtn"));
+    assert.match(doc.querySelector(".imageactions").textContent, /Choose image/);
 
     const setValue = (selector, value) => {
       const input = doc.querySelector(selector);
@@ -457,7 +460,7 @@ async function openRebuildConfirm(window, doc) {
   await waitFor(window, (w) => !!w.document.querySelector('[data-action="confirm-rebuild"]'));
 }
 
-test("Server console confirms a rebuild and warns that name and notes are cleared", async () => {
+test("Server console confirms a rebuild and warns that name, notes, and image are cleared", async () => {
   let posted = null;
   const fetchImpl = async (url, init = {}) => {
     if (String(url).endsWith("/api/build") && init.method === "POST") {
@@ -475,7 +478,7 @@ test("Server console confirms a rebuild and warns that name and notes are cleare
     await openRebuildConfirm(window, doc);
     const modal = doc.querySelector(".modal");
     assert.match(modal.textContent, /Replace Graceborne\?/);
-    assert.match(modal.textContent, /Custom name and notes are cleared/);
+    assert.match(modal.textContent, /Custom name, notes, and image are cleared/);
     assert.match(modal.textContent, /rating and review are kept/i);
     assert.equal(doc.querySelector('[data-action="rebuild-overwrite"]').checked, true);
     doc.querySelector('[data-action="confirm-rebuild"]').click();

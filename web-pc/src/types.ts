@@ -63,6 +63,7 @@ export interface PackState {
   modifiedAt: string;
   recipeId: string | null;
   artUrl: string;
+  artCustom?: boolean;
   notes?: string;
   review?: ModReviewState | null;
   error: string | null;
@@ -203,6 +204,7 @@ export interface UpdateProgress {
 
 export interface DesktopBridge {
   pickFolder?(title?: string): Promise<string | null>;
+  pickImage?(title?: string): Promise<string | null>;
   checkUpdate?(): Promise<UpdateInfo | null>;
   installUpdate?(): Promise<void>;
   onUpdateProgress?(callback: (progress: UpdateProgress) => void): () => void;

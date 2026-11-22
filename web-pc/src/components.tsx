@@ -69,16 +69,31 @@ function contentsCountLabel(contents: ContentsState): string {
   return `${count} ${count === 1 ? singular : raw}`;
 }
 
-export function PackArt({ pack }: { pack: PackState }) {
+export function PackArt({ pack, onPick, busy = false }: {
+  pack: PackState;
+  onPick?: () => void;
+  busy?: boolean;
+}) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [pack.artUrl]);
   const initial = (pack.name || "?").slice(0, 2).toUpperCase();
+  const content = pack.valid && pack.artUrl && !failed
+    ? <img src={pack.artUrl} alt="" onError={() => setFailed(true)} />
+    : <div className="artph">{initial}</div>;
+  if (!onPick) return <div className="art">{content}</div>;
   return (
-    <div className="art">
-      {pack.valid && pack.artUrl && !failed
-        ? <img src={pack.artUrl} alt="" onError={() => setFailed(true)} />
-        : <div className="artph">{initial}</div>}
-    </div>
+    <button
+      type="button"
+      className="art artbtn"
+      data-action="change-art"
+      data-id={pack.id}
+      title={busy ? "Working…" : "Change pack image"}
+      disabled={busy}
+      onClick={onPick}
+    >
+      {content}
+      <span className="artoverlay">{busy ? "Working…" : "Change image"}</span>
+    </button>
   );
 }
 
@@ -123,17 +138,19 @@ export function PairRequests({ requests, busy, onApprove, onDeny }: {
   );
 }
 
-export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onEdit, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
+export function PackLibrary({ data, error, job, pairBusy, busy, onRefresh, onBuildNew, onRebuild, onReveal, onRemove, onEdit, onPickImage, onShowBuild, onChangeFolder, onApprovePair, onDenyPair }: {
   data: ConsoleState | null;
   error: string | null;
   job: BuildJobState | null;
   pairBusy: boolean;
+  busy: boolean;
   onRefresh: () => void;
   onBuildNew: () => void;
   onRebuild: (pack: PackState) => void;
   onReveal: (id: string) => void;
   onRemove: (pack: PackState) => void;
   onEdit: (pack: PackState) => void;
+  onPickImage: (pack: PackState) => void;
   onShowBuild: () => void;
   onChangeFolder: () => void;
   onApprovePair: (id: string) => void;
@@ -238,7 +255,11 @@ export function PackLibrary({ data, error, job, pairBusy, onRefresh, onBuildNew,
           const recipe = data?.recipes.find((entry) => entry.id === pack.recipeId);
           return (
           <article key={pack.id} className={`packcard${pack.valid ? "" : " invalid"}`}>
-            <PackArt pack={pack} />
+            <PackArt
+              pack={pack}
+              busy={busy}
+              onPick={pack.valid ? () => onPickImage(pack) : undefined}
+            />
             <div className="packbody">
               <div className="packhead">
                 <div>
@@ -356,10 +377,12 @@ export function ContentsModal({ pack, onClose }: {
   );
 }
 
-export function EditPackModal({ pack, busy, onSave, onClose }: {
+export function EditPackModal({ pack, busy, onSave, onPickImage, onClearImage, onClose }: {
   pack: PackState;
   busy: boolean;
   onSave: (input: { name: string; notes: string; rating: number; review: string }) => void;
+  onPickImage: (pack: PackState) => Promise<string | null>;
+  onClearImage: (pack: PackState) => Promise<string | null>;
   onClose: () => void;
 }) {
   const builtInName = pack.baseName || pack.name;
@@ -367,6 +390,41 @@ export function EditPackModal({ pack, busy, onSave, onClose }: {
   const [notes, setNotes] = useState(pack.notes || "");
   const [rating, setRating] = useState(pack.review?.rating || 0);
   const [review, setReview] = useState(pack.review?.body || "");
+  const [imageUrl, setImageUrl] = useState(pack.artUrl);
+  const [customImage, setCustomImage] = useState(!!pack.artCustom);
+  const [imageBusy, setImageBusy] = useState(false);
+
+  useEffect(() => {
+    setImageUrl(pack.artUrl);
+    setCustomImage(!!pack.artCustom);
+  }, [pack.id, pack.artUrl, pack.artCustom]);
+
+  const chooseImage = async () => {
+    setImageBusy(true);
+    try {
+      const next = await onPickImage(pack);
+      if (next) {
+        setImageUrl(next);
+        setCustomImage(true);
+      }
+    } finally {
+      setImageBusy(false);
+    }
+  };
+
+  const removeImage = async () => {
+    setImageBusy(true);
+    try {
+      const next = await onClearImage(pack);
+      if (next) {
+        setImageUrl(next);
+        setCustomImage(false);
+      }
+    } finally {
+      setImageBusy(false);
+    }
+  };
+
   return (
     <Modal onClose={onClose}>
       <div className="modalhead">
@@ -397,6 +455,23 @@ export function EditPackModal({ pack, busy, onSave, onClose }: {
             onChange={(event) => setName(event.target.value)}
           />
           <p className="hint">Leave empty to use the built-in name “{builtInName}”. The name is shown in this library and on paired TVs.</p>
+        </div>
+        <div className="field">
+          <label>Pack image</label>
+          <div className="imagefield">
+            <PackArt pack={{ ...pack, artUrl: imageUrl }} onPick={() => { void chooseImage(); }} busy={imageBusy} />
+            <div className="imageactions">
+              <button className="btn small" type="button" disabled={imageBusy} onClick={() => { void chooseImage(); }}>
+                {customImage ? "Change image" : "Choose image"}
+              </button>
+              {customImage ? (
+                <button className="btn small" type="button" disabled={imageBusy} onClick={() => { void removeImage(); }}>
+                  Remove custom image
+                </button>
+              ) : null}
+              <p className="hint">PNG. Saved in the pack immediately and shown in the library and on the TV.</p>
+            </div>
+          </div>
         </div>
         <div className="field">
           <label htmlFor="pack-notes">Pack notes</label>
@@ -976,7 +1051,7 @@ export function BuildModal({ data, job, viewJob, initialRecipeId, initialPackId,
               <b>This replaces the current pack.</b> The folder and payload are swapped only after the new build succeeds.
             </div>
             <div className="callout error">
-              <b>Custom name and notes are cleared.</b> They belong to this build. The rating and review are kept because they are stored per game + mod.
+              <b>Custom name, notes, and image are cleared.</b> They belong to this build. The rating and review are kept because they are stored per game + mod.
             </div>
           </>
         )}

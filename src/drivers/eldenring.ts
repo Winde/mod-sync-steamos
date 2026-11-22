@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { copyDefaultArt } from "../art";
 import {
   ensureDir, writeJson, writeText, walkFiles, materialize,
   sha256File, formatBytes,
@@ -82,12 +83,10 @@ export async function buildPack({
   const profileSrc = me3.profileFile(src, modId, version);
   const me3Linux = path.join(src, "tools", "me3-linux");
   const me3Win = path.join(src, "tools", "me3-win");
-  const artSrc = path.join(src, "art", artId);
   requirePath(payloadSrc, "mod payload");
   requirePath(profileSrc, "me3 profile");
   requirePath(me3Linux, "me3 Linux runtime");
   requirePath(me3Win, "me3 Windows runtime");
-  requirePath(artSrc, "art");
 
   const platforms = paths.mergePlatforms(DEFAULT_PLATFORMS, recipe.platforms);
   paths.validatePlatforms(platforms, "pack.platforms");
@@ -112,12 +111,12 @@ export async function buildPack({
   }
   log(`Payload: ${links} hardlinks, ${copies} copies`);
 
-  log("Copying profile, tools, and art...");
+  log("Copying profile, tools, and default art...");
   fs.cpSync(profileSrc, path.join(dst, "profiles", path.basename(profileSrc)), { recursive: true });
   const windowsBinaries = me3.copyRuntime(me3Linux, me3Win, path.join(dst, "tools"));
   const linuxProfile = platforms["linux-proton"];
   if (linuxProfile) linuxProfile.loaderSupport = windowsBinaries;
-  fs.cpSync(artSrc, path.join(dst, "art", artId), { recursive: true });
+  copyDefaultArt(dst, artId);
 
   const toolFiles = walkFiles(path.join(dst, "tools"));
   const artFiles = walkFiles(path.join(dst, "art", artId));
@@ -188,6 +187,8 @@ export async function buildPack({
       hero: `art/${artId}/hero.png`,
       logo: `art/${artId}/logo.png`,
       icon: `art/${artId}/icon.png`,
+      header: `art/${artId}/header.png`,
+      portrait: `art/${artId}/portrait.png`,
     },
     notes: recipe.notes || [],
     preconditions: recipe.preconditions || [],
